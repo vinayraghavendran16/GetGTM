@@ -157,7 +157,7 @@
 <div id="app"></div>
 
 <script>
-const STORAGE_KEY = "getgtm_tracker_v7";
+const STORAGE_KEY = "getgtm_tracker_v8";
 const PW = "getgtm";
 
 const PATHS = {
@@ -197,19 +197,26 @@ async function saveState() {
 
 const DRIVE_CLIENT_FOLDERS_ID = "15m4KeuxmdMlmYgu_APaRcSa3K4Rr0Iz7";
 
-const PACKAGES = [
-  { id: "aeo-guided", group: "AEO / GEO", name: "Guided Visibility", price: "$1,200/mo",
-    desc: "Research, prioritisation & daily action queue. Client produces content." },
-  { id: "aeo-managed", group: "AEO / GEO", name: "Managed Authority", price: "$2,000/mo",
-    desc: "Adds GetGTM execution, content production & owned-authority development." },
-  { id: "outbound-india", group: "Outbound", name: "Signal-led Outbound — India", price: "$1,599/mo",
+const OUTBOUND_PLANS = [
+  { id: "outbound-india", name: "Outbound — India", price: "$1,599/mo",
     desc: "Signal-based outbound GTM. India pricing." },
-  { id: "outbound-us", group: "Outbound", name: "Signal-led Outbound — US & Other", price: "$2,499/mo",
+  { id: "outbound-us", name: "Outbound — US & Other", price: "$2,499/mo",
     desc: "Signal-based outbound GTM. US & rest-of-world pricing." },
 ];
 
-const CALLING_ADDON = { name: "US Calling", price: "$599/mo + $250 per attended meeting",
-  desc: "US calling add-on. Per-meeting fee on attended qualified meetings booked via calling." };
+const AEO_PLANS = [
+  { id: "aeo-guided", name: "Guided Visibility", price: "$1,200/mo",
+    desc: "Research, prioritisation & daily action queue. Client produces content." },
+  { id: "aeo-managed", name: "Managed Authority", price: "$2,000/mo",
+    desc: "Adds GetGTM execution, content production & owned-authority development." },
+];
+
+const ADDONS = [
+  { id: "us-calling", name: "US Calling", price: "$599/mo + $250/meeting",
+    desc: "US calling add-on. Per-meeting fee on attended qualified meetings." },
+  { id: "revops-definition-lock", name: "Definition Lock", price: "$3,500",
+    desc: "RevOps · 1 week. One 90-min session; signed one-page metric definitions." },
+];
 
 
 const GTME_ROSTER = [
@@ -223,7 +230,7 @@ function newClient(name, path) {
     id, name, path, createdAt: new Date().toISOString(),
     kickoffDate: "", targetLaunchDate: "",
     intake: { clientName: name, website: "", pocName: "", pocEmail: "",
-      package: "", callingAddon: false, packageNotes: "" },
+      outbound: "", optional: [], packageNotes: "" },
     people: {
       cro: "Vinay Raghavendran", croEmail: "vinay@getgtm.ai",
       cs: "", csEmail: "",
@@ -424,35 +431,52 @@ function renderIntakeTab(c) {
         </div>
         <div class="small" style="margin-top:8px">POC name and email auto-fill the Client POC fields in the Overview tab.</div>
 
-        <h3 style="margin:20px 0 10px;font-size:13px;font-weight:600">Package</h3>
+        <h3 style="margin:20px 0 6px;font-size:13px;font-weight:600">Outbound <span style="color:var(--danger);font-weight:500">· required, pick one</span></h3>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          ${PACKAGES.map(pkg => {
-            const selected = it.package === pkg.id;
+          ${OUTBOUND_PLANS.map(pkg => {
+            const sel = it.outbound === pkg.id;
             return `
-              <div data-package-card="${pkg.id}" style="border:${selected?'2px solid var(--brand)':'0.5px solid var(--border)'};border-radius:8px;padding:12px 14px;cursor:pointer;background:${selected?'var(--surface-1)':'var(--surface-2)'}">
+              <div data-outbound-card="${pkg.id}" style="border:${sel?'2px solid var(--brand)':'0.5px solid var(--border)'};border-radius:8px;padding:12px 14px;cursor:pointer;background:${sel?'var(--surface-1)':'var(--surface-2)'}">
                 <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
                   <div style="font-weight:600;font-size:13px">${escapeHTML(pkg.name)}</div>
                   <div style="font-weight:600;font-size:13px;color:var(--brand);white-space:nowrap">${escapeHTML(pkg.price)}</div>
                 </div>
-                <div class="badge pending" style="margin:6px 0">${escapeHTML(pkg.group)}</div>
-                <div class="small" style="margin-top:2px">${escapeHTML(pkg.desc)}</div>
+                <div class="small" style="margin-top:4px">${escapeHTML(pkg.desc)}</div>
               </div>`;
           }).join("")}
         </div>
 
-        <h3 style="margin:18px 0 10px;font-size:13px;font-weight:600">Add-on</h3>
-        <label style="display:flex;gap:10px;align-items:start;border:0.5px solid var(--border);border-radius:8px;padding:12px 14px;cursor:pointer">
-          <input type="checkbox" data-intake-check="callingAddon" ${it.callingAddon?'checked':''} style="margin-top:3px">
-          <div>
-            <div style="display:flex;justify-content:space-between;gap:8px">
-              <span style="font-weight:600;font-size:13px">${escapeHTML(CALLING_ADDON.name)}</span>
-              <span style="font-weight:600;font-size:13px;color:var(--brand);white-space:nowrap">${escapeHTML(CALLING_ADDON.price)}</span>
-            </div>
-            <div class="small" style="margin-top:2px">${escapeHTML(CALLING_ADDON.desc)}</div>
-          </div>
-        </label>
+        <h3 style="margin:18px 0 6px;font-size:13px;font-weight:600">AEO / GEO / Inbound <span style="color:var(--text-muted);font-weight:500">· optional, select any</span></h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          ${AEO_PLANS.map(pkg => {
+            const sel = it.optional.includes(pkg.id);
+            return `
+              <div data-optional-card="${pkg.id}" style="border:${sel?'2px solid var(--brand)':'0.5px solid var(--border)'};border-radius:8px;padding:12px 14px;cursor:pointer;background:${sel?'var(--surface-1)':'var(--surface-2)'}">
+                <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
+                  <div style="font-weight:600;font-size:13px">${sel?'✓ ':''}${escapeHTML(pkg.name)}</div>
+                  <div style="font-weight:600;font-size:13px;color:var(--brand);white-space:nowrap">${escapeHTML(pkg.price)}</div>
+                </div>
+                <div class="small" style="margin-top:4px">${escapeHTML(pkg.desc)}</div>
+              </div>`;
+          }).join("")}
+        </div>
 
-        <div class="field" style="margin-top:14px"><label>Package notes</label><textarea data-intake="packageNotes" placeholder="Term, milestones, third-party fees, custom scope — add details later">${escapeHTML(it.packageNotes)}</textarea></div>
+        <h3 style="margin:18px 0 6px;font-size:13px;font-weight:600">Add-ons <span style="color:var(--text-muted);font-weight:500">· optional, select any</span></h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          ${ADDONS.map(pkg => {
+            const sel = it.optional.includes(pkg.id);
+            return `
+              <div data-optional-card="${pkg.id}" style="border:${sel?'2px solid var(--brand)':'0.5px solid var(--border)'};border-radius:8px;padding:12px 14px;cursor:pointer;background:${sel?'var(--surface-1)':'var(--surface-2)'}">
+                <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
+                  <div style="font-weight:600;font-size:13px">${sel?'✓ ':''}${escapeHTML(pkg.name)}</div>
+                  <div style="font-weight:600;font-size:13px;color:var(--brand);white-space:nowrap">${escapeHTML(pkg.price)}</div>
+                </div>
+                <div class="small" style="margin-top:4px">${escapeHTML(pkg.desc)}</div>
+              </div>`;
+          }).join("")}
+        </div>
+
+        <div class="field" style="margin-top:16px"><label>Package notes</label><textarea data-intake="packageNotes" placeholder="Term, milestones, third-party fees, custom scope — add details later">${escapeHTML(it.packageNotes)}</textarea></div>
 
         <div style="display:flex;gap:8px;align-items:center;margin-top:16px;padding-top:16px;border-top:0.5px solid var(--border)">
           <button class="btn" data-action="save-intake">Save & continue to Overview →</button>
@@ -705,6 +729,13 @@ function attachHandlers() {
       else if (action === "tab") { ui.tab = el.dataset.tab; render(); }
       else if (action === "save-intake") {
         const cl = state.clients[ui.clientId];
+        if (!cl.intake.outbound) {
+          const btn = el;
+          btn.textContent = "Select an Outbound plan first";
+          btn.style.background = "var(--danger)";
+          setTimeout(() => { btn.textContent = "Save & continue to Overview →"; btn.style.background = ""; }, 1800);
+          return;
+        }
         cl.name = cl.intake.clientName || cl.name;
         if (!cl.people.clientPoc) cl.people.clientPoc = cl.intake.pocName;
         if (!cl.people.clientPocEmail) cl.people.clientPocEmail = cl.intake.pocEmail;
@@ -738,16 +769,19 @@ function attachHandlers() {
     });
   });
 
-  document.querySelectorAll("[data-package-card]").forEach(el => {
+  document.querySelectorAll("[data-outbound-card]").forEach(el => {
     el.addEventListener("click", () => {
-      state.clients[ui.clientId].intake.package = el.dataset.packageCard;
+      state.clients[ui.clientId].intake.outbound = el.dataset.outboundCard;
       saveState(); render();
     });
   });
-  document.querySelectorAll("[data-intake-check]").forEach(el => {
-    el.addEventListener("change", () => {
-      state.clients[ui.clientId].intake[el.dataset.intakeCheck] = el.checked;
-      saveState();
+  document.querySelectorAll("[data-optional-card]").forEach(el => {
+    el.addEventListener("click", () => {
+      const arr = state.clients[ui.clientId].intake.optional;
+      const id = el.dataset.optionalCard;
+      const i = arr.indexOf(id);
+      if (i >= 0) arr.splice(i, 1); else arr.push(id);
+      saveState(); render();
     });
   });
 
