@@ -157,7 +157,7 @@
 <div id="app"></div>
 
 <script>
-const STORAGE_KEY = "getgtm_tracker_v8";
+const STORAGE_KEY = "getgtm_tracker_v9";
 const PW = "getgtm";
 
 const PATHS = {
@@ -211,11 +211,41 @@ const AEO_PLANS = [
     desc: "Adds GetGTM execution, content production & owned-authority development." },
 ];
 
+const DELIGHT_PLANS = [
+  { id: "delight-test", name: "DelightLoop — Test", price: "$499 one-time",
+    desc: "One campaign play. 1 month. Test AI-powered gifting for pipeline & deal acceleration." },
+  { id: "delight-unlimited", name: "DelightLoop — Unlimited", price: "$899/yr",
+    desc: "Unlimited campaigns, contacts & personalized offline plays. Paid annually." },
+];
+
 const ADDONS = [
   { id: "us-calling", name: "US Calling", price: "$599/mo + $250/meeting",
     desc: "US calling add-on. Per-meeting fee on attended qualified meetings." },
   { id: "revops-definition-lock", name: "Definition Lock", price: "$3,500",
     desc: "RevOps · 1 week. One 90-min session; signed one-page metric definitions." },
+];
+
+const OFFERS = [
+  { id: "offer-outbound", category: "Outbound GTM",
+    headline: "Signal-led outbound that books meetings",
+    details: "We identify your ideal buyers using intent signals, build targeted lists, craft personalized messaging, and run multi-channel outbound campaigns — email, LinkedIn, and calling — so your pipeline fills predictably.",
+    bullets: ["Intent-signal targeting", "Multi-channel sequences (email + LinkedIn)", "Dedicated GTM Engineer", "Weekly performance reviews", "CRM integration & lead handover"] },
+  { id: "offer-aeo", category: "AEO / GEO / Inbound",
+    headline: "Get discovered where buyers actually search",
+    details: "We research the questions your buyers ask across AI answer engines and search, map the sources those engines rely on, and build your presence — owned content, community evidence, and third-party citations — so you show up when it matters.",
+    bullets: ["Prompt & topic universe mapping", "Owned-content strategy & production", "Citation & author outreach", "Community presence (Reddit, LinkedIn, forums)", "Monthly AI visibility reporting"] },
+  { id: "offer-delight", category: "Personalized Offline Plays",
+    headline: "Turn digital outreach into real-world touchpoints",
+    details: "AI-powered gifting that delivers the right gift to the right person at the right time. Augment your digital campaigns with personalized physical touchpoints to break through the noise, accelerate deals, and reduce churn.",
+    bullets: ["AI-matched hyper-personalized gifts", "Integrated with your CRM & campaign workflows", "Automated gifting operations & global delivery", "CTA tracking & gifting ROI measurement", "Works alongside outbound & inbound motions"] },
+  { id: "offer-calling", category: "US Calling",
+    headline: "Live calling that converts intent into conversations",
+    details: "Add US-based calling to your outbound motion. Trained callers work your signal-prioritized lists to book attended, qualified meetings — you only pay for meetings that actually happen.",
+    bullets: ["Trained US-based callers", "Signal-prioritized call lists", "Pay-per-attended-meeting model", "Call recording & CRM logging", "Stacks on top of any outbound plan"] },
+  { id: "offer-deflock", category: "Definition Lock",
+    headline: "Get your whole team on the same number",
+    details: "One 90-minute facilitated session with sales, marketing, CS, finance and RevOps. Every metric conflict surfaced and resolved in the room. You leave with a signed definitions sheet that every new hire and AI tool inherits.",
+    bullets: ["Qualified lead, pipeline stage, ARR/MRR/TCV definitions locked", "Retention, churn & attribution definitions agreed", "AI-influenced revenue defined", "Source-of-truth assigned per metric", "Credits 100% toward a full AI Revenue Verdict"] },
 ];
 
 
@@ -230,7 +260,7 @@ function newClient(name, path) {
     id, name, path, createdAt: new Date().toISOString(),
     kickoffDate: "", targetLaunchDate: "",
     intake: { clientName: name, website: "", pocName: "", pocEmail: "",
-      outbound: "", optional: [], packageNotes: "" },
+      outbound: "", aeo: "", delight: "", addons: [], packageNotes: "" },
     people: {
       cro: "Vinay Raghavendran", croEmail: "vinay@getgtm.ai",
       cs: "", csEmail: "",
@@ -399,6 +429,7 @@ function renderClient() {
       </div>
 
       <div class="tabs">
+        <button data-action="tab" data-tab="offers" class="${ui.tab==='offers'?'active':''}">Offers</button>
         <button data-action="tab" data-tab="intake" class="${ui.tab==='intake'?'active':''}">Client Intake</button>
         <button data-action="tab" data-tab="overview" class="${ui.tab==='overview'?'active':''}">Overview</button>
         <button data-action="tab" data-tab="timeline" class="${ui.tab==='timeline'?'active':''}">Timeline</button>
@@ -406,13 +437,48 @@ function renderClient() {
       </div>
 
       <div id="tab-body">${
-        ui.tab === "intake" ? renderIntakeTab(c)
+        ui.tab === "offers" ? renderOffersTab(c)
+        : ui.tab === "intake" ? renderIntakeTab(c)
         : ui.tab === "overview" ? renderOverviewTab(c)
         : ui.tab === "timeline" ? renderTimelineTab(c)
         : renderOutcomesTab(c)
       }</div>
     </div>
   `;
+}
+
+function renderOffersTab(c) {
+  const page = ui.offerPage || 0;
+  const offer = OFFERS[page];
+  const total = OFFERS.length;
+  const prevBtn = page === 0
+    ? '<button class="btn secondary sm" data-action="offer-prev" disabled style="opacity:.3;cursor:default">\u2190 Prev</button>'
+    : '<button class="btn secondary sm" data-action="offer-prev">\u2190 Prev</button>';
+  const nextLabel = page < total - 1 ? "Next \u2192" : "Done \u2014 go to Intake \u2192";
+  const bulletsHtml = offer.bullets.map(function(b) {
+    return '<div style="display:flex;gap:10px;align-items:start">' +
+      '<div style="color:var(--brand);font-size:16px;line-height:1;margin-top:2px">\u2713</div>' +
+      '<div style="font-size:13px">' + escapeHTML(b) + '</div></div>';
+  }).join("");
+  const dotsHtml = OFFERS.map(function(o, i) {
+    return '<div style="width:8px;height:8px;border-radius:50%;background:' + (i === page ? 'var(--brand)' : 'var(--border)') + '"></div>';
+  }).join("");
+  return '<div class="card">' +
+    '<div class="card-head"><div>' +
+    '<div class="small">' + (page + 1) + ' of ' + total + '</div>' +
+    '<h2>' + escapeHTML(offer.category) + '</h2>' +
+    '</div><div style="display:flex;gap:8px">' + prevBtn +
+    '<button class="btn sm" data-action="offer-next">' + nextLabel + '</button>' +
+    '</div></div>' +
+    '<div class="card-body" style="padding:24px 20px">' +
+    '<h2 style="margin:0 0 12px;font-size:20px;font-weight:600">' + escapeHTML(offer.headline) + '</h2>' +
+    '<p style="color:var(--text-secondary);font-size:14px;line-height:1.6;margin:0 0 20px">' + escapeHTML(offer.details) + '</p>' +
+    '<div style="display:flex;flex-direction:column;gap:10px">' + bulletsHtml + '</div>' +
+    '</div>' +
+    '<div style="padding:12px 20px;border-top:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center">' +
+    '<div class="small">Showing to prospect \u2014 no pricing on this view</div>' +
+    '<div style="display:flex;gap:6px">' + dotsHtml + '</div>' +
+    '</div></div>';
 }
 
 function renderIntakeTab(c) {
@@ -446,14 +512,29 @@ function renderIntakeTab(c) {
           }).join("")}
         </div>
 
-        <h3 style="margin:18px 0 6px;font-size:13px;font-weight:600">AEO / GEO / Inbound <span style="color:var(--text-muted);font-weight:500">· optional, select any</span></h3>
+        <h3 style="margin:18px 0 6px;font-size:13px;font-weight:600">AEO / GEO / Inbound <span style="color:var(--text-muted);font-weight:500">· optional, pick one</span></h3>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           ${AEO_PLANS.map(pkg => {
-            const sel = it.optional.includes(pkg.id);
+            const sel = it.aeo === pkg.id;
             return `
-              <div data-optional-card="${pkg.id}" style="border:${sel?'2px solid var(--brand)':'0.5px solid var(--border)'};border-radius:8px;padding:12px 14px;cursor:pointer;background:${sel?'var(--surface-1)':'var(--surface-2)'}">
+              <div data-aeo-card="${pkg.id}" style="border:${sel?'2px solid var(--brand)':'0.5px solid var(--border)'};border-radius:8px;padding:12px 14px;cursor:pointer;background:${sel?'var(--surface-1)':'var(--surface-2)'}">
                 <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
-                  <div style="font-weight:600;font-size:13px">${sel?'✓ ':''}${escapeHTML(pkg.name)}</div>
+                  <div style="font-weight:600;font-size:13px">${escapeHTML(pkg.name)}</div>
+                  <div style="font-weight:600;font-size:13px;color:var(--brand);white-space:nowrap">${escapeHTML(pkg.price)}</div>
+                </div>
+                <div class="small" style="margin-top:4px">${escapeHTML(pkg.desc)}</div>
+              </div>`;
+          }).join("")}
+        </div>
+
+        <h3 style="margin:18px 0 6px;font-size:13px;font-weight:600">Personalized Offline Plays <span style="color:var(--text-muted);font-weight:500">· optional, pick one</span></h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          ${DELIGHT_PLANS.map(pkg => {
+            const sel = it.delight === pkg.id;
+            return `
+              <div data-delight-card="${pkg.id}" style="border:${sel?'2px solid var(--brand)':'0.5px solid var(--border)'};border-radius:8px;padding:12px 14px;cursor:pointer;background:${sel?'var(--surface-1)':'var(--surface-2)'}">
+                <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
+                  <div style="font-weight:600;font-size:13px">${escapeHTML(pkg.name)}</div>
                   <div style="font-weight:600;font-size:13px;color:var(--brand);white-space:nowrap">${escapeHTML(pkg.price)}</div>
                 </div>
                 <div class="small" style="margin-top:4px">${escapeHTML(pkg.desc)}</div>
@@ -464,9 +545,9 @@ function renderIntakeTab(c) {
         <h3 style="margin:18px 0 6px;font-size:13px;font-weight:600">Add-ons <span style="color:var(--text-muted);font-weight:500">· optional, select any</span></h3>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           ${ADDONS.map(pkg => {
-            const sel = it.optional.includes(pkg.id);
+            const sel = it.addons.includes(pkg.id);
             return `
-              <div data-optional-card="${pkg.id}" style="border:${sel?'2px solid var(--brand)':'0.5px solid var(--border)'};border-radius:8px;padding:12px 14px;cursor:pointer;background:${sel?'var(--surface-1)':'var(--surface-2)'}">
+              <div data-addon-card="${pkg.id}" style="border:${sel?'2px solid var(--brand)':'0.5px solid var(--border)'};border-radius:8px;padding:12px 14px;cursor:pointer;background:${sel?'var(--surface-1)':'var(--surface-2)'}">
                 <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
                   <div style="font-weight:600;font-size:13px">${sel?'✓ ':''}${escapeHTML(pkg.name)}</div>
                   <div style="font-weight:600;font-size:13px;color:var(--brand);white-space:nowrap">${escapeHTML(pkg.price)}</div>
@@ -691,7 +772,7 @@ function renderModal() {
 }
 
 function attachHandlers() {
-  window.openClient = (id) => { ui.view = "client"; ui.clientId = id; ui.tab = "intake"; render(); };
+  window.openClient = (id) => { ui.view = "client"; ui.clientId = id; ui.tab = "offers"; ui.offerPage = 0; render(); };
 
   const doLogin = () => {
     const el = document.getElementById("pw");
@@ -723,10 +804,21 @@ function attachHandlers() {
         ui.modal = null;
         ui.view = "client";
         ui.clientId = c.id;
-        ui.tab = "intake";
+        ui.tab = "offers";
+        ui.offerPage = 0;
         render();
       } else if (action === "back") { ui.view = "dashboard"; render(); }
       else if (action === "tab") { ui.tab = el.dataset.tab; render(); }
+      else if (action === "offer-prev") {
+        ui.offerPage = Math.max(0, (ui.offerPage || 0) - 1);
+        render();
+      } else if (action === "offer-next") {
+        if ((ui.offerPage || 0) < OFFERS.length - 1) {
+          ui.offerPage = (ui.offerPage || 0) + 1; render();
+        } else {
+          ui.tab = "intake"; render();
+        }
+      }
       else if (action === "save-intake") {
         const cl = state.clients[ui.clientId];
         if (!cl.intake.outbound) {
@@ -775,10 +867,24 @@ function attachHandlers() {
       saveState(); render();
     });
   });
-  document.querySelectorAll("[data-optional-card]").forEach(el => {
+  document.querySelectorAll("[data-aeo-card]").forEach(el => {
     el.addEventListener("click", () => {
-      const arr = state.clients[ui.clientId].intake.optional;
-      const id = el.dataset.optionalCard;
+      const cl = state.clients[ui.clientId];
+      cl.intake.aeo = cl.intake.aeo === el.dataset.aeoCard ? "" : el.dataset.aeoCard;
+      saveState(); render();
+    });
+  });
+  document.querySelectorAll("[data-delight-card]").forEach(el => {
+    el.addEventListener("click", () => {
+      const cl = state.clients[ui.clientId];
+      cl.intake.delight = cl.intake.delight === el.dataset.delightCard ? "" : el.dataset.delightCard;
+      saveState(); render();
+    });
+  });
+  document.querySelectorAll("[data-addon-card]").forEach(el => {
+    el.addEventListener("click", () => {
+      const arr = state.clients[ui.clientId].intake.addons;
+      const id = el.dataset.addonCard;
       const i = arr.indexOf(id);
       if (i >= 0) arr.splice(i, 1); else arr.push(id);
       saveState(); render();
