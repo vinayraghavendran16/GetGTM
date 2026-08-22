@@ -226,26 +226,31 @@ const ADDONS = [
 ];
 
 const OFFERS = [
+  { id: "offer-problem", category: "The Problem",
+    headline: "Your buyers need 27 touchpoints. Your agency uses one channel.",
+    details: "B2B buyers now require 27 touchpoints across 4+ channels before they engage. Single-channel agencies still blast cold emails into inboxes where the practical ceiling dropped to 20–30 sends per day. The result: 2% reply rates, burned domains, and a pipeline that never compounds.",
+    bullets: ["287% more responses when you combine 3+ channels vs. single-channel outreach", "4.4% direct mail response rate vs 0.12% for email — 37× higher", "3× more meetings booked when physical mail lands 2–3 days before a sales touch", "83% of B2B buyers research independently before engaging with any seller", "Digital CAC rose 60% in five years. The old playbook is getting more expensive, not less."],
+    footer: "GetGTM runs digital + physical together. Email, LinkedIn, WhatsApp, calling, signals, gifting and direct mail — all as levers we pull to build your pipeline." },
   { id: "offer-outbound", category: "Outbound GTM",
-    headline: "Signal-led outbound that books meetings — powered by Heddl",
-    details: "Every GetGTM outbound engagement runs on Heddl, our AI-native GTM platform (heddl.app) — included in every package at no extra cost. Heddl turns social signals into strategy and outreach in one platform: social listening across 9 channels, AI-driven ICP scoring, and multi-channel execution across LinkedIn, email and WhatsApp. Teams running Heddl achieve a 7% reply rate — 3.5× the industry average — because outreach is triggered by real buying signals, not generic list blasts.",
-    bullets: ["Heddl platform included — social listening, GTM intelligence, content & outreach in one workflow", "9 signal channels monitored: LinkedIn, Reddit, X, Instagram, TikTok, YouTube, G2, Capterra, Trustpilot", "AI ICP scoring on 5 buying signals: funding, new hires, headcount, intent keywords, geography", "Multi-channel sequences: LinkedIn + email + WhatsApp from a single platform", "7% average reply rate on intent-led outreach (vs 2% industry average)", "Dedicated GTM Engineer running your campaigns end-to-end", "Replaces Apollo + Clay + HeyReach + Lemlist at 1/5th the combined cost", "Weekly performance reviews and CRM integration"] },
+    headline: "Signal-led outbound. Powered by Heddl.",
+    details: "Every engagement runs on Heddl (heddl.app) — included at no extra cost. Heddl monitors 9 signal channels, scores intent, and executes multi-channel sequences. Your dedicated GTM Engineer runs it end-to-end.",
+    bullets: ["9 signal channels: LinkedIn, Reddit, X, G2, Capterra, YouTube, TikTok, Instagram, Trustpilot", "Multi-channel sequences: LinkedIn + Email + WhatsApp", "AI ICP scoring on funding, hires, headcount, intent keywords, geography", "7% average reply rate — 3.5× industry average", "Replaces Apollo + Clay + HeyReach + Lemlist at 1/5th the cost"] },
   { id: "offer-aeo", category: "AEO / GEO / Inbound",
-    headline: "Get discovered where buyers actually search",
-    details: "We research the questions your buyers ask across AI answer engines and search, map the sources those engines rely on, and build your presence — owned content, community evidence, and third-party citations — so you show up when it matters.",
-    bullets: ["Prompt & topic universe mapping", "Owned-content strategy & production", "Citation & author outreach", "Community presence (Reddit, LinkedIn, forums)", "Monthly AI visibility reporting"] },
+    headline: "Show up where your buyers actually search.",
+    details: "We map the questions your buyers ask across AI answer engines and search, then build your presence — owned content, community evidence, and third-party citations — so you're the answer, not your competitor.",
+    bullets: ["Prompt & topic universe mapped to your solution areas", "Owned-content strategy, production and optimization", "Citation & author outreach to publications that influence AI answers", "Community presence: Reddit, LinkedIn, forums", "Monthly AI visibility reporting across your prompt set"] },
   { id: "offer-delight", category: "Personalized Offline Plays",
-    headline: "Turn digital outreach into real-world touchpoints",
-    details: "AI-powered gifting that delivers the right gift to the right person at the right time. Augment your digital campaigns with personalized physical touchpoints to break through the noise, accelerate deals, and reduce churn.",
-    bullets: ["AI-matched hyper-personalized gifts", "Integrated with your CRM & campaign workflows", "Automated gifting operations & global delivery", "CTA tracking & gifting ROI measurement", "Works alongside outbound & inbound motions"] },
+    headline: "Put something real on their desk.",
+    details: "Digital outreach gets filtered. A personalized gift on a decision-maker's desk gets picked up, held, and remembered. DelightLoop's AI matches the right gift to the right person at the right moment in your deal cycle.",
+    bullets: ["AI-matched hyper-personalized gifts triggered by deal signals", "Integrated with your CRM and campaign workflows", "Global sourcing, warehousing and automated delivery ops", "CTA tracking and gifting ROI measurement", "Stacks on outbound and inbound — the physical layer most agencies can't offer"] },
   { id: "offer-calling", category: "US Calling",
-    headline: "Live calling that converts intent into conversations",
-    details: "Add US-based calling to your outbound motion. Trained callers work your signal-prioritized lists to book attended, qualified meetings — you only pay for meetings that actually happen.",
-    bullets: ["Trained US-based callers", "Signal-prioritized call lists", "Pay-per-attended-meeting model", "Call recording & CRM logging", "Stacks on top of any outbound plan"] },
+    headline: "57% of C-suite prefer a phone call first.",
+    details: "Signal-prioritized calling converts intent into live conversations. Trained US-based callers work your highest-intent accounts. You only pay for meetings that actually happen.",
+    bullets: ["Trained US-based callers on your signal-prioritized lists", "Pay-per-attended-meeting — aligned incentives", "Call recording, CRM logging, and handover notes", "30–50% higher connect rates when paired with direct mail", "Stacks on top of any outbound plan"] },
   { id: "offer-deflock", category: "Definition Lock",
-    headline: "Get your whole team on the same number",
-    details: "One 90-minute facilitated session with sales, marketing, CS, finance and RevOps. Every metric conflict surfaced and resolved in the room. You leave with a signed definitions sheet that every new hire and AI tool inherits.",
-    bullets: ["Qualified lead, pipeline stage, ARR/MRR/TCV definitions locked", "Retention, churn & attribution definitions agreed", "AI-influenced revenue defined", "Source-of-truth assigned per metric", "Credits 100% toward a full AI Revenue Verdict"] },
+    headline: "Before you scale, agree on the numbers.",
+    details: "One 90-minute session. Every metric conflict surfaced and resolved in the room. You leave with a signed definitions sheet that every new hire and AI tool inherits.",
+    bullets: ["Qualified lead, pipeline stage, ARR/MRR/TCV — locked", "Retention, churn and attribution definitions agreed", "AI-influenced revenue defined and sourced", "Credits 100% toward a full AI Revenue Verdict", "The cheapest way to find out if your team even agrees"] },
 ];
 
 
@@ -451,16 +456,22 @@ function renderOffersTab(c) {
   const page = ui.offerPage || 0;
   const offer = OFFERS[page];
   const total = OFFERS.length;
+  const isProblem = offer.id === "offer-problem";
   const prevBtn = page === 0
     ? '<button class="btn secondary sm" data-action="offer-prev" disabled style="opacity:.3;cursor:default">\u2190 Prev</button>'
     : '<button class="btn secondary sm" data-action="offer-prev">\u2190 Prev</button>';
   const nextLabel = page < total - 1 ? "Next \u2192" : "Done \u2014 go to Intake \u2192";
-  const bulletsHtml = offer.bullets.map(function(b) {
+  var bulletsHtml = offer.bullets.map(function(b) {
+    var icon = isProblem ? '\u2716' : '\u2713';
+    var iconColor = isProblem ? 'var(--danger)' : 'var(--brand)';
     return '<div style="display:flex;gap:10px;align-items:start">' +
-      '<div style="color:var(--brand);font-size:16px;line-height:1;margin-top:2px">\u2713</div>' +
+      '<div style="color:' + iconColor + ';font-size:14px;line-height:1;margin-top:3px">' + icon + '</div>' +
       '<div style="font-size:13px">' + escapeHTML(b) + '</div></div>';
   }).join("");
-  const dotsHtml = OFFERS.map(function(o, i) {
+  var footerHtml = offer.footer
+    ? '<div style="background:var(--surface-1);border:0.5px solid var(--border);border-radius:6px;padding:14px 16px;margin-top:16px;font-size:13px;font-weight:500;color:var(--brand)">' + escapeHTML(offer.footer) + '</div>'
+    : '';
+  var dotsHtml = OFFERS.map(function(o, i) {
     return '<div style="width:8px;height:8px;border-radius:50%;background:' + (i === page ? 'var(--brand)' : 'var(--border)') + '"></div>';
   }).join("");
   return '<div class="card">' +
@@ -471,12 +482,13 @@ function renderOffersTab(c) {
     '<button class="btn sm" data-action="offer-next">' + nextLabel + '</button>' +
     '</div></div>' +
     '<div class="card-body" style="padding:24px 20px">' +
-    '<h2 style="margin:0 0 12px;font-size:20px;font-weight:600">' + escapeHTML(offer.headline) + '</h2>' +
-    '<p style="color:var(--text-secondary);font-size:14px;line-height:1.6;margin:0 0 20px">' + escapeHTML(offer.details) + '</p>' +
-    '<div style="display:flex;flex-direction:column;gap:10px">' + bulletsHtml + '</div>' +
+    '<h2 style="margin:0 0 12px;font-size:18px;font-weight:600">' + escapeHTML(offer.headline) + '</h2>' +
+    '<p style="color:var(--text-secondary);font-size:13px;line-height:1.6;margin:0 0 16px">' + escapeHTML(offer.details) + '</p>' +
+    '<div style="display:flex;flex-direction:column;gap:8px">' + bulletsHtml + '</div>' +
+    footerHtml +
     '</div>' +
-    '<div style="padding:12px 20px;border-top:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center">' +
-    '<div class="small">Showing to prospect \u2014 no pricing on this view</div>' +
+    '<div style="padding:10px 20px;border-top:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center">' +
+    '<div class="small">Prospect view \u2014 no pricing shown</div>' +
     '<div style="display:flex;gap:6px">' + dotsHtml + '</div>' +
     '</div></div>';
 }
