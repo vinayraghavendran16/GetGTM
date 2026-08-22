@@ -157,7 +157,7 @@
 <div id="app"></div>
 
 <script>
-const STORAGE_KEY = "getgtm_tracker_v6";
+const STORAGE_KEY = "getgtm_tracker_v7";
 const PW = "getgtm";
 
 const PATHS = {
@@ -197,6 +197,21 @@ async function saveState() {
 
 const DRIVE_CLIENT_FOLDERS_ID = "15m4KeuxmdMlmYgu_APaRcSa3K4Rr0Iz7";
 
+const PACKAGES = [
+  { id: "aeo-guided", group: "AEO / GEO", name: "Guided Visibility", price: "$1,200/mo",
+    desc: "Research, prioritisation & daily action queue. Client produces content." },
+  { id: "aeo-managed", group: "AEO / GEO", name: "Managed Authority", price: "$2,000/mo",
+    desc: "Adds GetGTM execution, content production & owned-authority development." },
+  { id: "outbound-india", group: "Outbound", name: "Signal-led Outbound — India", price: "$1,599/mo",
+    desc: "Signal-based outbound GTM. India pricing." },
+  { id: "outbound-us", group: "Outbound", name: "Signal-led Outbound — US & Other", price: "$2,499/mo",
+    desc: "Signal-based outbound GTM. US & rest-of-world pricing." },
+];
+
+const CALLING_ADDON = { name: "US Calling", price: "$599/mo + $250 per attended meeting",
+  desc: "US calling add-on. Per-meeting fee on attended qualified meetings booked via calling." };
+
+
 const GTME_ROSTER = [
   { name: "Arjun", email: "arjun@getgtm.ai" },
   { name: "Nishanth", email: "nishanth@getgtm.ai" },
@@ -207,7 +222,8 @@ function newClient(name, path) {
   return {
     id, name, path, createdAt: new Date().toISOString(),
     kickoffDate: "", targetLaunchDate: "",
-    intake: { clientName: name, website: "", pocName: "", pocEmail: "" },
+    intake: { clientName: name, website: "", pocName: "", pocEmail: "",
+      package: "", callingAddon: false, packageNotes: "" },
     people: {
       cro: "Vinay Raghavendran", croEmail: "vinay@getgtm.ai",
       cs: "", csEmail: "",
@@ -407,6 +423,37 @@ function renderIntakeTab(c) {
           <div class="field"><label>POC email</label><input data-intake="pocEmail" type="email" value="${escapeAttr(it.pocEmail)}" placeholder="name@company.com"></div>
         </div>
         <div class="small" style="margin-top:8px">POC name and email auto-fill the Client POC fields in the Overview tab.</div>
+
+        <h3 style="margin:20px 0 10px;font-size:13px;font-weight:600">Package</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          ${PACKAGES.map(pkg => {
+            const selected = it.package === pkg.id;
+            return `
+              <div data-package-card="${pkg.id}" style="border:${selected?'2px solid var(--brand)':'0.5px solid var(--border)'};border-radius:8px;padding:12px 14px;cursor:pointer;background:${selected?'var(--surface-1)':'var(--surface-2)'}">
+                <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
+                  <div style="font-weight:600;font-size:13px">${escapeHTML(pkg.name)}</div>
+                  <div style="font-weight:600;font-size:13px;color:var(--brand);white-space:nowrap">${escapeHTML(pkg.price)}</div>
+                </div>
+                <div class="badge pending" style="margin:6px 0">${escapeHTML(pkg.group)}</div>
+                <div class="small" style="margin-top:2px">${escapeHTML(pkg.desc)}</div>
+              </div>`;
+          }).join("")}
+        </div>
+
+        <h3 style="margin:18px 0 10px;font-size:13px;font-weight:600">Add-on</h3>
+        <label style="display:flex;gap:10px;align-items:start;border:0.5px solid var(--border);border-radius:8px;padding:12px 14px;cursor:pointer">
+          <input type="checkbox" data-intake-check="callingAddon" ${it.callingAddon?'checked':''} style="margin-top:3px">
+          <div>
+            <div style="display:flex;justify-content:space-between;gap:8px">
+              <span style="font-weight:600;font-size:13px">${escapeHTML(CALLING_ADDON.name)}</span>
+              <span style="font-weight:600;font-size:13px;color:var(--brand);white-space:nowrap">${escapeHTML(CALLING_ADDON.price)}</span>
+            </div>
+            <div class="small" style="margin-top:2px">${escapeHTML(CALLING_ADDON.desc)}</div>
+          </div>
+        </label>
+
+        <div class="field" style="margin-top:14px"><label>Package notes</label><textarea data-intake="packageNotes" placeholder="Term, milestones, third-party fees, custom scope — add details later">${escapeHTML(it.packageNotes)}</textarea></div>
+
         <div style="display:flex;gap:8px;align-items:center;margin-top:16px;padding-top:16px;border-top:0.5px solid var(--border)">
           <button class="btn" data-action="save-intake">Save & continue to Overview →</button>
           <span class="small" id="intake-saved" style="display:none;color:var(--success)">✓ Saved</span>
@@ -688,6 +735,19 @@ function attachHandlers() {
       const commit = () => { state.clients[ui.clientId][group][el.dataset[group]] = el.value; };
       el.addEventListener("input", () => { commit(); save(); });
       if (el.tagName === "SELECT") el.addEventListener("change", () => { commit(); saveState(); render(); });
+    });
+  });
+
+  document.querySelectorAll("[data-package-card]").forEach(el => {
+    el.addEventListener("click", () => {
+      state.clients[ui.clientId].intake.package = el.dataset.packageCard;
+      saveState(); render();
+    });
+  });
+  document.querySelectorAll("[data-intake-check]").forEach(el => {
+    el.addEventListener("change", () => {
+      state.clients[ui.clientId].intake[el.dataset.intakeCheck] = el.checked;
+      saveState();
     });
   });
 
