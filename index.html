@@ -407,6 +407,10 @@ function renderIntakeTab(c) {
           <div class="field"><label>POC email</label><input data-intake="pocEmail" type="email" value="${escapeAttr(it.pocEmail)}" placeholder="name@company.com"></div>
         </div>
         <div class="small" style="margin-top:8px">POC name and email auto-fill the Client POC fields in the Overview tab.</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:16px;padding-top:16px;border-top:0.5px solid var(--border)">
+          <button class="btn" data-action="save-intake">Save & continue to Overview →</button>
+          <span class="small" id="intake-saved" style="display:none;color:var(--success)">✓ Saved</span>
+        </div>
       </div>
     </div>
   `;
@@ -652,6 +656,15 @@ function attachHandlers() {
         render();
       } else if (action === "back") { ui.view = "dashboard"; render(); }
       else if (action === "tab") { ui.tab = el.dataset.tab; render(); }
+      else if (action === "save-intake") {
+        const cl = state.clients[ui.clientId];
+        cl.name = cl.intake.clientName || cl.name;
+        if (!cl.people.clientPoc) cl.people.clientPoc = cl.intake.pocName;
+        if (!cl.people.clientPocEmail) cl.people.clientPocEmail = cl.intake.pocEmail;
+        await saveState();
+        ui.tab = "overview";
+        render();
+      }
       else if (action === "add-outcome") {
         const c = state.clients[ui.clientId];
         c.outcomes.push({ date: new Date().toISOString().slice(0,10), metric: "", target: "", actual: "" });
