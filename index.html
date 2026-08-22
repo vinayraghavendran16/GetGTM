@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GetGTM · Engagement Tracker</title>
+  <style>
+    :root {
+      --brand: #a855f7;
+      --brand-light: #e9d5ff;
+      --brand-dark: #7c3aed;
+      --text-primary: #1c1917;
+      --text-secondary: #78716c;
+      --text-muted: #a8a29e;
+      --border: #e7e5e4;
+      --border-dark: #d6d3d0;
+      --surface-1: #fafaf9;
+      --surface-2: #ffffff;
+      --success: #15803d;
+      --success-light: #dcfce7;
+      --warning: #b45309;
+      --warning-light: #fef3c7;
+      --danger: #b91c1c;
+      --danger-light: #fee2e2;
+      --info: #1d4ed8;
+      --info-light: #dbeafe;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --text-primary: #fafaf9;
+        --text-secondary: #a8a29e;
+        --text-muted: #78716c;
+        --border: #44423e;
+        --border-dark: #5a5551;
+        --surface-1: #1a1917;
+        --surface-2: #27251f;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--surface-1); color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px; line-height: 1.5; }
+    button { font: inherit; cursor: pointer; border: none; }
+    input, select, textarea { font: inherit; color: inherit; }
+
+    .topbar { background: #000; color: #fff; padding: 12px 20px;
+      display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .topbar .brand { font-weight: 600; font-size: 14px; letter-spacing: .5px; display: flex;
+      align-items: center; gap: 12px; }
+    .topbar .logo { width: 40px; height: 40px; background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px;
+      font-weight: 700; color: #fff; position: relative; flex-shrink: 0; }
+    .topbar .logo::before { content: ''; position: absolute; width: 5px; height: 5px; background: #fff;
+      border-radius: 50%; top: 5px; right: 5px; }
+    .topbar .logo::after { content: ''; position: absolute; width: 5px; height: 5px; background: #fff;
+      border-radius: 50%; bottom: 6px; right: 8px; }
+    .topbar .brand strong { color: #fff; }
+    .topbar .meta { font-size: 12px; color: #888; }
+    .topbar .badge { background: #a855f7; color: #fff;
+      font-size: 10px; padding: 3px 8px; border-radius: 3px; font-weight: 600; }
+
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .card { background: var(--surface-2); border: 0.5px solid var(--border);
+      border-radius: 8px; overflow: hidden; }
+    .card-head { padding: 14px 18px; border-bottom: 0.5px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .card-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+    .card-head .sub { color: var(--text-secondary); font-size: 12px; }
+    .card-body { padding: 16px 18px; }
+
+    .btn { background: var(--brand); color: #fff; padding: 7px 12px;
+      border-radius: 5px; font-size: 12px; font-weight: 500; }
+    .btn:hover { opacity: .9; }
+    .btn.secondary { background: transparent; color: var(--text-primary);
+      border: 0.5px solid var(--border); }
+    .btn.secondary:hover { background: var(--surface-1); }
+    .btn.ghost { background: transparent; color: var(--text-primary); }
+    .btn.ghost:hover { background: var(--surface-1); }
+    .btn.sm { padding: 5px 9px; font-size: 11px; }
+
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px; margin-bottom: 18px; }
+    .kpi { background: var(--surface-1); border: 0.5px solid var(--border);
+      border-radius: 6px; padding: 12px 14px; }
+    .kpi .label { color: var(--text-secondary); font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .4px; }
+    .kpi .value { font-size: 20px; font-weight: 600; margin-top: 4px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; font-weight: 600; color: var(--text-secondary);
+      padding: 8px 12px; border-bottom: 0.5px solid var(--border);
+      font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
+    td { padding: 10px 12px; border-bottom: 0.5px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface-1); }
+
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 3px;
+      font-size: 10px; font-weight: 600; letter-spacing: .2px; }
+    .badge.done { background: var(--success-light); color: var(--success); }
+    .badge.pending { background: var(--info-light); color: var(--info); }
+
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font-size: 11px; font-weight: 600;
+      color: var(--text-secondary); text-transform: uppercase; letter-spacing: .3px;
+      margin-bottom: 4px; }
+    .field input, .field select, .field textarea {
+      width: 100%; padding: 8px 10px; border: 0.5px solid var(--border);
+      border-radius: 5px; background: var(--surface-1); }
+    .field textarea { min-height: 60px; font-family: inherit; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .progress { background: var(--border); height: 5px; border-radius: 999px;
+      overflow: hidden; width: 100%; }
+    .progress > div { height: 100%; background: var(--brand); }
+
+    .tabs { display: flex; gap: 2px; border-bottom: 0.5px solid var(--border);
+      margin-bottom: 16px; }
+    .tabs button { background: none; border: none; padding: 8px 12px;
+      color: var(--text-secondary); font-weight: 500; border-bottom: 2px solid transparent;
+      cursor: pointer; white-space: nowrap; }
+    .tabs button.active { color: var(--text-primary); border-bottom-color: var(--brand); }
+    .tabs button:hover { color: var(--text-primary); }
+
+    .share-box { background: var(--brand-light); border: 0.5px solid #d8b4fe;
+      border-radius: 6px; padding: 12px 14px; color: #6b21a8; font-size: 12px;
+      margin-bottom: 16px; }
+    .share-box strong { color: #6b21a8; }
+    .share-link { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+    .share-link input { flex: 1; padding: 6px 10px; border: 0.5px solid #d8b4fe;
+      background: #fff; border-radius: 4px; font-size: 11px; }
+
+    .breadcrumb { color: var(--text-secondary); font-size: 12px; margin-bottom: 12px; }
+    .breadcrumb a { color: var(--brand); cursor: pointer; text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
+
+    .empty { text-align: center; padding: 32px 20px; color: var(--text-muted); }
+    .empty h3 { color: var(--text-primary); margin: 0 0 6px; font-size: 14px; }
+
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6);
+      display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+    .modal { background: var(--surface-2); border-radius: 8px; width: 100%; max-width: 480px;
+      max-height: 90vh; overflow: auto; }
+
+    .login-box { max-width: 360px; margin: 60px auto; }
+    .login-box .card-body { padding: 32px 24px; text-align: center; }
+    .login-box h2 { margin: 0 0 8px; font-size: 16px; }
+    .login-box .sub { color: var(--text-secondary); margin-bottom: 20px; }
+    .login-box input { padding: 10px; margin-bottom: 14px; }
+    .login-box .btn { width: 100%; }
+
+    .small { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const STORAGE_KEY = "getgtm_tracker_v4";
+const PW = "getgtm";
+
+const PATHS = {
+  "7-day": { label: "7-day sprint", tagline: "Pre-warmed. Live in a week.",
+    stages: ["Qualification", "Scoping", "Proposal", "Commercial Handover", "Onboarding", "ICP Fitment", "TAM & List", "Messaging", "Campaign Build", "Launch", "First Review"],
+  },
+  "14-day": { label: "14-day buildout", tagline: "Infrastructure setup included. Two weeks.",
+    stages: ["Proposal / Scoping", "Commercial Handover", "Onboarding", "Infrastructure", "Connecting Accounts", "ICP Fitment", "TAM & List", "Messaging", "Campaign Build", "QA & Test", "Launch", "First Review"],
+  },
+  "niche": { label: "Niche GTM", tagline: "Deep research motion. 12–18 days.",
+    stages: ["Proposal / Scoping", "Commercial Handover", "Deep Discovery", "ICP Fitment", "Target List Research", "GTM Play Design", "Messaging", "Campaign Build", "QA & Validation", "Launch", "First Review"],
+  },
+};
+
+let state = { clients: {} };
+let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: null };
+
+async function loadState() {
+  try {
+    const r = await window.localStorage.getItem(STORAGE_KEY);
+    if (r) state = JSON.parse(r);
+  } catch (e) {}
+  if (!state.clients) state.clients = {};
+}
+
+async function saveState() {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {}
+}
+
+function newClient(name, path) {
+  const id = "c_" + Math.random().toString(36).slice(2, 10);
+  return {
+    id, name, path, createdAt: new Date().toISOString(),
+    kickoffDate: "", targetLaunchDate: "",
+    msp: { goals: "", icp: "", assets: "", integration: "", cs: "", gtme: "", channel: "" },
+    sow: { status: "Not Started", value: "", signedDate: "" },
+    stages: PATHS[path].stages.map(s => ({ stage: s, status: "Not Started", eta: "", notes: "" })),
+    outcomes: [],
+  };
+}
+
+function progressOf(c) {
+  const done = c.stages.filter(s => s.status === "Complete").length;
+  return Math.round((done / c.stages.length) * 100);
+}
+
+function render() {
+  const app = document.getElementById("app");
+  if (ui.view === null) {
+    ui.view = ui.isAuth ? "dashboard" : "login";
+  }
+  const clientId = new URLSearchParams(window.location.search).get("client");
+  if (clientId && state.clients[clientId] && !ui.isAuth) {
+    ui.view = "client";
+    ui.clientId = clientId;
+  }
+
+  let html = "";
+  if (ui.view === "login") html = renderLogin();
+  else if (ui.view === "dashboard") html = renderDashboard();
+  else if (ui.view === "client") html = renderClient();
+
+  app.innerHTML = html;
+  attachHandlers();
+  if (ui.modal) renderModal();
+}
+
+function renderLogin() {
+  return `
+    <div class="topbar">
+      <div class="brand"><div class="logo">GTM</div> <strong>Engagement Tracker</strong></div>
+    </div>
+    <div class="wrap">
+      <div class="login-box">
+        <div class="card">
+          <div class="card-body">
+            <h2>Dashboard access</h2>
+            <div class="sub">GetGTM team only</div>
+            <input id="pw" type="password" placeholder="Password" autofocus>
+            <button class="btn" data-action="login">Enter</button>
+            <div class="small" style="margin-top:14px;color:var(--text-muted)">Clients get a direct link — no password needed.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderDashboard() {
+  const clients = Object.values(state.clients).sort((a,b) => (b.createdAt||"").localeCompare(a.createdAt||""));
+  const active = clients.filter(c => progressOf(c) > 0 && progressOf(c) < 100).length;
+  const launched = clients.filter(c => progressOf(c) === 100).length;
+  const atRisk = clients.filter(c => c.stages.some(s => s.status === "Blocked")).length;
+
+  return `
+    <div class="topbar">
+      <div class="brand"><div class="logo">GTM</div> <strong>Engagement Tracker</strong></div>
+      <div style="margin-left:auto;display:flex;gap:12px;align-items:center">
+        <div class="meta">All engagements</div>
+        <button class="btn ghost sm" data-action="logout">Logout</button>
+      </div>
+    </div>
+    <div class="wrap">
+      <div class="kpis">
+        <div class="kpi"><div class="label">Total</div><div class="value">${clients.length}</div></div>
+        <div class="kpi"><div class="label">In flight</div><div class="value">${active}</div></div>
+        <div class="kpi"><div class="label">Launched</div><div class="value">${launched}</div></div>
+        <div class="kpi"><div class="label">At risk</div><div class="value" style="color:${atRisk?'var(--danger)':'inherit'}">${atRisk}</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Engagements</h2>
+          <button class="btn" data-action="new-client">+ New engagement</button>
+        </div>
+        <div class="card-body" style="padding:0">
+          ${clients.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">No engagements yet. <button class="btn" style="margin-top:12px" data-action="new-client">Create one</button></div>` : `
+            <table>
+              <thead><tr>
+                <th>Client</th><th>Path</th><th>Kickoff</th><th>Progress</th><th>Next step</th><th>SOW</th><th></th>
+              </tr></thead>
+              <tbody>
+                ${clients.map(c => {
+                  const prog = progressOf(c);
+                  const next = c.stages.find(s => s.status !== "Complete");
+                  const url = window.location.origin + window.location.pathname + "?client=" + c.id;
+                  return `<tr>
+                    <td><strong onclick="window.openClient('${c.id}')" style="cursor:pointer">${escapeHTML(c.name)}</strong></td>
+                    <td><span class="badge pending">${PATHS[c.path].label}</span></td>
+                    <td>${escapeHTML(c.kickoffDate || "—")}</td>
+                    <td><div class="progress" style="width:120px"><div style="width:${prog}%"></div></div><div class="small">${prog}%</div></td>
+                    <td><div class="small">${escapeHTML(next?.stage || "Done")}</div></td>
+                    <td><span class="badge ${c.sow.status === 'Signed' ? 'done' : 'pending'}">${escapeHTML(c.sow.status || "—")}</span></td>
+                    <td><button class="btn ghost sm" onclick="navigator.clipboard.writeText('${escapeAttr(url)}');alert('Link copied!')">Share</button></td>
+                  </tr>`;
+                }).join("")}
+              </tbody>
+            </table>
+          `}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderClient() {
+  const c = state.clients[ui.clientId];
+  if (!c) { ui.view = "dashboard"; return renderDashboard(); }
+  const prog = progressOf(c);
+
+  return `
+    <div class="topbar">
+      <div class="brand"><div class="logo">GTM</div> <strong>${escapeHTML(c.name)}</strong></div>
+      <div class="badge">Client view</div>
+    </div>
+    <div class="wrap">
+      <div class="breadcrumb"><a data-action="back">← Back</a></div>
+      
+      <div class="share-box">
+        Share this link with your team:
+        <div class="share-link">
+          <input type="text" readonly value="${window.location.href}">
+          <button class="btn sm ghost" onclick="navigator.clipboard.writeText(window.location.href)">Copy</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head">
+          <div>
+            <h2>${escapeHTML(c.name)}</h2>
+            <div class="sub">${PATHS[c.path].tagline}</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="kpis">
+            <div class="kpi"><div class="label">Path</div><div class="value" style="font-size:14px">${PATHS[c.path].label}</div></div>
+            <div class="kpi"><div class="label">Progress</div><div class="value">${prog}%</div><div class="progress" style="margin-top:6px"><div style="width:${prog}%"></div></div></div>
+            <div class="kpi"><div class="label">Kickoff</div><div class="value" style="font-size:14px">${escapeHTML(c.kickoffDate || "—")}</div></div>
+            <div class="kpi"><div class="label">Target launch</div><div class="value" style="font-size:14px">${escapeHTML(c.targetLaunchDate || "—")}</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button data-action="tab" data-tab="overview" class="active">Overview</button>
+        <button data-action="tab" data-tab="timeline">Timeline</button>
+        <button data-action="tab" data-tab="outcomes">Outcomes</button>
+      </div>
+
+      <div id="tab-body">${
+        ui.tab === "overview" ? renderOverviewTab(c)
+        : ui.tab === "timeline" ? renderTimelineTab(c)
+        : renderOutcomesTab(c)
+      }</div>
+    </div>
+  `;
+}
+
+function renderOverviewTab(c) {
+  const m = c.msp;
+  return `
+    <div class="card">
+      <div class="card-head"><h2>Mutual Success Plan</h2></div>
+      <div class="card-body">
+        <h3 style="margin:0 0 12px;font-size:13px;font-weight:600">People</h3>
+        <div class="grid-2">
+          <div class="field"><label>GetGTM CS</label><input data-msp="cs" value="${escapeAttr(m.cs)}" placeholder="Name"></div>
+          <div class="field"><label>GTME</label><input data-msp="gtme" value="${escapeAttr(m.gtme)}" placeholder="Name"></div>
+        </div>
+        <div class="field"><label>Slack/Teams</label><input data-msp="channel" value="${escapeAttr(m.channel)}" placeholder="Link or channel"></div>
+
+        <h3 style="margin:16px 0 12px;font-size:13px;font-weight:600">Goals</h3>
+        <div class="field"><label>Success metrics</label><textarea data-msp="goals" placeholder="What we're measuring">${escapeHTML(m.goals)}</textarea></div>
+
+        <h3 style="margin:16px 0 12px;font-size:13px;font-weight:600">ICP & Assets</h3>
+        <div class="field"><label>ICP</label><textarea data-msp="icp" placeholder="Geography, industry, size, role">${escapeHTML(m.icp)}</textarea></div>
+        <div class="field"><label>Assets</label><textarea data-msp="assets" placeholder="Lists, case studies, decks">${escapeHTML(m.assets)}</textarea></div>
+        <div class="field"><label>Integration</label><textarea data-msp="integration" placeholder="How leads flow back">${escapeHTML(m.integration)}</textarea></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderTimelineTab(c) {
+  return `
+    <div class="card">
+      <div class="card-head"><h2>What's moving</h2></div>
+      <div class="card-body">
+        ${c.stages.map((s, i) => `
+          <div style="padding:12px 0;border-bottom:0.5px solid var(--border);${i===c.stages.length-1?'border-bottom:none':''}">
+            <div style="display:flex;gap:12px;align-items:start">
+              <div style="flex:1">
+                <div style="font-weight:500;font-size:13px">${escapeHTML(s.stage)}</div>
+                <div class="small">${escapeHTML(s.notes || '')}</div>
+              </div>
+              <select data-stage="${i}" data-key="status" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;background:var(--surface-1);font-size:11px">
+                <option ${s.status==='Not Started'?'selected':''}>Not Started</option>
+                <option ${s.status==='In Progress'?'selected':''}>In Progress</option>
+                <option ${s.status==='Blocked'?'selected':''}>Blocked</option>
+                <option ${s.status==='Complete'?'selected':''}>Complete</option>
+              </select>
+            </div>
+            <input type="date" data-stage="${i}" data-key="eta" value="${escapeAttr(s.eta)}" style="margin-top:6px;padding:4px 8px;border:0.5px solid var(--border);border-radius:4px;background:var(--surface-1);font-size:11px;width:100%">
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderOutcomesTab(c) {
+  return `
+    <div class="card">
+      <div class="card-head">
+        <h2>Weekly outcomes</h2>
+        <button class="btn sm" data-action="add-outcome">+ Add row</button>
+      </div>
+      <div class="card-body">
+        ${c.outcomes.length === 0 ? `<div class="empty" style="padding:20px"><div>No outcomes logged yet.</div></div>` : `
+        <table>
+          <thead><tr><th>Date</th><th>Metric</th><th>Target</th><th>Actual</th><th></th></tr></thead>
+          <tbody>
+            ${c.outcomes.map((o, i) => `
+              <tr>
+                <td><input type="date" data-out="${i}" data-key="date" value="${escapeAttr(o.date)}" style="padding:4px;border:0.5px solid var(--border);border-radius:3px;width:100%;background:var(--surface-1)"></td>
+                <td><input data-out="${i}" data-key="metric" value="${escapeAttr(o.metric)}" placeholder="Meetings, replies, etc." style="padding:4px;border:0.5px solid var(--border);border-radius:3px;width:100%;background:var(--surface-1)"></td>
+                <td><input data-out="${i}" data-key="target" value="${escapeAttr(o.target)}" placeholder="10" style="padding:4px;border:0.5px solid var(--border);border-radius:3px;width:100%;background:var(--surface-1)"></td>
+                <td><input data-out="${i}" data-key="actual" value="${escapeAttr(o.actual)}" placeholder="12" style="padding:4px;border:0.5px solid var(--border);border-radius:3px;width:100%;background:var(--surface-1)"></td>
+                <td><button class="btn ghost sm" data-action="delete-out" data-i="${i}">×</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+function renderModal() {
+  const div = document.createElement("div");
+  div.className = "modal-backdrop";
+  if (ui.modal.type === "new-client") {
+    div.innerHTML = `
+      <div class="modal">
+        <div class="card-head"><h2>New engagement</h2></div>
+        <div class="card-body">
+          <div class="field"><label>Client name</label><input id="nc-name" placeholder="e.g. Acme Corp" autofocus></div>
+          <div class="field">
+            <label>Delivery path</label>
+            <select id="nc-path">
+              <option value="7-day">7-day sprint (pre-warmed)</option>
+              <option value="14-day">14-day buildout (infrastructure)</option>
+              <option value="niche">Niche GTM (deep research)</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+            <button class="btn secondary" data-action="modal-close">Cancel</button>
+            <button class="btn" data-action="modal-create">Create</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  div.addEventListener("click", (e) => { if (e.target === div) { ui.modal = null; render(); } });
+  document.body.appendChild(div);
+  document.querySelector("input, button", div)?.focus?.();
+}
+
+function attachHandlers() {
+  window.openClient = (id) => { ui.view = "client"; ui.clientId = id; ui.tab = "overview"; render(); };
+
+  document.querySelectorAll("[data-action]").forEach(el => {
+    el.addEventListener("click", async (e) => {
+      const action = el.dataset.action;
+      if (action === "login") {
+        const pw = document.getElementById("pw").value;
+        if (pw === PW) { ui.isAuth = true; ui.view = "dashboard"; render(); }
+        else alert("Wrong password");
+      } else if (action === "logout") { ui.isAuth = false; ui.view = "login"; render(); }
+      else if (action === "new-client") { ui.modal = { type: "new-client" }; render(); }
+      else if (action === "modal-close") { ui.modal = null; render(); }
+      else if (action === "modal-create") {
+        const name = document.getElementById("nc-name").value.trim();
+        const path = document.getElementById("nc-path").value;
+        if (!name) return;
+        const c = newClient(name, path);
+        state.clients[c.id] = c;
+        await saveState();
+        ui.modal = null;
+        ui.view = "client";
+        ui.clientId = c.id;
+        ui.tab = "overview";
+        render();
+      } else if (action === "back") { ui.view = "dashboard"; render(); }
+      else if (action === "tab") { ui.tab = el.dataset.tab; render(); }
+      else if (action === "add-outcome") {
+        const c = state.clients[ui.clientId];
+        c.outcomes.push({ date: new Date().toISOString().slice(0,10), metric: "", target: "", actual: "" });
+        await saveState();
+        render();
+      } else if (action === "delete-out") {
+        const c = state.clients[ui.clientId];
+        c.outcomes.splice(+el.dataset.i, 1);
+        await saveState();
+        render();
+      }
+    });
+  });
+
+  const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+  const save = debounce(saveState, 300);
+
+  document.querySelectorAll("[data-msp]").forEach(el => {
+    el.addEventListener("input", () => { state.clients[ui.clientId].msp[el.dataset.msp] = el.value; save(); });
+  });
+  document.querySelectorAll("[data-stage]").forEach(el => {
+    el.addEventListener("change", () => {
+      const s = state.clients[ui.clientId].stages[+el.dataset.stage];
+      s[el.dataset.key] = el.value;
+      saveState(); render();
+    });
+    el.addEventListener("input", () => {
+      const s = state.clients[ui.clientId].stages[+el.dataset.stage];
+      s[el.dataset.key] = el.value;
+      save();
+    });
+  });
+  document.querySelectorAll("[data-out]").forEach(el => {
+    el.addEventListener("input", () => {
+      const o = state.clients[ui.clientId].outcomes[+el.dataset.out];
+      o[el.dataset.key] = el.value;
+      save();
+    });
+  });
+}
+
+function escapeHTML(s) { return String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+function escapeAttr(s) { return escapeHTML(s); }
+
+(async function init() {
+  await loadState();
+  render();
+})();
+</script>
+</body>
+</html>
