@@ -157,7 +157,7 @@
 <div id="app"></div>
 
 <script>
-const STORAGE_KEY = "getgtm_tracker_v4";
+const STORAGE_KEY = "getgtm_tracker_v6";
 const PW = "getgtm";
 
 const PATHS = {
@@ -177,7 +177,13 @@ let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: nu
 
 async function loadState() {
   try {
-    const r = await window.localStorage.getItem(STORAGE_KEY);
+    let r = window.localStorage.getItem(STORAGE_KEY);
+    if (!r) {
+      for (const old of ["getgtm_tracker_v5","getgtm_tracker_v4","getgtm_tracker_v3"]) {
+        const prev = window.localStorage.getItem(old);
+        if (prev) { r = prev; window.localStorage.setItem(STORAGE_KEY, prev); break; }
+      }
+    }
     if (r) state = JSON.parse(r);
   } catch (e) {}
   if (!state.clients) state.clients = {};
@@ -189,12 +195,37 @@ async function saveState() {
   } catch (e) {}
 }
 
+const DRIVE_CLIENT_FOLDERS_ID = "15m4KeuxmdMlmYgu_APaRcSa3K4Rr0Iz7";
+
+const GTME_ROSTER = [
+  { name: "Arjun", email: "arjun@getgtm.ai" },
+  { name: "Nishanth", email: "nishanth@getgtm.ai" },
+];
+
 function newClient(name, path) {
   const id = "c_" + Math.random().toString(36).slice(2, 10);
   return {
     id, name, path, createdAt: new Date().toISOString(),
     kickoffDate: "", targetLaunchDate: "",
-    msp: { goals: "", icp: "", assets: "", integration: "", cs: "", gtme: "", channel: "" },
+    intake: { clientName: name, website: "", pocName: "", pocEmail: "" },
+    people: {
+      cro: "Vinay Raghavendran", croEmail: "vinay@getgtm.ai",
+      cs: "", csEmail: "",
+      gtme: "", gtmeEmail: "",
+      clientPoc: "", clientPocEmail: "",
+    },
+    channel: { type: "Slack", link: "" },
+    drive: { folderLink: "", assetsLink: "" },
+    goals: {
+      m1: { replies: "", meetings: "" },
+      m2: { replies: "", meetings: "" },
+      m3: { replies: "", meetings: "" },
+    },
+    icp: {
+      geography: "", industry: "", companySize: "", revenue: "",
+      roles: "", exclusions: "", currentAccounts: "", competitors: "",
+    },
+    integration: { type: "Google Sheet", sheetLink: "", crmName: "", notes: "" },
     sow: { status: "Not Started", value: "", signedDate: "" },
     stages: PATHS[path].stages.map(s => ({ stage: s, status: "Not Started", eta: "", notes: "" })),
     outcomes: [],
@@ -222,9 +253,10 @@ function render() {
   else if (ui.view === "dashboard") html = renderDashboard();
   else if (ui.view === "client") html = renderClient();
 
+  document.querySelectorAll(".modal-backdrop").forEach(el => el.remove());
   app.innerHTML = html;
   attachHandlers();
-  if (ui.modal) renderModal();
+  if (ui.modal) { renderModal(); attachHandlers(); }
 }
 
 function renderLogin() {
@@ -238,8 +270,8 @@ function renderLogin() {
           <div class="card-body">
             <h2>Dashboard access</h2>
             <div class="sub">GetGTM team only</div>
-            <input id="pw" type="password" placeholder="Password" autofocus>
-            <button class="btn" data-action="login">Enter</button>
+            <input id="pw" type="password" placeholder="Password" autofocus autocomplete="off" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:5px;background:var(--surface-2);color:var(--text-primary);margin-bottom:12px;font-size:14px">
+            <button class="btn" data-action="login" style="width:100%">Enter</button>
             <div class="small" style="margin-top:14px;color:var(--text-muted)">Clients get a direct link — no password needed.</div>
           </div>
         </div>
@@ -344,13 +376,15 @@ function renderClient() {
       </div>
 
       <div class="tabs">
-        <button data-action="tab" data-tab="overview" class="active">Overview</button>
-        <button data-action="tab" data-tab="timeline">Timeline</button>
-        <button data-action="tab" data-tab="outcomes">Outcomes</button>
+        <button data-action="tab" data-tab="intake" class="${ui.tab==='intake'?'active':''}">Client Intake</button>
+        <button data-action="tab" data-tab="overview" class="${ui.tab==='overview'?'active':''}">Overview</button>
+        <button data-action="tab" data-tab="timeline" class="${ui.tab==='timeline'?'active':''}">Timeline</button>
+        <button data-action="tab" data-tab="outcomes" class="${ui.tab==='outcomes'?'active':''}">Outcomes</button>
       </div>
 
       <div id="tab-body">${
-        ui.tab === "overview" ? renderOverviewTab(c)
+        ui.tab === "intake" ? renderIntakeTab(c)
+        : ui.tab === "overview" ? renderOverviewTab(c)
         : ui.tab === "timeline" ? renderTimelineTab(c)
         : renderOutcomesTab(c)
       }</div>
@@ -358,26 +392,136 @@ function renderClient() {
   `;
 }
 
+function renderIntakeTab(c) {
+  const it = c.intake;
+  return `
+    <div class="card">
+      <div class="card-head">
+        <div><h2>Client intake</h2><div class="sub">Capture the basics first — POC details flow into the Overview</div></div>
+      </div>
+      <div class="card-body">
+        <div class="grid-2">
+          <div class="field"><label>Client name</label><input data-intake="clientName" value="${escapeAttr(it.clientName)}" placeholder="Company name"></div>
+          <div class="field"><label>Website</label><input data-intake="website" value="${escapeAttr(it.website)}" placeholder="https://company.com"></div>
+          <div class="field"><label>POC name</label><input data-intake="pocName" value="${escapeAttr(it.pocName)}" placeholder="Name, title"></div>
+          <div class="field"><label>POC email</label><input data-intake="pocEmail" type="email" value="${escapeAttr(it.pocEmail)}" placeholder="name@company.com"></div>
+        </div>
+        <div class="small" style="margin-top:8px">POC name and email auto-fill the Client POC fields in the Overview tab.</div>
+      </div>
+    </div>
+  `;
+}
+
 function renderOverviewTab(c) {
-  const m = c.msp;
+  const p = c.people, g = c.goals, icp = c.icp, ch = c.channel, dr = c.drive, ig = c.integration;
+
+  const slackDeepLink = ch.type === "Slack"
+    ? "https://slack.com/get-started#/createnew"
+    : "https://teams.microsoft.com/";
+  const channelName = "getgtm-" + c.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const driveNewFolderLink = "https://drive.google.com/drive/folders/" + (DRIVE_CLIENT_FOLDERS_ID === "PASTE_YOUR_FOLDER_ID_HERE" ? "" : DRIVE_CLIENT_FOLDERS_ID);
+
   return `
     <div class="card">
       <div class="card-head"><h2>Mutual Success Plan</h2></div>
       <div class="card-body">
+
         <h3 style="margin:0 0 12px;font-size:13px;font-weight:600">People</h3>
         <div class="grid-2">
-          <div class="field"><label>GetGTM CS</label><input data-msp="cs" value="${escapeAttr(m.cs)}" placeholder="Name"></div>
-          <div class="field"><label>GTME</label><input data-msp="gtme" value="${escapeAttr(m.gtme)}" placeholder="Name"></div>
+          <div class="field"><label>GetGTM CRO</label><input data-people="cro" value="${escapeAttr(p.cro)}"></div>
+          <div class="field"><label>CRO email</label><input data-people="croEmail" type="email" value="${escapeAttr(p.croEmail)}"></div>
+          <div class="field"><label>GetGTM CS</label><input data-people="cs" value="${escapeAttr(p.cs)}" placeholder="Name"></div>
+          <div class="field"><label>CS email</label><input data-people="csEmail" type="email" value="${escapeAttr(p.csEmail)}" placeholder="name@getgtm.ai"></div>
+          <div class="field"><label>GTME</label>
+            <select data-gtme="select">
+              <option value="">Select GTME…</option>
+              ${GTME_ROSTER.map(m => `<option value="${escapeAttr(m.name)}" ${p.gtme===m.name?'selected':''}>${escapeHTML(m.name)}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field"><label>GTME email</label><input data-people="gtmeEmail" type="email" value="${escapeAttr(p.gtmeEmail)}" placeholder="Auto-filled from GTME" readonly style="background:var(--surface-1);color:var(--text-secondary)"></div>
+          <div class="field"><label>Client POC</label><input data-people="clientPoc" value="${escapeAttr(p.clientPoc || c.intake.pocName)}" placeholder="Set in Client Intake"></div>
+          <div class="field"><label>Client POC email</label><input data-people="clientPocEmail" type="email" value="${escapeAttr(p.clientPocEmail || c.intake.pocEmail)}" placeholder="Set in Client Intake"></div>
         </div>
-        <div class="field"><label>Slack/Teams</label><input data-msp="channel" value="${escapeAttr(m.channel)}" placeholder="Link or channel"></div>
+        <div class="small" style="margin-bottom:4px">Client POC pulls from the Client Intake tab. Edit here to override.</div>
 
-        <h3 style="margin:16px 0 12px;font-size:13px;font-weight:600">Goals</h3>
-        <div class="field"><label>Success metrics</label><textarea data-msp="goals" placeholder="What we're measuring">${escapeHTML(m.goals)}</textarea></div>
+        <h3 style="margin:20px 0 12px;font-size:13px;font-weight:600">Comms channel</h3>
+        <div class="grid-2">
+          <div class="field"><label>Platform</label>
+            <select data-channel="type">
+              <option ${ch.type==='Slack'?'selected':''}>Slack</option>
+              <option ${ch.type==='Teams'?'selected':''}>Teams</option>
+            </select>
+          </div>
+          <div class="field"><label>Channel link</label><input data-channel="link" value="${escapeAttr(ch.link)}" placeholder="Paste channel URL after creating"></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+          <a href="${slackDeepLink}" target="_blank" class="btn sm">+ Create ${escapeHTML(ch.type)} ${ch.type==='Slack'?'workspace/channel':'team'}</a>
+          <span class="small">Suggested name: <code style="background:var(--surface-1);padding:2px 6px;border-radius:3px">${escapeHTML(channelName)}</code></span>
+        </div>
+        ${ch.link ? `<a href="${escapeAttr(ch.link)}" target="_blank" class="btn sm ghost">Open ${escapeHTML(ch.type)} →</a>` : ''}
 
-        <h3 style="margin:16px 0 12px;font-size:13px;font-weight:600">ICP & Assets</h3>
-        <div class="field"><label>ICP</label><textarea data-msp="icp" placeholder="Geography, industry, size, role">${escapeHTML(m.icp)}</textarea></div>
-        <div class="field"><label>Assets</label><textarea data-msp="assets" placeholder="Lists, case studies, decks">${escapeHTML(m.assets)}</textarea></div>
-        <div class="field"><label>Integration</label><textarea data-msp="integration" placeholder="How leads flow back">${escapeHTML(m.integration)}</textarea></div>
+        <h3 style="margin:20px 0 12px;font-size:13px;font-weight:600">Drive folders</h3>
+        <div class="field"><label>Client folder link</label><input data-drive="folderLink" value="${escapeAttr(dr.folderLink)}" placeholder="Paste after creating in Client Folders"></div>
+        <div class="field"><label>Assets folder link</label><input data-drive="assetsLink" value="${escapeAttr(dr.assetsLink)}" placeholder="${escapeAttr(c.name)} + Assets"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+          <a href="${driveNewFolderLink}" target="_blank" class="btn sm">Open Client Folders in Drive</a>
+          ${dr.folderLink ? `<a href="${escapeAttr(dr.folderLink)}" target="_blank" class="btn sm ghost">Open ${escapeHTML(c.name)} folder →</a>` : ''}
+          ${dr.assetsLink ? `<a href="${escapeAttr(dr.assetsLink)}" target="_blank" class="btn sm ghost">Open Assets →</a>` : ''}
+        </div>
+        <div class="small">Create two folders: <code style="background:var(--surface-1);padding:2px 6px;border-radius:3px">${escapeHTML(c.name)}</code> and inside it <code style="background:var(--surface-1);padding:2px 6px;border-radius:3px">${escapeHTML(c.name)} + Assets</code>, then paste the links.</div>
+
+        <h3 style="margin:20px 0 12px;font-size:13px;font-weight:600">Goals (by month)</h3>
+        <table style="margin-bottom:4px">
+          <thead><tr><th>Month</th><th>Positive replies</th><th>Meetings booked</th></tr></thead>
+          <tbody>
+            <tr>
+              <td style="font-weight:500">M1</td>
+              <td><input data-goal="m1.replies" value="${escapeAttr(g.m1.replies)}" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
+              <td><input data-goal="m1.meetings" value="${escapeAttr(g.m1.meetings)}" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
+            </tr>
+            <tr>
+              <td style="font-weight:500">M2</td>
+              <td><input data-goal="m2.replies" value="${escapeAttr(g.m2.replies)}" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
+              <td><input data-goal="m2.meetings" value="${escapeAttr(g.m2.meetings)}" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
+            </tr>
+            <tr>
+              <td style="font-weight:500">M3</td>
+              <td><input data-goal="m3.replies" value="${escapeAttr(g.m3.replies)}" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
+              <td><input data-goal="m3.meetings" value="${escapeAttr(g.m3.meetings)}" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3 style="margin:20px 0 12px;font-size:13px;font-weight:600">ICP</h3>
+        <div class="grid-2">
+          <div class="field"><label>Geography</label><input data-icp="geography" value="${escapeAttr(icp.geography)}" placeholder="US, EU, APAC…"></div>
+          <div class="field"><label>Industry</label><input data-icp="industry" value="${escapeAttr(icp.industry)}" placeholder="SaaS, fintech…"></div>
+          <div class="field"><label>Company size</label><input data-icp="companySize" value="${escapeAttr(icp.companySize)}" placeholder="50–500 employees"></div>
+          <div class="field"><label>Annual revenue</label><input data-icp="revenue" value="${escapeAttr(icp.revenue)}" placeholder="$10M–$100M"></div>
+        </div>
+        <div class="field"><label>Roles (CXO / VP / Director / Manager)</label><input data-icp="roles" value="${escapeAttr(icp.roles)}" placeholder="VP Sales, CRO, Head of RevOps"></div>
+        <div class="field"><label>Exclusions</label><input data-icp="exclusions" value="${escapeAttr(icp.exclusions)}" placeholder="Segments to avoid, DNC"></div>
+        <div class="grid-2">
+          <div class="field"><label>Current accounts (suppress)</label><input data-icp="currentAccounts" value="${escapeAttr(icp.currentAccounts)}" placeholder="Existing customers"></div>
+          <div class="field"><label>Competitor displacement</label><input data-icp="competitors" value="${escapeAttr(icp.competitors)}" placeholder="Named competitors to target"></div>
+        </div>
+
+        <h3 style="margin:20px 0 12px;font-size:13px;font-weight:600">Integration</h3>
+        <div class="grid-2">
+          <div class="field"><label>Method</label>
+            <select data-integration="type">
+              <option ${ig.type==='Google Sheet'?'selected':''}>Google Sheet</option>
+              <option ${ig.type==='CRM (direct)'?'selected':''}>CRM (direct)</option>
+            </select>
+          </div>
+          ${ig.type === 'CRM (direct)'
+            ? `<div class="field"><label>CRM name</label><input data-integration="crmName" value="${escapeAttr(ig.crmName)}" placeholder="Salesforce, HubSpot…"></div>`
+            : `<div class="field"><label>Tracking sheet link</label><input data-integration="sheetLink" value="${escapeAttr(ig.sheetLink)}" placeholder="Paste Google Sheet URL"></div>`
+          }
+        </div>
+        ${ig.type === 'Google Sheet' && ig.sheetLink ? `<a href="${escapeAttr(ig.sheetLink)}" target="_blank" class="btn sm ghost">Open tracking sheet →</a>` : ''}
+        <div class="field" style="margin-top:12px"><label>Notes</label><textarea data-integration="notes" placeholder="Handover cadence, field mapping, owners">${escapeHTML(ig.notes)}</textarea></div>
+
       </div>
     </div>
   `;
@@ -440,6 +584,7 @@ function renderOutcomesTab(c) {
 }
 
 function renderModal() {
+  document.querySelectorAll(".modal-backdrop").forEach(el => el.remove());
   const div = document.createElement("div");
   div.className = "modal-backdrop";
   if (ui.modal.type === "new-client") {
@@ -466,33 +611,44 @@ function renderModal() {
   }
   div.addEventListener("click", (e) => { if (e.target === div) { ui.modal = null; render(); } });
   document.body.appendChild(div);
-  document.querySelector("input, button", div)?.focus?.();
+  const firstInput = div.querySelector("input");
+  if (firstInput) firstInput.focus();
 }
 
 function attachHandlers() {
-  window.openClient = (id) => { ui.view = "client"; ui.clientId = id; ui.tab = "overview"; render(); };
+  window.openClient = (id) => { ui.view = "client"; ui.clientId = id; ui.tab = "intake"; render(); };
+
+  const doLogin = () => {
+    const el = document.getElementById("pw");
+    if (!el) return;
+    if (el.value === PW) { ui.isAuth = true; ui.view = "dashboard"; render(); }
+    else { el.style.borderColor = "var(--danger)"; el.value = ""; el.focus(); }
+  };
+  const pwEl = document.getElementById("pw");
+  if (pwEl) {
+    pwEl.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doLogin(); } });
+  }
 
   document.querySelectorAll("[data-action]").forEach(el => {
     el.addEventListener("click", async (e) => {
       const action = el.dataset.action;
       if (action === "login") {
-        const pw = document.getElementById("pw").value;
-        if (pw === PW) { ui.isAuth = true; ui.view = "dashboard"; render(); }
-        else alert("Wrong password");
+        doLogin();
       } else if (action === "logout") { ui.isAuth = false; ui.view = "login"; render(); }
       else if (action === "new-client") { ui.modal = { type: "new-client" }; render(); }
       else if (action === "modal-close") { ui.modal = null; render(); }
       else if (action === "modal-create") {
-        const name = document.getElementById("nc-name").value.trim();
+        const nameEl = document.getElementById("nc-name");
+        const name = nameEl.value.trim();
         const path = document.getElementById("nc-path").value;
-        if (!name) return;
+        if (!name) { nameEl.style.borderColor = "var(--danger)"; nameEl.focus(); return; }
         const c = newClient(name, path);
         state.clients[c.id] = c;
         await saveState();
         ui.modal = null;
         ui.view = "client";
         ui.clientId = c.id;
-        ui.tab = "overview";
+        ui.tab = "intake";
         render();
       } else if (action === "back") { ui.view = "dashboard"; render(); }
       else if (action === "tab") { ui.tab = el.dataset.tab; render(); }
@@ -513,8 +669,31 @@ function attachHandlers() {
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
   const save = debounce(saveState, 300);
 
-  document.querySelectorAll("[data-msp]").forEach(el => {
-    el.addEventListener("input", () => { state.clients[ui.clientId].msp[el.dataset.msp] = el.value; save(); });
+  const simpleGroups = ["people", "channel", "icp", "drive", "integration", "intake"];
+  simpleGroups.forEach(group => {
+    document.querySelectorAll(`[data-${group}]`).forEach(el => {
+      const commit = () => { state.clients[ui.clientId][group][el.dataset[group]] = el.value; };
+      el.addEventListener("input", () => { commit(); save(); });
+      if (el.tagName === "SELECT") el.addEventListener("change", () => { commit(); saveState(); render(); });
+    });
+  });
+
+  document.querySelectorAll("[data-gtme]").forEach(el => {
+    el.addEventListener("change", () => {
+      const match = GTME_ROSTER.find(m => m.name === el.value);
+      const cl = state.clients[ui.clientId];
+      cl.people.gtme = el.value;
+      cl.people.gtmeEmail = match ? match.email : "";
+      saveState(); render();
+    });
+  });
+
+  document.querySelectorAll("[data-goal]").forEach(el => {
+    el.addEventListener("input", () => {
+      const [month, metric] = el.dataset.goal.split(".");
+      state.clients[ui.clientId].goals[month][metric] = el.value;
+      save();
+    });
   });
   document.querySelectorAll("[data-stage]").forEach(el => {
     el.addEventListener("change", () => {
