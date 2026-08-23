@@ -151,7 +151,52 @@
     .login-box .btn { width: 100%; }
 
     .small { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
-  </style>
+  
+  .ppt-fullscreen { position: fixed; inset: 0; z-index: 200; background: #000;
+    display: flex; flex-direction: column; }
+  .ppt-topbar { display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 24px; background: #000; border-bottom: 1px solid #222; flex-shrink: 0; }
+  .ppt-brand { display: flex; align-items: center; gap: 10px; color: #fff;
+    font-weight: 600; font-size: 14px; }
+  .ppt-counter { color: #666; font-size: 12px; font-weight: 500; }
+  .ppt-nav { display: flex; gap: 8px; }
+  .ppt-btn { background: #a855f7; color: #fff; border: none; padding: 8px 18px;
+    border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; }
+  .ppt-btn:hover { background: #9333ea; }
+  .ppt-btn-sec { background: #333; color: #fff; border: none; padding: 8px 14px;
+    border-radius: 6px; font-size: 13px; cursor: pointer; }
+  .ppt-btn-sec:hover { background: #444; }
+
+  .ppt-slide { flex: 1; display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+  .ppt-half { padding: 40px 48px; display: flex; flex-direction: column; justify-content: center;
+    overflow: auto; }
+  .ppt-dark { background: #111; color: #ccc; }
+  .ppt-light { background: #fafaf9; color: #1c1917; }
+  @media (prefers-color-scheme: dark) { .ppt-light { background: #1e1e1c; color: #e5e5e3; } }
+  @media (max-width: 768px) {
+    .ppt-slide { grid-template-columns: 1fr; }
+    .ppt-half { padding: 24px 20px; }
+  }
+
+  .ppt-label { font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: #888; margin-bottom: 20px; }
+  .ppt-light .ppt-label { color: #a855f7; }
+  .ppt-lines { display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+  .ppt-line { font-size: 14px; line-height: 1.5; }
+  .ppt-dark .ppt-line { color: #aaa; }
+  .ppt-stat { font-size: 32px; font-weight: 700; line-height: 1.1; }
+  .ppt-dark .ppt-stat { color: #ef4444; }
+  .ppt-light .ppt-stat { color: #a855f7; }
+  .ppt-stat-sub { font-size: 14px; color: #888; margin-top: 6px; }
+
+  .ppt-footer { display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 24px; background: #000; border-top: 1px solid #222; flex-shrink: 0; }
+  .ppt-category { color: #fff; font-weight: 600; font-size: 13px; }
+  .ppt-dots { display: flex; gap: 6px; }
+  .ppt-dot { width: 8px; height: 8px; border-radius: 50%; background: #333; }
+  .ppt-dot.active { background: #a855f7; }
+  .ppt-hint { color: #555; font-size: 11px; }
+</style>
 </head>
 <body>
 <div id="app"></div>
@@ -225,32 +270,61 @@ const ADDONS = [
     desc: "RevOps · 1 week. One 90-min session; signed one-page metric definitions." },
 ];
 
-const OFFERS = [
-  { id: "offer-problem", category: "The Problem",
-    headline: "Your buyers need 27 touchpoints. Your agency uses one channel.",
-    details: "B2B buyers now require 27 touchpoints across 4+ channels before they engage. Single-channel agencies still blast cold emails into inboxes where the practical ceiling dropped to 20–30 sends per day. The result: 2% reply rates, burned domains, and a pipeline that never compounds.",
-    bullets: ["287% more responses when you combine 3+ channels vs. single-channel outreach", "4.4% direct mail response rate vs 0.12% for email — 37× higher", "3× more meetings booked when physical mail lands 2–3 days before a sales touch", "83% of B2B buyers research independently before engaging with any seller", "Digital CAC rose 60% in five years. The old playbook is getting more expensive, not less."],
-    footer: "GetGTM runs digital + physical together. Email, LinkedIn, WhatsApp, calling, signals, gifting and direct mail — all as levers we pull to build your pipeline." },
-  { id: "offer-outbound", category: "Outbound GTM",
-    headline: "Signal-led outbound. Powered by Heddl.",
-    details: "Every engagement runs on Heddl (heddl.app) — included at no extra cost. Heddl monitors 9 signal channels, scores intent, and executes multi-channel sequences. Your dedicated GTM Engineer runs it end-to-end.",
-    bullets: ["9 signal channels: LinkedIn, Reddit, X, G2, Capterra, YouTube, TikTok, Instagram, Trustpilot", "Multi-channel sequences: LinkedIn + Email + WhatsApp", "AI ICP scoring on funding, hires, headcount, intent keywords, geography", "7% average reply rate — 3.5× industry average", "Replaces Apollo + Clay + HeyReach + Lemlist at 1/5th the cost"] },
-  { id: "offer-aeo", category: "AEO / GEO / Inbound",
-    headline: "Show up where your buyers actually search.",
-    details: "We map the questions your buyers ask across AI answer engines and search, then build your presence — owned content, community evidence, and third-party citations — so you're the answer, not your competitor.",
-    bullets: ["Prompt & topic universe mapped to your solution areas", "Owned-content strategy, production and optimization", "Citation & author outreach to publications that influence AI answers", "Community presence: Reddit, LinkedIn, forums", "Monthly AI visibility reporting across your prompt set"] },
-  { id: "offer-delight", category: "Personalized Offline Plays",
-    headline: "Put something real on their desk.",
-    details: "Digital outreach gets filtered. A personalized gift on a decision-maker's desk gets picked up, held, and remembered. DelightLoop's AI matches the right gift to the right person at the right moment in your deal cycle.",
-    bullets: ["AI-matched hyper-personalized gifts triggered by deal signals", "Integrated with your CRM and campaign workflows", "Global sourcing, warehousing and automated delivery ops", "CTA tracking and gifting ROI measurement", "Stacks on outbound and inbound — the physical layer most agencies can't offer"] },
-  { id: "offer-calling", category: "US Calling",
-    headline: "57% of C-suite prefer a phone call first.",
-    details: "Signal-prioritized calling converts intent into live conversations. Trained US-based callers work your highest-intent accounts. You only pay for meetings that actually happen.",
-    bullets: ["Trained US-based callers on your signal-prioritized lists", "Pay-per-attended-meeting — aligned incentives", "Call recording, CRM logging, and handover notes", "30–50% higher connect rates when paired with direct mail", "Stacks on top of any outbound plan"] },
-  { id: "offer-deflock", category: "Definition Lock",
-    headline: "Before you scale, agree on the numbers.",
-    details: "One 90-minute session. Every metric conflict surfaced and resolved in the room. You leave with a signed definitions sheet that every new hire and AI tool inherits.",
-    bullets: ["Qualified lead, pipeline stage, ARR/MRR/TCV — locked", "Retention, churn and attribution definitions agreed", "AI-influenced revenue defined and sourced", "Credits 100% toward a full AI Revenue Verdict", "The cheapest way to find out if your team even agrees"] },
+const SLIDES = [
+  { category: "The Problem", before: {
+      label: "TODAY",
+      lines: ["Apollo for data \u2014 $99/mo", "Clay for enrichment \u2014 $149/mo", "HeyReach for LinkedIn \u2014 $79/mo", "Smartlead for email \u2014 $94/mo", "Separate dialer \u2014 $50/mo", "CRM \u2014 $45/mo", "Intent data \u2014 $200/mo", "Content tools \u2014 $100/mo"],
+      stat: "$800+/mo in tools alone.", statSub: "8 tools. 8 logins. Zero signal layer."
+    }, after: {
+      label: "WITH GETGTM",
+      lines: ["\u{1F4E1} In-market signals \u2014 9 channels", "\u{1F4E7} Email sequences", "\u{1F517} LinkedIn outreach", "\u{1F4F1} WhatsApp", "\u{1F4DE} US calling", "\u{1F381} Physical gifting & mailers", "\u{1F4DD} AEO / GEO / Inbound", "\u{1F465} CRO + GTM Engineer + CS built in"],
+      stat: "One team.", statSub: "Digital + physical. Every lever, handled."
+  }},
+  { category: "Outbound GTM", before: {
+      label: "TYPICAL AGENCY",
+      lines: ["Single-channel email blasts", "Generic templates, fake personalization", "No signal layer \u2014 spray and pray", "2% reply rate (industry average)", "Burned domains every 60 days", "Junior SDRs reading scripts", "You manage the tools yourself"],
+      stat: "2% reply rate.", statSub: "Domains that don\u2019t last a quarter."
+    }, after: {
+      label: "GETGTM + HEDDL",
+      lines: ["9 signal channels monitored for intent", "AI ICP scoring before outreach", "Multi-channel: LinkedIn + Email + WhatsApp", "Dedicated GTM Engineer end-to-end", "Heddl platform included \u2014 no extra cost", "7% average reply rate \u2014 3.5\u00D7 industry", "Weekly reviews, CRM integration, handover"],
+      stat: "7% reply rate.", statSub: "Signal-led. Not spray-led."
+  }},
+  { category: "AEO / GEO / Inbound", before: {
+      label: "WITHOUT AEO",
+      lines: ["Buyers ask AI for solutions", "AI cites your competitor\u2019s content", "No presence in answer engines", "SEO alone takes 12+ months", "Community questions go unanswered", "Nobody tracks prompt visibility"],
+      stat: "Invisible.", statSub: "Where buyers actually decide."
+    }, after: {
+      label: "WITH GETGTM AEO",
+      lines: ["Prompt universe mapped to your solution", "Owned content built for AI citation", "Author & publication outreach", "Reddit, LinkedIn, forum presence", "Monthly AI visibility reporting", "35\u201360 day discovery timeline"],
+      stat: "The answer.", statSub: "Not your competitor."
+  }},
+  { category: "Personalized Offline Plays", before: {
+      label: "DIGITAL ONLY",
+      lines: ["100+ marketing emails per inbox/week", "Prospects filter, delete, ignore", "0.12% email response rate", "Zero physical touchpoints", "No pattern interrupt in the deal", "Every agency looks the same in an inbox"],
+      stat: "0.12% response.", statSub: "Filtered before it\u2019s read."
+    }, after: {
+      label: "WITH DELIGHTLOOP",
+      lines: ["AI-matched gift for the right person", "Triggered by deal signals in your CRM", "4.4% direct mail response \u2014 37\u00D7 email", "3\u00D7 more meetings when mail precedes a call", "Global sourcing, warehousing, delivery", "CTA tracking and gifting ROI"],
+      stat: "4.4% response.", statSub: "They held it in their hands."
+  }},
+  { category: "US Calling", before: {
+      label: "COLD CALLING (OLD WAY)",
+      lines: ["80 dials/day, 2.8% connect rate", "Junior reps reading a script", "No signal prioritization", "97 dials go nowhere", "Same voicemail as every other agency", "Pay per hour regardless of outcome"],
+      stat: "97 wasted dials.", statSub: "Per day. Per rep."
+    }, after: {
+      label: "GETGTM CALLING",
+      lines: ["Signal-prioritized call lists", "Trained US-based callers", "30\u201350% higher connects paired with mail", "57% of C-suite prefer phone first", "Pay-per-attended-meeting model", "Call recording, CRM logging, handover"],
+      stat: "Pay for meetings.", statSub: "Not for dials."
+  }},
+  { category: "Definition Lock", before: {
+      label: "MOST TEAMS TODAY",
+      lines: ["5 leaders define \u2018qualified lead\u2019 5 ways", "Pipeline numbers don\u2019t reconcile", "AI tools inherit the confusion", "Churn measured differently by each team", "No source of truth per metric", "Board asks a question, nobody agrees"],
+      stat: "5 definitions.", statSub: "For the same number."
+    }, after: {
+      label: "AFTER 90 MINUTES",
+      lines: ["Every metric conflict resolved in the room", "Signed one-page definitions sheet", "Qualified lead, pipeline, ARR/MRR locked", "Retention, churn, attribution agreed", "AI-influenced revenue defined", "Credits 100% toward full Verdict"],
+      stat: "One number.", statSub: "Signed by everyone."
+  }},
 ];
 
 
@@ -453,44 +527,54 @@ function renderClient() {
 }
 
 function renderOffersTab(c) {
-  const page = ui.offerPage || 0;
-  const offer = OFFERS[page];
-  const total = OFFERS.length;
-  const isProblem = offer.id === "offer-problem";
-  const prevBtn = page === 0
-    ? '<button class="btn secondary sm" data-action="offer-prev" disabled style="opacity:.3;cursor:default">\u2190 Prev</button>'
-    : '<button class="btn secondary sm" data-action="offer-prev">\u2190 Prev</button>';
-  const nextLabel = page < total - 1 ? "Next \u2192" : "Done \u2014 go to Intake \u2192";
-  var bulletsHtml = offer.bullets.map(function(b) {
-    var icon = isProblem ? '\u2716' : '\u2713';
-    var iconColor = isProblem ? 'var(--danger)' : 'var(--brand)';
-    return '<div style="display:flex;gap:10px;align-items:start">' +
-      '<div style="color:' + iconColor + ';font-size:14px;line-height:1;margin-top:3px">' + icon + '</div>' +
-      '<div style="font-size:13px">' + escapeHTML(b) + '</div></div>';
+  var page = ui.offerPage || 0;
+  var slide = SLIDES[page];
+  var total = SLIDES.length;
+
+  var prevBtn = page === 0
+    ? '<button class="ppt-btn ppt-btn-sec" disabled style="opacity:.3">\u2190</button>'
+    : '<button class="ppt-btn ppt-btn-sec" data-action="offer-prev">\u2190</button>';
+  var nextBtn = page < total - 1
+    ? '<button class="ppt-btn" data-action="offer-next">Next \u2192</button>'
+    : '<button class="ppt-btn" data-action="offer-next">Done \u2192</button>';
+
+  var beforeLines = slide.before.lines.map(function(l) {
+    return '<div class="ppt-line">' + escapeHTML(l) + '</div>';
   }).join("");
-  var footerHtml = offer.footer
-    ? '<div style="background:var(--surface-1);border:0.5px solid var(--border);border-radius:6px;padding:14px 16px;margin-top:16px;font-size:13px;font-weight:500;color:var(--brand)">' + escapeHTML(offer.footer) + '</div>'
-    : '';
-  var dotsHtml = OFFERS.map(function(o, i) {
-    return '<div style="width:8px;height:8px;border-radius:50%;background:' + (i === page ? 'var(--brand)' : 'var(--border)') + '"></div>';
+  var afterLines = slide.after.lines.map(function(l) {
+    return '<div class="ppt-line">' + escapeHTML(l) + '</div>';
   }).join("");
-  return '<div class="card">' +
-    '<div class="card-head"><div>' +
-    '<div class="small">' + (page + 1) + ' of ' + total + '</div>' +
-    '<h2>' + escapeHTML(offer.category) + '</h2>' +
-    '</div><div style="display:flex;gap:8px">' + prevBtn +
-    '<button class="btn sm" data-action="offer-next">' + nextLabel + '</button>' +
-    '</div></div>' +
-    '<div class="card-body" style="padding:24px 20px">' +
-    '<h2 style="margin:0 0 12px;font-size:18px;font-weight:600">' + escapeHTML(offer.headline) + '</h2>' +
-    '<p style="color:var(--text-secondary);font-size:13px;line-height:1.6;margin:0 0 16px">' + escapeHTML(offer.details) + '</p>' +
-    '<div style="display:flex;flex-direction:column;gap:8px">' + bulletsHtml + '</div>' +
-    footerHtml +
+
+  var dotsHtml = SLIDES.map(function(s, i) {
+    return '<div class="ppt-dot' + (i === page ? ' active' : '') + '"></div>';
+  }).join("");
+
+  return '<div class="ppt-fullscreen" id="ppt-screen">' +
+    '<div class="ppt-topbar">' +
+      '<div class="ppt-brand"><div class="logo">GTM</div> GetGTM</div>' +
+      '<div class="ppt-counter">' + (page + 1) + ' / ' + total + '</div>' +
+      '<div class="ppt-nav">' + prevBtn + nextBtn + '</div>' +
     '</div>' +
-    '<div style="padding:10px 20px;border-top:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center">' +
-    '<div class="small">Prospect view \u2014 no pricing shown</div>' +
-    '<div style="display:flex;gap:6px">' + dotsHtml + '</div>' +
-    '</div></div>';
+    '<div class="ppt-slide">' +
+      '<div class="ppt-half ppt-dark">' +
+        '<div class="ppt-label">' + escapeHTML(slide.before.label) + '</div>' +
+        '<div class="ppt-lines">' + beforeLines + '</div>' +
+        '<div class="ppt-stat">' + escapeHTML(slide.before.stat) + '</div>' +
+        '<div class="ppt-stat-sub">' + escapeHTML(slide.before.statSub) + '</div>' +
+      '</div>' +
+      '<div class="ppt-half ppt-light">' +
+        '<div class="ppt-label">' + escapeHTML(slide.after.label) + '</div>' +
+        '<div class="ppt-lines">' + afterLines + '</div>' +
+        '<div class="ppt-stat">' + escapeHTML(slide.after.stat) + '</div>' +
+        '<div class="ppt-stat-sub">' + escapeHTML(slide.after.statSub) + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="ppt-footer">' +
+      '<div class="ppt-category">' + escapeHTML(slide.category) + '</div>' +
+      '<div class="ppt-dots">' + dotsHtml + '</div>' +
+      '<div class="ppt-hint">No pricing shown \u2014 prospect view</div>' +
+    '</div>' +
+  '</div>';
 }
 
 function renderIntakeTab(c) {
@@ -825,7 +909,7 @@ function attachHandlers() {
         ui.offerPage = Math.max(0, (ui.offerPage || 0) - 1);
         render();
       } else if (action === "offer-next") {
-        if ((ui.offerPage || 0) < OFFERS.length - 1) {
+        if ((ui.offerPage || 0) < SLIDES.length - 1) {
           ui.offerPage = (ui.offerPage || 0) + 1; render();
         } else {
           ui.tab = "intake"; render();
