@@ -298,6 +298,10 @@
   .ob-price-market { font-size: 11px; font-weight: 600; color: #a855f7; text-transform: uppercase;
     letter-spacing: 1px; margin-bottom: 4px; }
   .ob-price-amount { font-size: 28px; font-weight: 700; color: #fff; }
+
+  .ob-bottom { margin-top: auto; padding-top: 20px; }
+  .ob-bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 900px) { .ob-bottom-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -810,16 +814,29 @@ function renderOutboundSlide(s, topbar, footer, c) {
         '<h2 class="ob-headline">' + escapeHTML(s.headline) + '</h2>' +
         '<p class="ob-intro">' + escapeHTML(s.intro) + '</p>' +
         '<div class="ob-points">' + pointsHtml + '</div>' +
+        '<div class="ob-bottom">' +
+          '<div class="ob-bottom-grid">' +
+            '<div>' +
+              '<div class="ob-section-label" style="margin-top:24px">' + escapeHTML(s.addOnInfra.title) + '</div>' +
+              '<div class="ob-infra">' + addOnHtml + '</div>' +
+              '<div class="ob-extras">' + extrasHtml + '</div>' +
+            '</div>' +
+            (price ? '<div>' +
+              '<div class="ob-section-label" style="margin-top:24px">Pricing</div>' +
+              '<div class="ob-price-card">' +
+                '<div class="ob-price-market">' + escapeHTML(marketLabel) + '</div>' +
+                '<div class="ob-price-amount">' + escapeHTML(price) + '</div>' +
+              '</div>' +
+            '</div>' : '') +
+          '</div>' +
+        '</div>' +
       '</div>' +
       '<div class="ob-right">' +
         '<div class="ob-section-label">Onboarding models</div>' +
         '<div class="ob-models">' + modelsHtml + '</div>' +
         '<div class="ob-section-label" style="margin-top:28px">' + escapeHTML(s.infra.title) + '</div>' +
         '<div class="ob-infra">' + infraHtml + '</div>' +
-        '<div class="ob-section-label" style="margin-top:28px">' + escapeHTML(s.addOnInfra.title) + '</div>' +
-        '<div class="ob-infra">' + addOnHtml + '</div>' +
-        '<div class="ob-extras">' + extrasHtml + '</div>' +
-        pricingHtml +
+
       '</div>' +
     '</div>' + footer + '</div>';
 }
