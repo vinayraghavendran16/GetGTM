@@ -196,6 +196,49 @@
   .ppt-dot { width: 8px; height: 8px; border-radius: 50%; background: #333; }
   .ppt-dot.active { background: #a855f7; }
   .ppt-hint { color: #555; font-size: 11px; }
+
+  .problem-header { padding: 28px 48px 0; text-align: center; }
+  .problem-headline { color: #fff; font-size: 26px; font-weight: 700; margin: 0 0 8px; }
+  .problem-subline { color: #888; font-size: 14px; margin: 0 auto; max-width: 720px; line-height: 1.5; }
+
+  .problem-grid { flex: 1; display: grid; grid-template-columns: 1fr auto 1fr;
+    min-height: 0; overflow: auto; padding: 0; }
+  @media (max-width: 900px) { .problem-grid { grid-template-columns: 1fr; } }
+
+  .problem-col { padding: 24px 32px; display: flex; flex-direction: column; justify-content: center; }
+  .problem-left { background: #111; color: #aaa; }
+  .problem-center { background: #1a0a0a; padding: 24px 20px; border-left: 2px solid #b91c1c;
+    border-right: 2px solid #b91c1c; max-width: 280px; }
+  @media (max-width: 900px) { .problem-center { max-width: 100%; border-left: none; border-right: none;
+    border-top: 2px solid #b91c1c; border-bottom: 2px solid #b91c1c; } }
+  .problem-right { background: #fafaf9; color: #1c1917; }
+  @media (prefers-color-scheme: dark) { .problem-right { background: #1e1e1c; color: #e5e5e3; } }
+
+  .problem-col-stat { font-size: 15px; font-weight: 700; color: #ef4444; margin-top: 16px; }
+  .problem-col-statsub { font-size: 12px; color: #777; margin-top: 4px; }
+
+  .gap-label { font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: #ef4444; margin-bottom: 12px; }
+  .gap-line { height: 1px; background: #b91c1c; opacity: .3; margin: 8px 0; }
+  .gap-items { display: flex; flex-direction: column; gap: 10px; }
+  .gap-item {}
+  .gap-title { font-size: 12px; font-weight: 600; color: #f87171; }
+  .gap-desc { font-size: 11px; color: #888; line-height: 1.4; margin-top: 2px; }
+
+  .ppt-line-check { color: #1c1917; }
+  @media (prefers-color-scheme: dark) { .ppt-line-check { color: #e5e5e3; } }
+
+  .problem-table { padding: 0 48px 8px; background: #000; }
+  .problem-table table { width: 100%; max-width: 640px; margin: 0 auto; border-collapse: collapse;
+    font-size: 12px; }
+  .problem-table th { color: #888; font-size: 10px; text-transform: uppercase; letter-spacing: .5px;
+    padding: 8px 12px; border-bottom: 1px solid #222; text-align: left; font-weight: 600; }
+  .problem-table td { padding: 6px 12px; border-bottom: 1px solid #1a1a1a; }
+  .tbl-before { color: #777; }
+  .tbl-after { color: #a855f7; font-weight: 500; }
+
+  .problem-closing { padding: 14px 48px; background: #000; border-top: 1px solid #222;
+    color: #a855f7; font-size: 14px; font-weight: 500; text-align: center; line-height: 1.5; }
 </style>
 </head>
 <body>
@@ -271,15 +314,42 @@ const ADDONS = [
 ];
 
 const SLIDES = [
-  { category: "The Problem", before: {
-      label: "TODAY",
-      lines: ["Apollo for data \u2014 $99/mo", "Clay for enrichment \u2014 $149/mo", "HeyReach for LinkedIn \u2014 $79/mo", "Smartlead for email \u2014 $94/mo", "Separate dialer \u2014 $50/mo", "CRM \u2014 $45/mo", "Intent data \u2014 $200/mo", "Content tools \u2014 $100/mo"],
-      stat: "$800+/mo in tools alone.", statSub: "8 tools. 8 logins. Zero signal layer."
-    }, after: {
-      label: "WITH GETGTM",
-      lines: ["\u{1F4E1} In-market signals \u2014 9 channels", "\u{1F4E7} Email sequences", "\u{1F517} LinkedIn outreach", "\u{1F4F1} WhatsApp", "\u{1F4DE} US calling", "\u{1F381} Physical gifting & mailers", "\u{1F4DD} AEO / GEO / Inbound", "\u{1F465} CRO + GTM Engineer + CS built in"],
-      stat: "One team.", statSub: "Digital + physical. Every lever, handled."
-  }},
+  { category: "The Problem", type: "problem",
+    headline: "The tools work. The handoffs do not.",
+    subline: "Agencies deliver isolated activities. GetGTM coordinates signals, messaging, channels and people as one accountable pipeline system.",
+    left: {
+      label: "TODAY: A COLLECTION OF TOOLS AND VENDORS",
+      lines: ["Data provider identifies accounts", "Enrichment tool adds contacts", "Email agency sends sequences", "LinkedIn runs separately", "Calling team receives a different list", "Content and inbound operate independently", "Internal team manages the handoffs", "Every partner reports different metrics"],
+      stat: "8+ tools. Multiple owners. No shared operating rhythm.",
+      statSub: "Plus $800+/month in tools before strategy, people or execution."
+    },
+    center: {
+      label: "WHY AGENCY DELIVERY BREAKS",
+      lines: [
+        ["No end-to-end ownership", "Each vendor is responsible for a channel, not pipeline."],
+        ["Channels operate in silos", "Email, LinkedIn, calls and content target different accounts at different times."],
+        ["Context dies during handoffs", "Signals and buyer responses do not reach the next person fast enough."],
+        ["Messaging never compounds", "Learnings from calls rarely improve email, content or targeting."],
+        ["Activity replaces outcomes", "Reports celebrate sends, clicks and dials instead of qualified conversations."],
+        ["The client becomes the PM", "Your internal team coordinates every tool, agency and workflow."]
+      ]
+    },
+    right: {
+      label: "WITH GETGTM: ONE ACCOUNTABLE GTM POD",
+      lines: ["In-market signals determine who to target", "One account strategy across every channel", "Email, LinkedIn, WhatsApp and calling coordinated", "Digital outreach reinforced with gifting and mailers", "AEO, GEO and inbound insights feed outbound", "CRO, GTM Engineer and Customer Success built in", "One reporting layer and weekly optimization loop", "One team accountable for qualified pipeline"],
+      stat: "One strategy. One operating rhythm. One accountable team.",
+      statSub: "Digital + physical. Every relevant lever coordinated around the same accounts."
+    },
+    table: [
+      ["Channel specialists", "Integrated GTM pod"],
+      ["Activity ownership", "Pipeline accountability"],
+      ["Independent campaigns", "One coordinated account journey"],
+      ["Monthly reporting", "Weekly learning and optimization"],
+      ["Client manages handoffs", "GetGTM manages the entire motion"],
+      ["Digital-only execution", "Digital + physical execution"]
+    ],
+    closing: "We do not sell you more tools. We operate the system that turns buying signals into conversations and conversations into pipeline."
+  },
   { category: "Outbound GTM", before: {
       label: "TYPICAL AGENCY",
       lines: ["Single-channel email blasts", "Generic templates, fake personalization", "No signal layer \u2014 spray and pray", "2% reply rate (industry average)", "Burned domains every 60 days", "Junior SDRs reading scripts", "You manage the tools yourself"],
@@ -538,6 +608,26 @@ function renderOffersTab(c) {
     ? '<button class="ppt-btn" data-action="offer-next">Next \u2192</button>'
     : '<button class="ppt-btn" data-action="offer-next">Done \u2192</button>';
 
+  var dotsHtml = SLIDES.map(function(s, i) {
+    return '<div class="ppt-dot' + (i === page ? ' active' : '') + '"></div>';
+  }).join("");
+
+  var topbar = '<div class="ppt-topbar">' +
+    '<div class="ppt-brand"><div class="logo">GTM</div> GetGTM</div>' +
+    '<div class="ppt-counter">' + (page + 1) + ' / ' + total + '</div>' +
+    '<div class="ppt-nav">' + prevBtn + nextBtn + '</div>' +
+  '</div>';
+
+  var footer = '<div class="ppt-footer">' +
+    '<div class="ppt-category">' + escapeHTML(slide.category) + '</div>' +
+    '<div class="ppt-dots">' + dotsHtml + '</div>' +
+    '<div class="ppt-hint">Prospect view</div>' +
+  '</div>';
+
+  if (slide.type === "problem") {
+    return renderProblemSlide(slide, topbar, footer);
+  }
+
   var beforeLines = slide.before.lines.map(function(l) {
     return '<div class="ppt-line">' + escapeHTML(l) + '</div>';
   }).join("");
@@ -545,16 +635,7 @@ function renderOffersTab(c) {
     return '<div class="ppt-line">' + escapeHTML(l) + '</div>';
   }).join("");
 
-  var dotsHtml = SLIDES.map(function(s, i) {
-    return '<div class="ppt-dot' + (i === page ? ' active' : '') + '"></div>';
-  }).join("");
-
-  return '<div class="ppt-fullscreen" id="ppt-screen">' +
-    '<div class="ppt-topbar">' +
-      '<div class="ppt-brand"><div class="logo">GTM</div> GetGTM</div>' +
-      '<div class="ppt-counter">' + (page + 1) + ' / ' + total + '</div>' +
-      '<div class="ppt-nav">' + prevBtn + nextBtn + '</div>' +
-    '</div>' +
+  return '<div class="ppt-fullscreen">' + topbar +
     '<div class="ppt-slide">' +
       '<div class="ppt-half ppt-dark">' +
         '<div class="ppt-label">' + escapeHTML(slide.before.label) + '</div>' +
@@ -568,13 +649,61 @@ function renderOffersTab(c) {
         '<div class="ppt-stat">' + escapeHTML(slide.after.stat) + '</div>' +
         '<div class="ppt-stat-sub">' + escapeHTML(slide.after.statSub) + '</div>' +
       '</div>' +
+    '</div>' + footer + '</div>';
+}
+
+function renderProblemSlide(s, topbar, footer) {
+  var leftLines = s.left.lines.map(function(l) {
+    return '<div class="ppt-line">' + escapeHTML(l) + '</div>';
+  }).join("");
+
+  var centerLines = s.center.lines.map(function(pair) {
+    return '<div class="gap-item">' +
+      '<div class="gap-title">' + escapeHTML(pair[0]) + '</div>' +
+      '<div class="gap-desc">' + escapeHTML(pair[1]) + '</div>' +
+    '</div>';
+  }).join("");
+
+  var rightLines = s.right.lines.map(function(l) {
+    return '<div class="ppt-line ppt-line-check">\u2713 ' + escapeHTML(l) + '</div>';
+  }).join("");
+
+  var tableRows = s.table.map(function(row) {
+    return '<tr><td class="tbl-before">' + escapeHTML(row[0]) + '</td>' +
+      '<td class="tbl-after">' + escapeHTML(row[1]) + '</td></tr>';
+  }).join("");
+
+  return '<div class="ppt-fullscreen">' + topbar +
+    '<div class="problem-header">' +
+      '<h1 class="problem-headline">' + escapeHTML(s.headline) + '</h1>' +
+      '<p class="problem-subline">' + escapeHTML(s.subline) + '</p>' +
     '</div>' +
-    '<div class="ppt-footer">' +
-      '<div class="ppt-category">' + escapeHTML(slide.category) + '</div>' +
-      '<div class="ppt-dots">' + dotsHtml + '</div>' +
-      '<div class="ppt-hint">No pricing shown \u2014 prospect view</div>' +
+    '<div class="problem-grid">' +
+      '<div class="problem-col problem-left">' +
+        '<div class="ppt-label">' + escapeHTML(s.left.label) + '</div>' +
+        '<div class="ppt-lines">' + leftLines + '</div>' +
+        '<div class="problem-col-stat">' + escapeHTML(s.left.stat) + '</div>' +
+        '<div class="problem-col-statsub">' + escapeHTML(s.left.statSub) + '</div>' +
+      '</div>' +
+      '<div class="problem-col problem-center">' +
+        '<div class="gap-label">' + escapeHTML(s.center.label) + '</div>' +
+        '<div class="gap-line"></div>' +
+        '<div class="gap-items">' + centerLines + '</div>' +
+        '<div class="gap-line"></div>' +
+      '</div>' +
+      '<div class="problem-col problem-right">' +
+        '<div class="ppt-label" style="color:#a855f7">' + escapeHTML(s.right.label) + '</div>' +
+        '<div class="ppt-lines">' + rightLines + '</div>' +
+        '<div class="problem-col-stat" style="color:#a855f7">' + escapeHTML(s.right.stat) + '</div>' +
+        '<div class="problem-col-statsub">' + escapeHTML(s.right.statSub) + '</div>' +
+      '</div>' +
     '</div>' +
-  '</div>';
+    '<div class="problem-table">' +
+      '<table><thead><tr><th>Traditional agencies</th><th>GetGTM</th></tr></thead>' +
+      '<tbody>' + tableRows + '</tbody></table>' +
+    '</div>' +
+    '<div class="problem-closing">' + escapeHTML(s.closing) + '</div>' +
+    footer + '</div>';
 }
 
 function renderIntakeTab(c) {
