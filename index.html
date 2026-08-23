@@ -325,11 +325,39 @@
   .prop-check-item { display: flex; align-items: center; gap: 8px; font-size: 13px;
     padding: 8px 12px; background: var(--surface-1); border-radius: 4px; cursor: pointer; }
   .prop-check-item input { margin: 0; }
+
+  .prop-pdf-preview { background: #fff; border: 0.5px solid var(--border); border-radius: 8px;
+    padding: 32px; color: #1c1917; font-size: 12px; line-height: 1.5; max-height: 500px; overflow: auto; }
+  .prop-pdf-preview .cover { background: #1c1917; color: #fff; padding: 32px 28px; border-radius: 8px; margin-bottom: 20px; }
+  .prop-pdf-preview .cover h1 { font-size: 22px; font-weight: 700; margin: 0 0 8px; line-height: 1.1; }
+  .prop-pdf-preview .cover .sub { color: #a8a29e; font-size: 11px; line-height: 1.5; }
+  .prop-pdf-preview .cover .logo { font-size: 14px; font-weight: 700; margin-bottom: 16px; }
+  .prop-pdf-preview .cover .logo span { color: #a855f7; }
+  .prop-pdf-preview .meta-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: #e5e5e5; border: 1px solid #e5e5e5; border-radius: 6px; overflow: hidden; margin-bottom: 16px; }
+  .prop-pdf-preview .meta-cell { background: #fff; padding: 10px 12px; }
+  .prop-pdf-preview .meta-cell .label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: #888; margin-bottom: 2px; }
+  .prop-pdf-preview .meta-cell .val { font-size: 12px; font-weight: 600; }
+  .prop-pdf-preview .invest { background: #1c1917; color: #fff; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; }
+  .prop-pdf-preview .invest .il { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #a855f7; margin-bottom: 4px; }
+  .prop-pdf-preview .invest .iv { font-size: 18px; font-weight: 700; }
+  .prop-pdf-preview .sect { margin-bottom: 16px; }
+  .prop-pdf-preview .sect-num { display: inline-block; background: #a855f7; color: #fff; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 3px; margin-right: 6px; }
+  .prop-pdf-preview .sect h2 { font-size: 15px; font-weight: 700; margin: 0; display: inline; }
+  .prop-pdf-preview .sect-line { height: 1px; background: #e5e5e5; margin: 6px 0 10px; }
+  .prop-pdf-preview table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 12px; }
+  .prop-pdf-preview th { text-align: left; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; color: #888; padding: 6px 10px; border-bottom: 1px solid #ddd; }
+  .prop-pdf-preview td { padding: 6px 10px; border-bottom: 1px solid #eee; }
+  .prop-pdf-preview .obligations { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .prop-pdf-preview .obl-col .obl-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: #888; margin-bottom: 6px; }
+  .prop-pdf-preview .obl-col ul { margin: 0; padding-left: 14px; font-size: 11px; line-height: 1.6; }
+  .prop-pdf-preview .pkg-list { margin: 0 0 12px; padding: 0; list-style: none; }
+  .prop-pdf-preview .pkg-list li { padding: 4px 0; border-bottom: 1px solid #eee; font-size: 11px; }
+  .prop-pdf-preview .footer { border-top: 1px solid #e5e5e5; padding-top: 8px; font-size: 9px; color: #888; text-align: center; margin-top: 20px; }
 </style>
 </head>
 <body>
 <div id="app"></div>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
 const STORAGE_KEY = "getgtm_tracker_v9";
 const PW = "getgtm";
@@ -1113,74 +1141,219 @@ function renderOverviewTab(c) {
   `;
 }
 
-function buildProposalContent(c) {
-  var it = c.intake || {};
-  var p = c.people || {};
-  var g = c.goals || {};
-  var icp = c.icp || {};
-  var ig = c.integration || {};
-
-  var outboundLabel = it.outbound === "outbound-india" ? "Signal-led Outbound (India) - $1,599/mo" : it.outbound === "outbound-us" ? "Signal-led Outbound (US & Other) - $2,499/mo" : "Outbound - TBD";
-  var aeoLabel = it.aeo === "aeo-guided" ? "AEO/GEO Guided Visibility - $1,200/mo" : it.aeo === "aeo-managed" ? "AEO/GEO Managed Authority - $2,000/mo" : "";
-  var delightLabel = it.delight === "delight-test" ? "DelightLoop Test - $499 one-time" : it.delight === "delight-unlimited" ? "DelightLoop Unlimited - $899/yr" : "";
-  var addons = (it.addons || []).map(function(a) {
-    if (a === "us-calling") return "Warm Path Calling - $599/mo + $250/attended meeting";
-    if (a === "revops-definition-lock") return "Definition Lock - $3,500";
-    return a;
-  });
-
-  var lines = [];
-  lines.push("INITIAL PROPOSAL - " + escapeHTML(c.name));
-  lines.push("Prepared by GetGTM.ai for " + escapeHTML(p.clientPoc || it.pocName || c.name));
-  lines.push("");
-  lines.push("DELIVERY PATH: " + (c.path === "7-day" ? "7-day sprint" : c.path === "14-day" ? "14-day buildout" : "Niche GTM"));
-  lines.push("");
-  lines.push("SELECTED PACKAGES:");
-  lines.push("  " + outboundLabel);
-  if (aeoLabel) lines.push("  " + aeoLabel);
-  if (delightLabel) lines.push("  " + delightLabel);
-  addons.forEach(function(a) { lines.push("  Add-on: " + a); });
-  lines.push("");
-  if (g.m1) {
-    lines.push("GOALS:");
-    lines.push("  M1: " + (g.m1.replies || "-") + " positive replies / " + (g.m1.meetings || "-") + " meetings");
-    lines.push("  M2: " + (g.m2.replies || "-") + " positive replies / " + (g.m2.meetings || "-") + " meetings");
-    lines.push("  M3: " + (g.m3.replies || "-") + " positive replies / " + (g.m3.meetings || "-") + " meetings");
-    lines.push("");
-  }
-  if (icp.geography || icp.industry || icp.roles) {
-    lines.push("ICP:");
-    if (icp.geography) lines.push("  Geography: " + icp.geography);
-    if (icp.industry) lines.push("  Industry: " + icp.industry);
-    if (icp.companySize) lines.push("  Company size: " + icp.companySize);
-    if (icp.revenue) lines.push("  Revenue: " + icp.revenue);
-    if (icp.roles) lines.push("  Roles: " + icp.roles);
-    lines.push("");
-  }
-  lines.push("TEAM:");
-  lines.push("  CRO: " + (p.cro || "TBD") + " (" + (p.croEmail || "") + ")");
-  lines.push("  CS: " + (p.cs || "TBD") + " (" + (p.csEmail || "") + ")");
-  lines.push("  GTME: " + (p.gtme || "TBD") + " (" + (p.gtmeEmail || "") + ")");
-  lines.push("  Client POC: " + (p.clientPoc || it.pocName || "TBD") + " (" + (p.clientPocEmail || it.pocEmail || "") + ")");
-  return lines;
-}
-
 function buildGmailLink(to, subject, bodyLines) {
   var body = bodyLines.join("\n");
   return "https://mail.google.com/mail/?view=cm&to=" + encodeURIComponent(to) +
     "&su=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
 }
 
+function buildProposalHTML(c, isForPDF) {
+  var it = c.intake || {};
+  var p = c.people || {};
+  var g = c.goals || {};
+  var icp = c.icp || {};
+  var ig = c.integration || {};
+  var pocName = p.clientPoc || it.pocName || "TBD";
+  var pocEmail = p.clientPocEmail || it.pocEmail || "";
+  var cro = p.cro || "Vinay Raghavendran";
+  var croEmail = p.croEmail || "vinay@getgtm.ai";
+  var cs = p.cs || "TBD";
+  var gtme = p.gtme || "TBD";
+  var today = new Date().toLocaleDateString("en-US", { year:"numeric", month:"long", day:"numeric" });
+  var pathLabel = c.path === "7-day" ? "7-day sprint" : c.path === "14-day" ? "14-day buildout" : "Niche GTM";
+  var price = it.outbound === "outbound-india" ? "$1,599" : it.outbound === "outbound-us" ? "$2,499" : "TBD";
+  var market = it.outbound === "outbound-india" ? "India" : "US & Other";
+
+  var packages = [];
+  if (it.outbound) packages.push(it.outbound === "outbound-india" ? "Signal-led Outbound (India) - $1,599/mo" : "Signal-led Outbound (US) - $2,499/mo");
+  if (it.aeo) packages.push(it.aeo === "aeo-guided" ? "AEO/GEO Guided Visibility - $1,200/mo" : "AEO/GEO Managed Authority - $2,000/mo");
+  if (it.delight) packages.push(it.delight === "delight-test" ? "DelightLoop Test - $499" : "DelightLoop Unlimited - $899/yr");
+  (it.addons || []).forEach(function(a) {
+    if (a === "us-calling") packages.push("Warm Path Calling - $599/mo + $250/meeting");
+    if (a === "revops-definition-lock") packages.push("Definition Lock - $3,500");
+  });
+
+  var s = isForPDF ? 'style' : 'style';
+  var css = isForPDF ? '<style>@page{margin:40px 50px}body{font-family:Helvetica,Arial,sans-serif;color:#1c1917;font-size:12px;line-height:1.5}' +
+    '.cover{background:#1c1917;color:#fff;padding:60px 50px;border-radius:12px;margin-bottom:30px}' +
+    '.cover h1{font-size:32px;font-weight:700;margin:0 0 12px;line-height:1.1}.cover .sub{color:#a8a29e;font-size:13px;line-height:1.6}' +
+    '.cover .logo{font-size:16px;font-weight:700;margin-bottom:24px;color:#fff}.cover .logo span{color:#a855f7}' +
+    '.meta-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:#e5e5e5;border:1px solid #e5e5e5;border-radius:8px;overflow:hidden;margin-bottom:24px}' +
+    '.meta-cell{background:#fff;padding:14px 16px}.meta-cell .label{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:4px}.meta-cell .val{font-size:13px;font-weight:600}' +
+    '.invest{background:#1c1917;color:#fff;border-radius:8px;padding:16px 20px;margin-bottom:30px}.invest .il{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#a855f7;margin-bottom:6px}.invest .iv{font-size:20px;font-weight:700}' +
+    '.sect{margin-bottom:24px}.sect-num{display:inline-block;background:#a855f7;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;margin-right:8px}' +
+    '.sect h2{font-size:18px;font-weight:700;margin:0 0 4px;display:inline}.sect-line{height:1px;background:#e5e5e5;margin:8px 0 14px}' +
+    'table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px}th{text-align:left;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#888;padding:8px 12px;border-bottom:1px solid #ddd}' +
+    'td{padding:8px 12px;border-bottom:1px solid #eee}td strong{font-weight:600}' +
+    '.tier-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px}.tier{background:#f5f5f4;border-radius:8px;padding:14px 16px}' +
+    '.tier .tl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#a855f7;margin-bottom:6px}.tier h3{font-size:13px;font-weight:600;margin:0 0 8px}.tier p{font-size:11px;color:#555;margin:3px 0}' +
+    '.obligations{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:16px}.obl-col .obl-label{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:8px}.obl-col ul{margin:0;padding-left:16px;font-size:11px;line-height:1.6}' +
+    '.footer{border-top:1px solid #e5e5e5;padding-top:12px;font-size:9px;color:#888;text-align:center;margin-top:30px}' +
+    '.pkg-list{margin:0 0 16px;padding:0;list-style:none}.pkg-list li{padding:6px 0;border-bottom:1px solid #eee;font-size:12px}' +
+    '.page-break{page-break-before:always}' +
+    '</style>' : '';
+
+  var html = (isForPDF ? '<!DOCTYPE html><html><head><meta charset="UTF-8">' + css + '</head><body>' : '<div class="prop-pdf-preview">');
+
+  // Cover
+  html += '<div class="cover"><div class="logo">get<span>GTM</span></div>' +
+    '<div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#888;float:right;margin-top:-20px">GO-TO-MARKET PROPOSAL</div>' +
+    '<h1>Outbound<br>Pipeline Proposal<br>for ' + escapeHTML(c.name) + '</h1>' +
+    '<div class="sub">A signal-driven, Build-Operate-Transfer outbound engine that puts ' + escapeHTML(c.name) +
+    ' in front of the right buyers at the right time. Built, operated, and handed back to your team.</div></div>';
+
+  // Meta grid
+  html += '<div class="meta-grid">' +
+    '<div class="meta-cell"><div class="label">Proposal date</div><div class="val">' + today + '</div></div>' +
+    '<div class="meta-cell"><div class="label">Proposal sent by</div><div class="val">' + escapeHTML(cro) + ', getGTM.ai</div></div>' +
+    '<div class="meta-cell"><div class="label">Prepared for</div><div class="val">' + escapeHTML(pocName) + ', ' + escapeHTML(c.name) + '</div></div>' +
+    '<div class="meta-cell"><div class="label">Engagement type</div><div class="val">GTM Managed Service (BOT)</div></div>' +
+    '<div class="meta-cell"><div class="label">Delivery path</div><div class="val">' + escapeHTML(pathLabel) + '</div></div>' +
+    '<div class="meta-cell"><div class="label">Initial term</div><div class="val">3 months</div></div>' +
+  '</div>';
+
+  // Investment
+  html += '<div class="invest"><div class="il">Monthly investment</div><div class="iv">' + escapeHTML(price) + '/month</div></div>';
+
+  // 01 Executive Summary
+  html += '<div class="sect"><span class="sect-num">01</span><h2>Executive Summary</h2><div class="sect-line"></div>' +
+    '<p><strong>Understanding ' + escapeHTML(c.name) + '.</strong> ' + escapeHTML(it.website ? 'Based at ' + it.website + '. ' : '') +
+    'This proposal outlines a scalable, signal-driven outbound engine tailored to ' + escapeHTML(c.name) + "'s ICP, operated end-to-end by getGTM.ai, with clear scope, defined KPIs, and a transfer of the full playbook at the end of the term.</p>" +
+    '</div>';
+
+  // 02 Selected packages
+  html += '<div class="sect"><span class="sect-num">02</span><h2>Selected Packages</h2><div class="sect-line"></div>' +
+    '<ul class="pkg-list">' + packages.map(function(p) { return '<li><strong>' + escapeHTML(p) + '</strong></li>'; }).join('') + '</ul></div>';
+
+  // 03 ICP
+  html += '<div class="sect"><span class="sect-num">03</span><h2>Ideal Customer Profile</h2><div class="sect-line"></div>';
+  if (icp.geography || icp.industry || icp.roles) {
+    html += '<table><thead><tr><th>Dimension</th><th>Definition</th></tr></thead><tbody>';
+    if (icp.geography) html += '<tr><td><strong>Geography</strong></td><td>' + escapeHTML(icp.geography) + '</td></tr>';
+    if (icp.industry) html += '<tr><td><strong>Industry</strong></td><td>' + escapeHTML(icp.industry) + '</td></tr>';
+    if (icp.companySize) html += '<tr><td><strong>Company size</strong></td><td>' + escapeHTML(icp.companySize) + '</td></tr>';
+    if (icp.revenue) html += '<tr><td><strong>Revenue</strong></td><td>' + escapeHTML(icp.revenue) + '</td></tr>';
+    if (icp.roles) html += '<tr><td><strong>Roles</strong></td><td>' + escapeHTML(icp.roles) + '</td></tr>';
+    if (icp.exclusions) html += '<tr><td><strong>Exclusions</strong></td><td>' + escapeHTML(icp.exclusions) + '</td></tr>';
+    html += '</tbody></table>';
+  } else { html += '<p>ICP to be defined during onboarding.</p>'; }
+  html += '</div>';
+
+  // 04 Goals
+  html += '<div class="sect"><span class="sect-num">04</span><h2>Outcomes & Goals</h2><div class="sect-line"></div>';
+  if (g.m1) {
+    html += '<table><thead><tr><th>Month</th><th>Positive replies</th><th>Meetings booked</th></tr></thead><tbody>' +
+      '<tr><td>M1</td><td>' + escapeHTML(g.m1.replies || "Ramp") + '</td><td>' + escapeHTML(g.m1.meetings || "Ramp") + '</td></tr>' +
+      '<tr><td>M2</td><td>' + escapeHTML(g.m2.replies || "TBD") + '</td><td>' + escapeHTML(g.m2.meetings || "TBD") + '</td></tr>' +
+      '<tr><td>M3</td><td>' + escapeHTML(g.m3.replies || "TBD") + '</td><td>' + escapeHTML(g.m3.meetings || "TBD") + '</td></tr>' +
+      '</tbody></table>';
+  }
+  html += '</div>';
+
+  // 05 Deliverables (static)
+  html += '<div class="sect' + (isForPDF ? ' page-break' : '') + '"><span class="sect-num">05</span><h2>Deliverables & Platform</h2><div class="sect-line"></div>' +
+    '<table><thead><tr><th>Deliverable</th><th>Description</th></tr></thead><tbody>' +
+    '<tr><td><strong>ICP & Signal Mapping</strong></td><td>Buyer-tier definition and signal sources configured in Heddl.app.</td></tr>' +
+    '<tr><td><strong>Prospect List Build & Enrichment</strong></td><td>Verified accounts and contacts across ICP tiers, enriched with emails and LinkedIn profiles.</td></tr>' +
+    '<tr><td><strong>Messaging & Sequences</strong></td><td>Signal-triggered email + LinkedIn cadences per programme, written, tested, and deployed.</td></tr>' +
+    '<tr><td><strong>Platform & Tooling</strong></td><td>Heddl.app (intent signals, automation, attribution) - fully bundled.</td></tr>' +
+    '<tr><td><strong>Reporting & KPI Evidence</strong></td><td>Weekly sent/open/reply metrics and monthly KPI evidence report.</td></tr>' +
+    '<tr><td><strong>Playbook Transfer</strong></td><td>At end of term: full outreach playbook, sequences, ICP definitions, and signal configuration handed to ' + escapeHTML(c.name) + '.</td></tr>' +
+    '</tbody></table></div>';
+
+  // 06 Commercial terms (static)
+  html += '<div class="sect"><span class="sect-num">06</span><h2>Commercial Terms</h2><div class="sect-line"></div>' +
+    '<table><thead><tr><th>Component</th><th>Amount</th><th>When due</th></tr></thead><tbody>' +
+    '<tr><td><strong>Month 1 - Onboarding & Setup</strong></td><td>' + escapeHTML(price) + '</td><td>On signing</td></tr>' +
+    '<tr><td><strong>Month 2+ - Monthly retainer</strong></td><td>' + escapeHTML(price) + '/mo</td><td>1st of each month</td></tr>' +
+    '</tbody></table>' +
+    '<p style="font-size:10px;color:#888">Fees are all-inclusive of tooling, enrichment credits, and platform usage. Payments in USD.</p></div>';
+
+  // 07 Obligations (static)
+  html += '<div class="sect"><span class="sect-num">07</span><h2>Obligations</h2><div class="sect-line"></div>' +
+    '<div class="obligations">' +
+    '<div class="obl-col"><div class="obl-label">GETGTM.AI</div><ul>' +
+    '<li>Deliver programmes with reasonable skill and care</li>' +
+    '<li>Provide weekly activity reports and monthly KPI evidence</li>' +
+    '<li>Maintain confidentiality of all client data</li>' +
+    '<li>Assign a dedicated GTM lead</li></ul></div>' +
+    '<div class="obl-col"><div class="obl-label">' + escapeHTML(c.name).toUpperCase() + '</div><ul>' +
+    '<li>Provide product info and ICP guidance within 5 business days</li>' +
+    '<li>Provide domains/mailboxes and LinkedIn accounts</li>' +
+    '<li>Designate a contact to receive leads and join reviews</li>' +
+    '<li>Respond to KPI verification within 5 business days</li></ul></div>' +
+    '</div></div>';
+
+  // 08 Team
+  html += '<div class="sect"><span class="sect-num">08</span><h2>Your GetGTM Team</h2><div class="sect-line"></div>' +
+    '<table><thead><tr><th>Role</th><th>Name</th><th>Email</th></tr></thead><tbody>' +
+    '<tr><td><strong>CRO</strong></td><td>' + escapeHTML(cro) + '</td><td>' + escapeHTML(croEmail) + '</td></tr>' +
+    '<tr><td><strong>CS</strong></td><td>' + escapeHTML(cs) + '</td><td>' + escapeHTML(p.csEmail || "") + '</td></tr>' +
+    '<tr><td><strong>GTM Engineer</strong></td><td>' + escapeHTML(gtme) + '</td><td>' + escapeHTML(p.gtmeEmail || "") + '</td></tr>' +
+    '</tbody></table></div>';
+
+  // Footer
+  html += '<div class="footer">CONFIDENTIAL PROPOSAL | GETGTM.AI | ' + escapeHTML(croEmail) + '</div>';
+
+  html += (isForPDF ? '</body></html>' : '</div>');
+  return html;
+}
+
+function generateProposalPDF(c) {
+  var html = buildProposalHTML(c, true);
+  var filename = c.name.replace(/[^a-zA-Z0-9]+/g, '_') + '_x_GetGTM_Initial_Proposal.pdf';
+  var container = document.createElement('div');
+  container.innerHTML = html;
+  document.body.appendChild(container);
+  var opt = {
+    margin: 0,
+    filename: filename,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['css', 'legacy'] }
+  };
+  html2pdf().set(opt).from(container).save().then(function() {
+    document.body.removeChild(container);
+  });
+}
+
+function buildProposalEmailBody(c) {
+  var it = c.intake || {};
+  var p = c.people || {};
+  var pocName = (p.clientPoc || it.pocName || "").split(",")[0].split(" ")[0] || "there";
+  var lines = [
+    "Hi " + pocName + ",",
+    "",
+    "Thank you for taking the time to speak with us. Please find attached our initial proposal for " + c.name + ".",
+    "",
+    "The proposal covers:",
+    "- Selected packages and pricing",
+    "- ICP and target market definition",
+    "- Monthly outcome goals",
+    "- Deliverables and platform details",
+    "- Commercial terms and your GetGTM team",
+    "",
+    "Please review and let us know if anything needs to be adjusted. We are happy to walk through the proposal on a call if that is easier.",
+    "",
+    "Looking forward to your feedback.",
+    "",
+    "Best,",
+    (p.cro || "Vinay Raghavendran"),
+    "GetGTM.ai"
+  ];
+  return lines;
+}
+
 function renderProposalTab(c) {
   var pr = c.proposal;
   if (!pr) { c.proposal = { stage: "draft", initialSentDate: "", initialNotes: "", scopeNotes: [], finalSentDate: "", finalNotes: "", approvedDate: "", approvalEmail: "", sowGenerated: false }; pr = c.proposal; }
   var it = c.intake || {};
-  var proposalLines = buildProposalContent(c);
   var pocEmail = c.people.clientPocEmail || it.pocEmail || "";
-  var gmailInitial = buildGmailLink(pocEmail, "GetGTM Initial Proposal - " + c.name, proposalLines);
+  var emailLines = buildProposalEmailBody(c);
+  var gmailLink = buildGmailLink(pocEmail, c.name + " x GetGTM - Initial Proposal", emailLines);
 
   var stage = pr.stage;
-  var stageLabels = { draft: "1. Draft", sent: "2. Scope Review", final: "3. Final Sent", approved: "4. Approved" };
 
   var stageBar = '<div class="prop-stages">';
   ["draft","sent","final","approved"].forEach(function(s, i) {
@@ -1199,29 +1372,28 @@ function renderProposalTab(c) {
   if (stage === "draft") {
     html += '<div class="prop-section">';
     html += '<h3 class="prop-h3">Initial proposal preview</h3>';
-    html += '<div class="prop-preview">' + proposalLines.map(function(l) {
-      return '<div class="prop-line">' + (l === "" ? "&nbsp;" : escapeHTML(l)) + '</div>';
-    }).join("") + '</div>';
-    html += '<div class="field" style="margin-top:12px"><label>Notes to include</label><textarea data-proposal="initialNotes" placeholder="Add context, special terms, or notes for the client">' + escapeHTML(pr.initialNotes) + '</textarea></div>';
-    html += '<div style="display:flex;gap:8px;margin-top:12px">';
-    html += '<a href="' + gmailInitial + '" target="_blank" class="btn" data-action="mark-initial-sent">Generate & send via Gmail</a>';
+    html += '<div class="small" style="margin-bottom:12px">This proposal auto-populates from your Client Intake and Overview. Review, then generate the PDF and send.</div>';
+    html += buildProposalHTML(c, false);
+    html += '<div class="field" style="margin-top:12px"><label>Internal notes</label><textarea data-proposal="initialNotes" placeholder="Notes for internal reference (not included in the PDF)">' + escapeHTML(pr.initialNotes) + '</textarea></div>';
+    html += '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">';
+    html += '<button class="btn" data-action="generate-pdf">Generate PDF</button>';
+    html += '<a href="' + gmailLink + '" target="_blank" class="btn" style="text-decoration:none" data-action="mark-initial-sent">Draft email in Gmail</a>';
     html += '</div>';
+    html += '<div class="small" style="margin-top:8px">PDF downloads as <code>' + escapeHTML(c.name.replace(/[^a-zA-Z0-9]+/g, '_')) + '_x_GetGTM_Initial_Proposal.pdf</code>. Attach it to the Gmail draft.</div>';
     html += '</div>';
   }
 
   if (stage === "sent") {
     html += '<div class="prop-section">';
-    html += '<div class="small" style="margin-bottom:12px">Initial proposal sent ' + escapeHTML(pr.initialSentDate) + '. Add scope review notes below.</div>';
-    html += '<h3 class="prop-h3">Scope review (GTME / CS)</h3>';
-    html += '<div class="prop-preview" style="max-height:200px;overflow:auto;margin-bottom:12px">' + proposalLines.map(function(l) {
-      return '<div class="prop-line">' + (l === "" ? "&nbsp;" : escapeHTML(l)) + '</div>';
-    }).join("") + '</div>';
-    html += '<div class="field"><label>Feasibility notes</label><textarea data-proposal="finalNotes" placeholder="What is feasible? What needs to change? Any scope clarifications?">' + escapeHTML(pr.finalNotes) + '</textarea></div>';
-
-    var finalLines = proposalLines.concat(["", "SCOPE REVIEW NOTES:", pr.finalNotes || "(none)"]);
-    var gmailFinal = buildGmailLink(pocEmail, "GetGTM Final Proposal - " + c.name, finalLines);
-    html += '<div style="display:flex;gap:8px;margin-top:12px">';
-    html += '<a href="' + gmailFinal + '" target="_blank" class="btn" data-action="mark-final-sent">Send final proposal via Gmail</a>';
+    html += '<div class="small" style="margin-bottom:12px">Initial proposal sent ' + escapeHTML(pr.initialSentDate) + '. GTME / CS: add scope review notes below.</div>';
+    html += '<h3 class="prop-h3">Scope review</h3>';
+    html += '<div class="field"><label>Feasibility notes</label><textarea data-proposal="finalNotes" placeholder="What is feasible? What needs to change? Any scope adjustments?">' + escapeHTML(pr.finalNotes) + '</textarea></div>';
+    var finalEmailLines = buildProposalEmailBody(c);
+    finalEmailLines.splice(2, 1, "Following our review, please find the final proposal for " + c.name + " with scope adjustments noted.");
+    var gmailFinal = buildGmailLink(pocEmail, c.name + " x GetGTM - Final Proposal", finalEmailLines);
+    html += '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">';
+    html += '<button class="btn" data-action="generate-pdf">Regenerate PDF</button>';
+    html += '<a href="' + gmailFinal + '" target="_blank" class="btn" style="text-decoration:none" data-action="mark-final-sent">Send final proposal via Gmail</a>';
     html += '</div>';
     html += '</div>';
   }
@@ -1229,27 +1401,21 @@ function renderProposalTab(c) {
   if (stage === "final") {
     html += '<div class="prop-section">';
     html += '<div class="small" style="margin-bottom:12px">Final proposal sent ' + escapeHTML(pr.finalSentDate) + '. Waiting for client approval via email.</div>';
-    html += '<div class="field"><label>Approval email reference</label><input data-proposal="approvalEmail" value="' + escapeAttr(pr.approvalEmail) + '" placeholder="Paste the approval email subject or thread link"></div>';
-    html += '<button class="btn" data-action="mark-approved">Mark as approved</button>';
+    html += '<div class="field"><label>Approval email reference</label><input data-proposal="approvalEmail" value="' + escapeAttr(pr.approvalEmail) + '" placeholder="Paste approval email subject or thread link"></div>';
+    html += '<button class="btn" data-action="mark-approved">Mark as approved - generate SOW</button>';
     html += '</div>';
   }
 
   if (stage === "approved") {
     html += '<div class="prop-section">';
     html += '<div style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:14px 16px;color:#15803d;font-size:13px;margin-bottom:16px">';
-    html += '<strong>Proposal approved</strong> on ' + escapeHTML(pr.approvedDate) + '. SOW and onboarding checklist are ready.';
+    html += '<strong>Proposal approved</strong> on ' + escapeHTML(pr.approvedDate) + '. SOW and onboarding ready.';
+    html += '</div>';
+    html += '<div style="display:flex;gap:8px;margin-bottom:16px">';
+    html += '<button class="btn" data-action="generate-pdf">Download SOW as PDF</button>';
     html += '</div>';
 
-    html += '<h3 class="prop-h3">Auto-generated SOW summary</h3>';
-    html += '<div class="prop-preview">';
-    var sowLines = buildProposalContent(c);
-    sowLines.splice(0, 1, "STATEMENT OF WORK - " + c.name);
-    if (pr.finalNotes) sowLines.push("", "AGREED SCOPE AMENDMENTS:", pr.finalNotes);
-    sowLines.push("", "APPROVED: " + pr.approvedDate, "REFERENCE: " + (pr.approvalEmail || "On file"));
-    html += sowLines.map(function(l) { return '<div class="prop-line">' + (l === "" ? "&nbsp;" : escapeHTML(l)) + '</div>'; }).join("");
-    html += '</div>';
-
-    html += '<h3 class="prop-h3" style="margin-top:20px">Onboarding checklist</h3>';
+    html += '<h3 class="prop-h3">Onboarding checklist</h3>';
     var checks = ["SOW signed and filed", "Invoice sent for Part 1", "Shared Slack/Teams channel created",
       "Drive folder created with Assets subfolder", "CRM access granted or sheet created",
       "LinkedIn accounts connected", "Sales Navigator access confirmed",
@@ -1257,16 +1423,16 @@ function renderProposalTab(c) {
       "ICP fitment document prepared", "MSP signed off by both parties"];
     html += '<div class="prop-checklist">';
     checks.forEach(function(item, i) {
-      html += '<label class="prop-check-item"><input type="checkbox" data-onboard-check="' + i + '"> ' + escapeHTML(item) + '</label>';
+      html += '<label class="prop-check-item"><input type="checkbox"> ' + escapeHTML(item) + '</label>';
     });
     html += '</div>';
-
     html += '</div>';
   }
 
   html += '</div></div>';
   return html;
 }
+
 
 
 function renderTimelineTab(c) {
@@ -1406,7 +1572,9 @@ function attachHandlers() {
           ui.tab = "intake"; render();
         }
       }
-      else if (action === "mark-initial-sent") {
+      else if (action === "generate-pdf") {
+        generateProposalPDF(state.clients[ui.clientId]);
+      } else if (action === "mark-initial-sent") {
         const cl = state.clients[ui.clientId];
         cl.proposal.stage = "sent";
         cl.proposal.initialSentDate = new Date().toISOString().slice(0,10);
