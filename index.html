@@ -623,7 +623,7 @@ function render() {
   let html = "";
   if (ui.view === "login") html = renderLogin();
   else if (ui.view === "dashboard") html = renderDashboard();
-  else if (ui.view === "client") html = renderClient();
+  else if (ui.view === "client") { var cl = state.clients[ui.clientId]; if (cl) syncTimelineFromDelivery(cl); html = renderClient(); }
 
   document.querySelectorAll(".modal-backdrop").forEach(el => el.remove());
   app.innerHTML = html;
@@ -1473,6 +1473,112 @@ function renderProposalTab(c) {
 
 
 
+function syncTimelineFromDelivery(c) {
+  if (!c.delivery || !c.stages) return;
+  var del = c.delivery.onboarding;
+  var stageMap = {};
+  del.forEach(function(item) { stageMap[item.item] = item.status; });
+
+  function allDone() {
+    var items = Array.prototype.slice.call(arguments);
+    return items.every(function(name) { return stageMap[name] === "Complete"; });
+  }
+  function anyBlocked() {
+    var items = Array.prototype.slice.call(arguments);
+    return items.some(function(name) { return stageMap[name] === "Blocked"; });
+  }
+  function anyStarted() {
+    var items = Array.prototype.slice.call(arguments);
+    return items.some(function(name) { return stageMap[name] === "In Progress" || stageMap[name] === "Complete"; });
+  }
+
+  c.stages.forEach(function(stage) {
+    var s = stage.stage;
+    var newStatus = stage.status;
+
+    // Proposal approved = Qualification + Scoping + Proposal + Commercial Handover done
+    if (c.proposal && c.proposal.stage === "approved") {
+      if (s === "Qualification" || s === "Scoping" || s === "Proposal" || s === "Proposal / Scoping") newStatus = "Complete";
+      if (s === "Commercial Handover") {
+        if (allDone("SOW signed and filed", "Invoice sent (Part 1)")) newStatus = "Complete";
+        else if (anyStarted("SOW signed and filed", "Invoice sent (Part 1)")) newStatus = "In Progress";
+      }
+    }
+
+    if (s === "Onboarding" || s === "Onboarding Call") {
+      if (allDone("Kickoff call completed")) newStatus = "Complete";
+      else if (anyStarted("Kickoff call completed", "Shared Slack/Teams channel created")) newStatus = "In Progress";
+      if (anyBlocked("Kickoff call completed")) newStatus = "Blocked";
+    }
+
+    if (s === "Infrastructure") {
+      if (allDone("Email domains purchased", "Email domains warming")) newStatus = "Complete";
+      else if (anyStarted("Email domains purchased", "Email domains warming")) newStatus = "In Progress";
+      if (anyBlocked("Email domains purchased", "Email domains warming")) newStatus = "Blocked";
+    }
+
+    if (s === "Connecting Accounts") {
+      if (allDone("LinkedIn accounts connected", "Sales Navigator access confirmed", "CRM access granted or tracking sheet created")) newStatus = "Complete";
+      else if (anyStarted("LinkedIn accounts connected", "Sales Navigator access confirmed")) newStatus = "In Progress";
+      if (anyBlocked("LinkedIn accounts connected", "Sales Navigator access confirmed")) newStatus = "Blocked";
+    }
+
+    if (s === "ICP Fitment") {
+      if (allDone("ICP fitment document approved")) newStatus = "Complete";
+      else if (anyStarted("ICP fitment document approved")) newStatus = "In Progress";
+      if (anyBlocked("ICP fitment document approved")) newStatus = "Blocked";
+    }
+
+    if (s === "TAM & List" || s === "Target List Research") {
+      if (allDone("TAM & launch list built")) newStatus = "Complete";
+      else if (anyStarted("TAM & launch list built")) newStatus = "In Progress";
+      if (anyBlocked("TAM & launch list built")) newStatus = "Blocked";
+    }
+
+    if (s === "Messaging") {
+      if (allDone("Messaging approved")) newStatus = "Complete";
+      else if (anyStarted("Messaging approved")) newStatus = "In Progress";
+      if (anyBlocked("Messaging approved")) newStatus = "Blocked";
+    }
+
+    if (s === "Campaign Build" || s === "QA & Test" || s === "QA & Validation") {
+      if (allDone("Campaign built and QA passed")) newStatus = "Complete";
+      else if (anyStarted("Campaign built and QA passed")) newStatus = "In Progress";
+      if (anyBlocked("Campaign built and QA passed")) newStatus = "Blocked";
+    }
+
+    if (s === "Launch") {
+      if (allDone("First campaign launched")) newStatus = "Complete";
+      else if (anyStarted("First campaign launched")) newStatus = "In Progress";
+      if (anyBlocked("First campaign launched")) newStatus = "Blocked";
+    }
+
+    if (s === "First Review" || s === "Post-launch") {
+      if (allDone("MSP signed off by both parties", "First campaign launched")) newStatus = "Complete";
+      else if (allDone("First campaign launched")) newStatus = "In Progress";
+    }
+
+    // Deep Discovery (niche path)
+    if (s === "Deep Discovery") {
+      if (allDone("Kickoff call completed")) newStatus = "Complete";
+      else if (anyStarted("Kickoff call completed")) newStatus = "In Progress";
+    }
+
+    // GTM Play Design (niche path)
+    if (s === "GTM Play Design") {
+      if (allDone("ICP fitment document approved", "TAM & launch list built")) newStatus = "Complete";
+      else if (anyStarted("ICP fitment document approved")) newStatus = "In Progress";
+    }
+
+    // Update date if completing
+    if (newStatus === "Complete" && stage.status !== "Complete" && !stage.eta) {
+      stage.eta = new Date().toISOString().slice(0, 10);
+    }
+
+    stage.status = newStatus;
+  });
+}
+
 function renderTimelineBar(c) {
   var stages = c.stages || [];
   var total = stages.length;
@@ -1724,6 +1830,7 @@ function attachHandlers() {
         cl.proposal.stage = "approved";
         cl.proposal.approvedDate = new Date().toISOString().slice(0,10);
         cl.sow.status = "Drafting";
+        syncTimelineFromDelivery(cl);
         await saveState(); render();
       }
       else if (action === "save-intake") {
@@ -1814,7 +1921,7 @@ function attachHandlers() {
       if (!cl.delivery) return;
       var idx = parseInt(el.dataset.delivery);
       cl.delivery.onboarding[idx][el.dataset.key] = el.value;
-      if (el.dataset.key === "status") { saveState(); render(); } else { save(); }
+      if (el.dataset.key === "status") { syncTimelineFromDelivery(cl); saveState(); render(); } else { save(); }
     };
     el.addEventListener("input", handler);
     el.addEventListener("change", handler);
