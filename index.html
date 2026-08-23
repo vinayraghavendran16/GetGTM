@@ -302,6 +302,29 @@
   .ob-bottom { margin-top: auto; padding-top: 20px; }
   .ob-bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
   @media (max-width: 900px) { .ob-bottom-grid { grid-template-columns: 1fr; } }
+
+  .prop-stages { display: flex; align-items: center; gap: 0; margin-bottom: 24px; padding: 16px 0; }
+  .prop-stage-dot { display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 1; }
+  .prop-stage-num { width: 28px; height: 28px; border-radius: 50%; background: var(--border);
+    color: var(--text-muted); display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; }
+  .prop-stage-dot.done .prop-stage-num { background: #a855f7; color: #fff; }
+  .prop-stage-dot.current .prop-stage-num { box-shadow: 0 0 0 3px #e9d5ff; }
+  .prop-stage-label { font-size: 10px; color: var(--text-muted); font-weight: 500; white-space: nowrap; }
+  .prop-stage-dot.done .prop-stage-label { color: #a855f7; }
+  .prop-stage-line { flex: 1; height: 2px; background: var(--border); min-width: 20px; margin-top: -18px; }
+  .prop-stage-line.done { background: #a855f7; }
+
+  .prop-section { margin-top: 8px; }
+  .prop-h3 { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
+  .prop-preview { background: var(--surface-1); border: 0.5px solid var(--border); border-radius: 6px;
+    padding: 16px; font-family: monospace; font-size: 12px; line-height: 1.6; max-height: 400px; overflow: auto; }
+  .prop-line { white-space: pre-wrap; }
+
+  .prop-checklist { display: flex; flex-direction: column; gap: 8px; }
+  .prop-check-item { display: flex; align-items: center; gap: 8px; font-size: 13px;
+    padding: 8px 12px; background: var(--surface-1); border-radius: 4px; cursor: pointer; }
+  .prop-check-item input { margin: 0; }
 </style>
 </head>
 <body>
@@ -507,6 +530,14 @@ function newClient(name, path) {
       roles: "", exclusions: "", currentAccounts: "", competitors: "",
     },
     integration: { type: "Google Sheet", sheetLink: "", crmName: "", notes: "" },
+    proposal: {
+      stage: "draft",
+      initialSentDate: "", initialNotes: "",
+      scopeNotes: [],
+      finalSentDate: "", finalNotes: "",
+      approvedDate: "", approvalEmail: "",
+      sowGenerated: false
+    },
     sow: { status: "Not Started", value: "", signedDate: "" },
     stages: PATHS[path].stages.map(s => ({ stage: s, status: "Not Started", eta: "", notes: "" })),
     outcomes: [],
@@ -661,6 +692,7 @@ function renderClient() {
         <button data-action="tab" data-tab="offers" class="${ui.tab==='offers'?'active':''}">Offers</button>
         <button data-action="tab" data-tab="intake" class="${ui.tab==='intake'?'active':''}">Client Intake</button>
         <button data-action="tab" data-tab="overview" class="${ui.tab==='overview'?'active':''}">Overview</button>
+        <button data-action="tab" data-tab="proposal" class="${ui.tab==='proposal'?'active':''}">Proposal</button>
         <button data-action="tab" data-tab="timeline" class="${ui.tab==='timeline'?'active':''}">Timeline</button>
         <button data-action="tab" data-tab="outcomes" class="${ui.tab==='outcomes'?'active':''}">Outcomes</button>
       </div>
@@ -669,6 +701,7 @@ function renderClient() {
         ui.tab === "offers" ? renderOffersTab(c)
         : ui.tab === "intake" ? renderIntakeTab(c)
         : ui.tab === "overview" ? renderOverviewTab(c)
+        : ui.tab === "proposal" ? renderProposalTab(c)
         : ui.tab === "timeline" ? renderTimelineTab(c)
         : renderOutcomesTab(c)
       }</div>
@@ -1080,6 +1113,162 @@ function renderOverviewTab(c) {
   `;
 }
 
+function buildProposalContent(c) {
+  var it = c.intake || {};
+  var p = c.people || {};
+  var g = c.goals || {};
+  var icp = c.icp || {};
+  var ig = c.integration || {};
+
+  var outboundLabel = it.outbound === "outbound-india" ? "Signal-led Outbound (India) - $1,599/mo" : it.outbound === "outbound-us" ? "Signal-led Outbound (US & Other) - $2,499/mo" : "Outbound - TBD";
+  var aeoLabel = it.aeo === "aeo-guided" ? "AEO/GEO Guided Visibility - $1,200/mo" : it.aeo === "aeo-managed" ? "AEO/GEO Managed Authority - $2,000/mo" : "";
+  var delightLabel = it.delight === "delight-test" ? "DelightLoop Test - $499 one-time" : it.delight === "delight-unlimited" ? "DelightLoop Unlimited - $899/yr" : "";
+  var addons = (it.addons || []).map(function(a) {
+    if (a === "us-calling") return "Warm Path Calling - $599/mo + $250/attended meeting";
+    if (a === "revops-definition-lock") return "Definition Lock - $3,500";
+    return a;
+  });
+
+  var lines = [];
+  lines.push("INITIAL PROPOSAL - " + escapeHTML(c.name));
+  lines.push("Prepared by GetGTM.ai for " + escapeHTML(p.clientPoc || it.pocName || c.name));
+  lines.push("");
+  lines.push("DELIVERY PATH: " + (c.path === "7-day" ? "7-day sprint" : c.path === "14-day" ? "14-day buildout" : "Niche GTM"));
+  lines.push("");
+  lines.push("SELECTED PACKAGES:");
+  lines.push("  " + outboundLabel);
+  if (aeoLabel) lines.push("  " + aeoLabel);
+  if (delightLabel) lines.push("  " + delightLabel);
+  addons.forEach(function(a) { lines.push("  Add-on: " + a); });
+  lines.push("");
+  if (g.m1) {
+    lines.push("GOALS:");
+    lines.push("  M1: " + (g.m1.replies || "-") + " positive replies / " + (g.m1.meetings || "-") + " meetings");
+    lines.push("  M2: " + (g.m2.replies || "-") + " positive replies / " + (g.m2.meetings || "-") + " meetings");
+    lines.push("  M3: " + (g.m3.replies || "-") + " positive replies / " + (g.m3.meetings || "-") + " meetings");
+    lines.push("");
+  }
+  if (icp.geography || icp.industry || icp.roles) {
+    lines.push("ICP:");
+    if (icp.geography) lines.push("  Geography: " + icp.geography);
+    if (icp.industry) lines.push("  Industry: " + icp.industry);
+    if (icp.companySize) lines.push("  Company size: " + icp.companySize);
+    if (icp.revenue) lines.push("  Revenue: " + icp.revenue);
+    if (icp.roles) lines.push("  Roles: " + icp.roles);
+    lines.push("");
+  }
+  lines.push("TEAM:");
+  lines.push("  CRO: " + (p.cro || "TBD") + " (" + (p.croEmail || "") + ")");
+  lines.push("  CS: " + (p.cs || "TBD") + " (" + (p.csEmail || "") + ")");
+  lines.push("  GTME: " + (p.gtme || "TBD") + " (" + (p.gtmeEmail || "") + ")");
+  lines.push("  Client POC: " + (p.clientPoc || it.pocName || "TBD") + " (" + (p.clientPocEmail || it.pocEmail || "") + ")");
+  return lines;
+}
+
+function buildGmailLink(to, subject, bodyLines) {
+  var body = bodyLines.join("\n");
+  return "https://mail.google.com/mail/?view=cm&to=" + encodeURIComponent(to) +
+    "&su=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+}
+
+function renderProposalTab(c) {
+  var pr = c.proposal;
+  if (!pr) { c.proposal = { stage: "draft", initialSentDate: "", initialNotes: "", scopeNotes: [], finalSentDate: "", finalNotes: "", approvedDate: "", approvalEmail: "", sowGenerated: false }; pr = c.proposal; }
+  var it = c.intake || {};
+  var proposalLines = buildProposalContent(c);
+  var pocEmail = c.people.clientPocEmail || it.pocEmail || "";
+  var gmailInitial = buildGmailLink(pocEmail, "GetGTM Initial Proposal - " + c.name, proposalLines);
+
+  var stage = pr.stage;
+  var stageLabels = { draft: "1. Draft", sent: "2. Scope Review", final: "3. Final Sent", approved: "4. Approved" };
+
+  var stageBar = '<div class="prop-stages">';
+  ["draft","sent","final","approved"].forEach(function(s, i) {
+    var done = ["draft","sent","final","approved"].indexOf(stage) >= i;
+    stageBar += '<div class="prop-stage-dot' + (done ? ' done' : '') + (stage === s ? ' current' : '') + '">' +
+      '<div class="prop-stage-num">' + (i+1) + '</div>' +
+      '<div class="prop-stage-label">' + ["Draft","Scope Review","Final Sent","Approved"][i] + '</div>' +
+    '</div>';
+    if (i < 3) stageBar += '<div class="prop-stage-line' + (["draft","sent","final","approved"].indexOf(stage) > i ? ' done' : '') + '"></div>';
+  });
+  stageBar += '</div>';
+
+  var html = '<div class="card"><div class="card-head"><h2>Proposal workflow</h2></div><div class="card-body">';
+  html += stageBar;
+
+  if (stage === "draft") {
+    html += '<div class="prop-section">';
+    html += '<h3 class="prop-h3">Initial proposal preview</h3>';
+    html += '<div class="prop-preview">' + proposalLines.map(function(l) {
+      return '<div class="prop-line">' + (l === "" ? "&nbsp;" : escapeHTML(l)) + '</div>';
+    }).join("") + '</div>';
+    html += '<div class="field" style="margin-top:12px"><label>Notes to include</label><textarea data-proposal="initialNotes" placeholder="Add context, special terms, or notes for the client">' + escapeHTML(pr.initialNotes) + '</textarea></div>';
+    html += '<div style="display:flex;gap:8px;margin-top:12px">';
+    html += '<a href="' + gmailInitial + '" target="_blank" class="btn" data-action="mark-initial-sent">Generate & send via Gmail</a>';
+    html += '</div>';
+    html += '</div>';
+  }
+
+  if (stage === "sent") {
+    html += '<div class="prop-section">';
+    html += '<div class="small" style="margin-bottom:12px">Initial proposal sent ' + escapeHTML(pr.initialSentDate) + '. Add scope review notes below.</div>';
+    html += '<h3 class="prop-h3">Scope review (GTME / CS)</h3>';
+    html += '<div class="prop-preview" style="max-height:200px;overflow:auto;margin-bottom:12px">' + proposalLines.map(function(l) {
+      return '<div class="prop-line">' + (l === "" ? "&nbsp;" : escapeHTML(l)) + '</div>';
+    }).join("") + '</div>';
+    html += '<div class="field"><label>Feasibility notes</label><textarea data-proposal="finalNotes" placeholder="What is feasible? What needs to change? Any scope clarifications?">' + escapeHTML(pr.finalNotes) + '</textarea></div>';
+
+    var finalLines = proposalLines.concat(["", "SCOPE REVIEW NOTES:", pr.finalNotes || "(none)"]);
+    var gmailFinal = buildGmailLink(pocEmail, "GetGTM Final Proposal - " + c.name, finalLines);
+    html += '<div style="display:flex;gap:8px;margin-top:12px">';
+    html += '<a href="' + gmailFinal + '" target="_blank" class="btn" data-action="mark-final-sent">Send final proposal via Gmail</a>';
+    html += '</div>';
+    html += '</div>';
+  }
+
+  if (stage === "final") {
+    html += '<div class="prop-section">';
+    html += '<div class="small" style="margin-bottom:12px">Final proposal sent ' + escapeHTML(pr.finalSentDate) + '. Waiting for client approval via email.</div>';
+    html += '<div class="field"><label>Approval email reference</label><input data-proposal="approvalEmail" value="' + escapeAttr(pr.approvalEmail) + '" placeholder="Paste the approval email subject or thread link"></div>';
+    html += '<button class="btn" data-action="mark-approved">Mark as approved</button>';
+    html += '</div>';
+  }
+
+  if (stage === "approved") {
+    html += '<div class="prop-section">';
+    html += '<div style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:14px 16px;color:#15803d;font-size:13px;margin-bottom:16px">';
+    html += '<strong>Proposal approved</strong> on ' + escapeHTML(pr.approvedDate) + '. SOW and onboarding checklist are ready.';
+    html += '</div>';
+
+    html += '<h3 class="prop-h3">Auto-generated SOW summary</h3>';
+    html += '<div class="prop-preview">';
+    var sowLines = buildProposalContent(c);
+    sowLines.splice(0, 1, "STATEMENT OF WORK - " + c.name);
+    if (pr.finalNotes) sowLines.push("", "AGREED SCOPE AMENDMENTS:", pr.finalNotes);
+    sowLines.push("", "APPROVED: " + pr.approvedDate, "REFERENCE: " + (pr.approvalEmail || "On file"));
+    html += sowLines.map(function(l) { return '<div class="prop-line">' + (l === "" ? "&nbsp;" : escapeHTML(l)) + '</div>'; }).join("");
+    html += '</div>';
+
+    html += '<h3 class="prop-h3" style="margin-top:20px">Onboarding checklist</h3>';
+    var checks = ["SOW signed and filed", "Invoice sent for Part 1", "Shared Slack/Teams channel created",
+      "Drive folder created with Assets subfolder", "CRM access granted or sheet created",
+      "LinkedIn accounts connected", "Sales Navigator access confirmed",
+      "Email domains purchased and warming", "Kickoff call scheduled",
+      "ICP fitment document prepared", "MSP signed off by both parties"];
+    html += '<div class="prop-checklist">';
+    checks.forEach(function(item, i) {
+      html += '<label class="prop-check-item"><input type="checkbox" data-onboard-check="' + i + '"> ' + escapeHTML(item) + '</label>';
+    });
+    html += '</div>';
+
+    html += '</div>';
+  }
+
+  html += '</div></div>';
+  return html;
+}
+
+
 function renderTimelineTab(c) {
   return `
     <div class="card">
@@ -1217,6 +1406,23 @@ function attachHandlers() {
           ui.tab = "intake"; render();
         }
       }
+      else if (action === "mark-initial-sent") {
+        const cl = state.clients[ui.clientId];
+        cl.proposal.stage = "sent";
+        cl.proposal.initialSentDate = new Date().toISOString().slice(0,10);
+        await saveState(); render();
+      } else if (action === "mark-final-sent") {
+        const cl = state.clients[ui.clientId];
+        cl.proposal.stage = "final";
+        cl.proposal.finalSentDate = new Date().toISOString().slice(0,10);
+        await saveState(); render();
+      } else if (action === "mark-approved") {
+        const cl = state.clients[ui.clientId];
+        cl.proposal.stage = "approved";
+        cl.proposal.approvedDate = new Date().toISOString().slice(0,10);
+        cl.sow.status = "Drafting";
+        await saveState(); render();
+      }
       else if (action === "save-intake") {
         const cl = state.clients[ui.clientId];
         if (!cl.intake.outbound) {
@@ -1286,6 +1492,14 @@ function attachHandlers() {
       const i = arr.indexOf(id);
       if (i >= 0) arr.splice(i, 1); else arr.push(id);
       saveState(); render();
+    });
+  });
+
+  document.querySelectorAll("[data-proposal]").forEach(el => {
+    el.addEventListener("input", () => {
+      if (!state.clients[ui.clientId].proposal) return;
+      state.clients[ui.clientId].proposal[el.dataset.proposal] = el.value;
+      save();
     });
   });
 
