@@ -239,6 +239,18 @@
 
   .problem-closing { padding: 14px 48px; background: #000; border-top: 1px solid #222;
     color: #a855f7; font-size: 14px; font-weight: 500; text-align: center; line-height: 1.5; }
+
+  .summary-body { flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; background: #000; padding: 48px; }
+  .summary-table { width: 100%; max-width: 680px; }
+  .summary-table table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .summary-table th { color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
+    padding: 12px 16px; border-bottom: 1px solid #333; text-align: left; font-weight: 600; }
+  .summary-table td { padding: 14px 16px; border-bottom: 1px solid #1a1a1a; }
+  .summary-table .tbl-before { color: #777; font-size: 15px; }
+  .summary-table .tbl-after { color: #a855f7; font-weight: 600; font-size: 15px; }
+  .summary-closing { color: #a855f7; font-size: 16px; font-weight: 500; text-align: center;
+    margin-top: 40px; max-width: 680px; line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -255,7 +267,7 @@ const PATHS = {
   "14-day": { label: "14-day buildout", tagline: "Infrastructure setup included. Two weeks.",
     stages: ["Proposal / Scoping", "Commercial Handover", "Onboarding", "Infrastructure", "Connecting Accounts", "ICP Fitment", "TAM & List", "Messaging", "Campaign Build", "QA & Test", "Launch", "First Review"],
   },
-  "niche": { label: "Niche GTM", tagline: "Deep research motion. 12–18 days.",
+  "niche": { label: "Niche GTM", tagline: "Deep research motion. 12-18 days.",
     stages: ["Proposal / Scoping", "Commercial Handover", "Deep Discovery", "ICP Fitment", "Target List Research", "GTM Play Design", "Messaging", "Campaign Build", "QA & Validation", "Launch", "First Review"],
   },
 };
@@ -286,9 +298,9 @@ async function saveState() {
 const DRIVE_CLIENT_FOLDERS_ID = "15m4KeuxmdMlmYgu_APaRcSa3K4Rr0Iz7";
 
 const OUTBOUND_PLANS = [
-  { id: "outbound-india", name: "Outbound — India", price: "$1,599/mo",
+  { id: "outbound-india", name: "Outbound - India", price: "$1,599/mo",
     desc: "Signal-based outbound GTM. India pricing." },
-  { id: "outbound-us", name: "Outbound — US & Other", price: "$2,499/mo",
+  { id: "outbound-us", name: "Outbound - US & Other", price: "$2,499/mo",
     desc: "Signal-based outbound GTM. US & rest-of-world pricing." },
 ];
 
@@ -300,9 +312,9 @@ const AEO_PLANS = [
 ];
 
 const DELIGHT_PLANS = [
-  { id: "delight-test", name: "DelightLoop — Test", price: "$499 one-time",
+  { id: "delight-test", name: "DelightLoop - Test", price: "$499 one-time",
     desc: "One campaign play. 1 month. Test AI-powered gifting for pipeline & deal acceleration." },
-  { id: "delight-unlimited", name: "DelightLoop — Unlimited", price: "$899/yr",
+  { id: "delight-unlimited", name: "DelightLoop - Unlimited", price: "$899/yr",
     desc: "Unlimited campaigns, contacts & personalized offline plays. Paid annually." },
 ];
 
@@ -340,6 +352,17 @@ const SLIDES = [
       stat: "One strategy. One operating rhythm. One accountable team.",
       statSub: "Digital + physical. Every relevant lever coordinated around the same accounts."
     },
+    table: [
+      ["Channel specialists", "Integrated GTM pod"],
+      ["Activity ownership", "Pipeline accountability"],
+      ["Independent campaigns", "One coordinated account journey"],
+      ["Monthly reporting", "Weekly learning and optimization"],
+      ["Client manages handoffs", "GetGTM manages the entire motion"],
+      ["Digital-only execution", "Digital + physical execution"]
+    ],
+    closing: "We do not sell you more tools. We operate the system that turns buying signals into conversations and conversations into pipeline."
+  },
+  { category: "The Problem", type: "problem-summary",
     table: [
       ["Channel specialists", "Integrated GTM pod"],
       ["Activity ownership", "Pipeline accountability"],
@@ -474,7 +497,7 @@ function renderLogin() {
             <div class="sub">GetGTM team only</div>
             <input id="pw" type="password" placeholder="Password" autofocus autocomplete="off" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:5px;background:var(--surface-2);color:var(--text-primary);margin-bottom:12px;font-size:14px">
             <button class="btn" data-action="login" style="width:100%">Enter</button>
-            <div class="small" style="margin-top:14px;color:var(--text-muted)">Clients get a direct link — no password needed.</div>
+            <div class="small" style="margin-top:14px;color:var(--text-muted)">Clients get a direct link - no password needed.</div>
           </div>
         </div>
       </div>
@@ -523,10 +546,10 @@ function renderDashboard() {
                   return `<tr>
                     <td><strong onclick="window.openClient('${c.id}')" style="cursor:pointer">${escapeHTML(c.name)}</strong></td>
                     <td><span class="badge pending">${PATHS[c.path].label}</span></td>
-                    <td>${escapeHTML(c.kickoffDate || "—")}</td>
+                    <td>${escapeHTML(c.kickoffDate || "-")}</td>
                     <td><div class="progress" style="width:120px"><div style="width:${prog}%"></div></div><div class="small">${prog}%</div></td>
                     <td><div class="small">${escapeHTML(next?.stage || "Done")}</div></td>
-                    <td><span class="badge ${c.sow.status === 'Signed' ? 'done' : 'pending'}">${escapeHTML(c.sow.status || "—")}</span></td>
+                    <td><span class="badge ${c.sow.status === 'Signed' ? 'done' : 'pending'}">${escapeHTML(c.sow.status || "-")}</span></td>
                     <td><button class="btn ghost sm" onclick="navigator.clipboard.writeText('${escapeAttr(url)}');alert('Link copied!')">Share</button></td>
                   </tr>`;
                 }).join("")}
@@ -571,8 +594,8 @@ function renderClient() {
           <div class="kpis">
             <div class="kpi"><div class="label">Path</div><div class="value" style="font-size:14px">${PATHS[c.path].label}</div></div>
             <div class="kpi"><div class="label">Progress</div><div class="value">${prog}%</div><div class="progress" style="margin-top:6px"><div style="width:${prog}%"></div></div></div>
-            <div class="kpi"><div class="label">Kickoff</div><div class="value" style="font-size:14px">${escapeHTML(c.kickoffDate || "—")}</div></div>
-            <div class="kpi"><div class="label">Target launch</div><div class="value" style="font-size:14px">${escapeHTML(c.targetLaunchDate || "—")}</div></div>
+            <div class="kpi"><div class="label">Kickoff</div><div class="value" style="font-size:14px">${escapeHTML(c.kickoffDate || "-")}</div></div>
+            <div class="kpi"><div class="label">Target launch</div><div class="value" style="font-size:14px">${escapeHTML(c.targetLaunchDate || "-")}</div></div>
           </div>
         </div>
       </div>
@@ -626,6 +649,9 @@ function renderOffersTab(c) {
 
   if (slide.type === "problem") {
     return renderProblemSlide(slide, topbar, footer);
+  }
+  if (slide.type === "problem-summary") {
+    return renderProblemSummary(slide, topbar, footer);
   }
 
   var beforeLines = slide.before.lines.map(function(l) {
@@ -698,11 +724,23 @@ function renderProblemSlide(s, topbar, footer) {
         '<div class="problem-col-statsub">' + escapeHTML(s.right.statSub) + '</div>' +
       '</div>' +
     '</div>' +
-    '<div class="problem-table">' +
-      '<table><thead><tr><th>Traditional agencies</th><th>GetGTM</th></tr></thead>' +
-      '<tbody>' + tableRows + '</tbody></table>' +
+    footer + '</div>';
+}
+
+function renderProblemSummary(s, topbar, footer) {
+  var tableRows = s.table.map(function(row) {
+    return '<tr><td class="tbl-before">' + escapeHTML(row[0]) + '</td>' +
+      '<td class="tbl-after">' + escapeHTML(row[1]) + '</td></tr>';
+  }).join("");
+
+  return '<div class="ppt-fullscreen">' + topbar +
+    '<div class="summary-body">' +
+      '<div class="summary-table">' +
+        '<table><thead><tr><th>Traditional agencies</th><th>GetGTM</th></tr></thead>' +
+        '<tbody>' + tableRows + '</tbody></table>' +
+      '</div>' +
+      '<div class="summary-closing">' + escapeHTML(s.closing) + '</div>' +
     '</div>' +
-    '<div class="problem-closing">' + escapeHTML(s.closing) + '</div>' +
     footer + '</div>';
 }
 
@@ -711,7 +749,7 @@ function renderIntakeTab(c) {
   return `
     <div class="card">
       <div class="card-head">
-        <div><h2>Client intake</h2><div class="sub">Capture the basics first — POC details flow into the Overview</div></div>
+        <div><h2>Client intake</h2><div class="sub">Capture the basics first - POC details flow into the Overview</div></div>
       </div>
       <div class="card-body">
         <div class="grid-2">
@@ -782,7 +820,7 @@ function renderIntakeTab(c) {
           }).join("")}
         </div>
 
-        <div class="field" style="margin-top:16px"><label>Package notes</label><textarea data-intake="packageNotes" placeholder="Term, milestones, third-party fees, custom scope — add details later">${escapeHTML(it.packageNotes)}</textarea></div>
+        <div class="field" style="margin-top:16px"><label>Package notes</label><textarea data-intake="packageNotes" placeholder="Term, milestones, third-party fees, custom scope - add details later">${escapeHTML(it.packageNotes)}</textarea></div>
 
         <div style="display:flex;gap:8px;align-items:center;margin-top:16px;padding-top:16px;border-top:0.5px solid var(--border)">
           <button class="btn" data-action="save-intake">Save & continue to Overview →</button>
@@ -877,8 +915,8 @@ function renderOverviewTab(c) {
         <div class="grid-2">
           <div class="field"><label>Geography</label><input data-icp="geography" value="${escapeAttr(icp.geography)}" placeholder="US, EU, APAC…"></div>
           <div class="field"><label>Industry</label><input data-icp="industry" value="${escapeAttr(icp.industry)}" placeholder="SaaS, fintech…"></div>
-          <div class="field"><label>Company size</label><input data-icp="companySize" value="${escapeAttr(icp.companySize)}" placeholder="50–500 employees"></div>
-          <div class="field"><label>Annual revenue</label><input data-icp="revenue" value="${escapeAttr(icp.revenue)}" placeholder="$10M–$100M"></div>
+          <div class="field"><label>Company size</label><input data-icp="companySize" value="${escapeAttr(icp.companySize)}" placeholder="50-500 employees"></div>
+          <div class="field"><label>Annual revenue</label><input data-icp="revenue" value="${escapeAttr(icp.revenue)}" placeholder="$10M-$100M"></div>
         </div>
         <div class="field"><label>Roles (CXO / VP / Director / Manager)</label><input data-icp="roles" value="${escapeAttr(icp.roles)}" placeholder="VP Sales, CRO, Head of RevOps"></div>
         <div class="field"><label>Exclusions</label><input data-icp="exclusions" value="${escapeAttr(icp.exclusions)}" placeholder="Segments to avoid, DNC"></div>
