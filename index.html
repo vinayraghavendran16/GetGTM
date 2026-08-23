@@ -263,6 +263,28 @@
   .offer-line { font-size: 15px; color: #ccc; line-height: 1.5; display: flex; gap: 10px;
     align-items: start; }
   .offer-check { color: #a855f7; font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+  .ob-slide { flex: 1; display: grid; grid-template-columns: 1fr 380px; min-height: 0; overflow: auto; }
+  @media (max-width: 900px) { .ob-slide { grid-template-columns: 1fr; } }
+  .ob-left { background: #000; padding: 32px 40px; overflow: auto; }
+  .ob-right { background: #111; padding: 32px 36px; border-left: 1px solid #222; overflow: auto; }
+  @media (prefers-color-scheme: dark) { .ob-right { background: #111; } }
+  .ob-headline { color: #fff; font-size: 22px; font-weight: 600; margin: 0 0 14px; line-height: 1.3; }
+  .ob-intro { color: #999; font-size: 13px; line-height: 1.6; margin: 0 0 20px; }
+  .ob-points { display: flex; flex-direction: column; gap: 12px; }
+  .ob-point { font-size: 13px; color: #ccc; line-height: 1.5; padding-left: 16px;
+    border-left: 2px solid #a855f7; }
+  .ob-section-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: #a855f7; margin-bottom: 14px; }
+  .ob-models { display: flex; flex-direction: column; gap: 12px; }
+  .ob-model { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 14px 16px; }
+  .ob-model-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .ob-model-desc { font-size: 12px; color: #999; line-height: 1.4; }
+  .ob-infra { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .ob-infra-item { font-size: 13px; color: #ccc; padding: 8px 12px;
+    background: #1a1a1a; border-radius: 4px; }
+  .ob-cta { background: #a855f7; color: #fff; font-size: 13px; font-weight: 600;
+    padding: 12px 16px; border-radius: 6px; text-align: center; }
 </style>
 </head>
 <body>
@@ -385,9 +407,28 @@ const SLIDES = [
     ],
     closing: "We do not sell you more tools. We operate the system that turns buying signals into conversations and conversations into pipeline."
   },
-  { category: "Outbound", type: "offer",
-    headline: "Signal-led outbound. Powered by Heddl.",
-    lines: ["Heddl platform included - social listening, ICP scoring, multi-channel execution", "9 signal channels monitored for buying intent", "Multi-channel sequences: LinkedIn + Email + WhatsApp", "AI ICP scoring on funding, hires, headcount, intent, geography", "Dedicated GTM Engineer runs campaigns end-to-end", "Weekly performance reviews and CRM integration", "Replaces 5+ point solutions at a fraction of the cost"],
+  { category: "Outbound", type: "outbound-detail",
+    headline: "Outbound in 2026 has changed.",
+    intro: "Running an email campaign to thousands of people that you hope are ICP and waiting for replies doesn't work anymore. AI has enabled outbound to move from persona-based selling to signal and intent-based. GetGTM helps customers run effortless outbound motions that convert.",
+    points: [
+      "Our GTM Engineers understand your target markets, create plays around what we've seen work and activate them across your owned infrastructure or our own.",
+      "We are outcome-focused. We usually start with 4 positive replies and 4 meetings booked from the second month onwards.",
+      "Social listening across LinkedIn, Reddit, X and G2 provides insights into real prospects talking about real problems.",
+      "Multi-channel outreach across LinkedIn, Email and WhatsApp ensures 3.5X more hand raises.",
+      "AI ICP scoring on funding, hires, headcount, intent, geography.",
+      "Dedicated GTM Engineer runs campaigns end-to-end. A CRO manages expectations and ensures continuity. A CCO manages the project and ensures smooth delivery.",
+      "Weekly performance reports. Monthly reviews and optimization.",
+      "Replaces 5+ point solutions at a fraction of the cost."
+    ],
+    models: [
+      { name: "7-day sprint", desc: "Infrastructure is pre-warmed or already available. Campaign live in 7 days." },
+      { name: "14-day buildout", desc: "Infrastructure purchased in owned domain names and warmed up. Campaign live in 14 days." }
+    ],
+    infra: {
+      title: "Minimum infrastructure requirement",
+      items: ["2 LinkedIn accounts", "1 Sales Navigator account", "3 secondary email domains with 3 mailboxes each"],
+      cta: "Get ready-to-launch infrastructure for $99"
+    }
   },
   { category: "AEO/GEO - Guided Visibility", type: "offer",
     headline: "We find the opportunities. You create the content.",
@@ -485,6 +526,7 @@ function renderLogin() {
             <h2>Dashboard access</h2>
             <div class="sub">GetGTM team only</div>
             <input id="pw" type="password" placeholder="Password" autofocus autocomplete="off" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:5px;background:var(--surface-2);color:var(--text-primary);margin-bottom:12px;font-size:14px">
+            <div id="pw-error" style="display:none;color:#b91c1c;font-size:12px;font-weight:500;margin-bottom:10px">Wrong password. Try again.</div>
             <button class="btn" data-action="login" style="width:100%">Enter</button>
             <div class="small" style="margin-top:14px;color:var(--text-muted)">Clients get a direct link - no password needed.</div>
           </div>
@@ -627,7 +669,7 @@ function renderOffersTab(c) {
   var topbar = '<div class="ppt-topbar">' +
     '<div class="ppt-brand"><div class="logo">GTM</div> GetGTM</div>' +
     '<div class="ppt-counter">' + (page + 1) + ' / ' + total + '</div>' +
-    '<div class="ppt-nav">' + prevBtn + nextBtn + '</div>' +
+    '<div class="ppt-nav">' + (page === 0 ? '<button class="ppt-btn-sec" data-action="skip-ppt" style="margin-right:8px">Skip presentation</button>' : '') + prevBtn + nextBtn + '</div>' +
   '</div>';
 
   var footer = '<div class="ppt-footer">' +
@@ -641,6 +683,9 @@ function renderOffersTab(c) {
   }
   if (slide.type === "problem-summary") {
     return renderProblemSummary(slide, topbar, footer);
+  }
+  if (slide.type === "outbound-detail") {
+    return renderOutboundSlide(slide, topbar, footer);
   }
   if (slide.type === "offer") {
     return renderOfferSlide(slide, topbar, footer);
@@ -698,6 +743,40 @@ function renderProblemSlide(s, topbar, footer) {
       '</div>' +
     '</div>' +
     footer + '</div>';
+}
+
+function renderOutboundSlide(s, topbar, footer) {
+  var pointsHtml = s.points.map(function(p) {
+    return '<div class="ob-point">' + escapeHTML(p) + '</div>';
+  }).join("");
+
+  var modelsHtml = s.models.map(function(m) {
+    return '<div class="ob-model">' +
+      '<div class="ob-model-name">' + escapeHTML(m.name) + '</div>' +
+      '<div class="ob-model-desc">' + escapeHTML(m.desc) + '</div>' +
+    '</div>';
+  }).join("");
+
+  var infraHtml = s.infra.items.map(function(item) {
+    return '<div class="ob-infra-item">' + escapeHTML(item) + '</div>';
+  }).join("");
+
+  return '<div class="ppt-fullscreen">' + topbar +
+    '<div class="ob-slide">' +
+      '<div class="ob-left">' +
+        '<div class="offer-category">' + escapeHTML(s.category) + '</div>' +
+        '<h2 class="ob-headline">' + escapeHTML(s.headline) + '</h2>' +
+        '<p class="ob-intro">' + escapeHTML(s.intro) + '</p>' +
+        '<div class="ob-points">' + pointsHtml + '</div>' +
+      '</div>' +
+      '<div class="ob-right">' +
+        '<div class="ob-section-label">Onboarding models</div>' +
+        '<div class="ob-models">' + modelsHtml + '</div>' +
+        '<div class="ob-section-label" style="margin-top:28px">' + escapeHTML(s.infra.title) + '</div>' +
+        '<div class="ob-infra">' + infraHtml + '</div>' +
+        '<div class="ob-cta">' + escapeHTML(s.infra.cta) + '</div>' +
+      '</div>' +
+    '</div>' + footer + '</div>';
 }
 
 function renderOfferSlide(s, topbar, footer) {
@@ -1029,7 +1108,7 @@ function attachHandlers() {
     const el = document.getElementById("pw");
     if (!el) return;
     if (el.value === PW) { ui.isAuth = true; ui.view = "dashboard"; render(); }
-    else { el.style.borderColor = "var(--danger)"; el.value = ""; el.focus(); }
+    else { el.style.borderColor = "var(--danger)"; el.value = ""; el.focus(); var err = document.getElementById("pw-error"); if (err) { err.style.display = "block"; setTimeout(function(){ err.style.display = "none"; }, 2000); } }
   };
   const pwEl = document.getElementById("pw");
   if (pwEl) {
@@ -1060,6 +1139,7 @@ function attachHandlers() {
         render();
       } else if (action === "back") { ui.view = "dashboard"; render(); }
       else if (action === "tab") { ui.tab = el.dataset.tab; render(); }
+      else if (action === "skip-ppt") { ui.tab = "intake"; render(); }
       else if (action === "offer-prev") {
         ui.offerPage = Math.max(0, (ui.offerPage || 0) - 1);
         render();
