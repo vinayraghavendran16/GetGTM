@@ -285,6 +285,19 @@
     background: #1a1a1a; border-radius: 4px; }
   .ob-cta { background: #a855f7; color: #fff; font-size: 13px; font-weight: 600;
     padding: 12px 16px; border-radius: 6px; text-align: center; }
+
+  .ob-model-active { border-color: #a855f7; background: #1a0f2e; }
+  .ob-model-badge { font-size: 10px; font-weight: 700; color: #a855f7; text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 4px; }
+  .ob-infra-included { border-left: 2px solid #a855f7; }
+  .ob-extras { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+  .ob-extra { font-size: 11px; color: #777; padding-left: 12px; }
+  .ob-pricing { }
+  .ob-price-card { background: #1a0f2e; border: 1px solid #a855f7; border-radius: 8px;
+    padding: 16px; text-align: center; }
+  .ob-price-market { font-size: 11px; font-weight: 600; color: #a855f7; text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 4px; }
+  .ob-price-amount { font-size: 28px; font-weight: 700; color: #fff; }
 </style>
 </head>
 <body>
@@ -426,8 +439,12 @@ const SLIDES = [
     ],
     infra: {
       title: "Minimum infrastructure requirement",
-      items: ["2 LinkedIn accounts", "1 Sales Navigator account", "3 secondary email domains with 3 mailboxes each"],
-      cta: "Get ready-to-launch infrastructure for $99"
+      items: ["2 LinkedIn accounts", "1 Sales Navigator account", "3 secondary email domains with 3 mailboxes each"]
+    },
+    addOnInfra: {
+      title: "Additional infrastructure at $99",
+      items: ["10 mailboxes with a sending capacity of 3,800 emails/month", "800 LinkedIn messages/month", "$100 worth of enrichment included (2,000 email enrichments)"],
+      extras: ["Mobile number enrichment available separately", "Additional email enrichment at $0.05 per validated email"]
     }
   },
   { category: "AEO/GEO - Guided Visibility", type: "offer",
@@ -685,7 +702,7 @@ function renderOffersTab(c) {
     return renderProblemSummary(slide, topbar, footer);
   }
   if (slide.type === "outbound-detail") {
-    return renderOutboundSlide(slide, topbar, footer);
+    return renderOutboundSlide(slide, topbar, footer, c);
   }
   if (slide.type === "offer") {
     return renderOfferSlide(slide, topbar, footer);
@@ -745,13 +762,20 @@ function renderProblemSlide(s, topbar, footer) {
     footer + '</div>';
 }
 
-function renderOutboundSlide(s, topbar, footer) {
+function renderOutboundSlide(s, topbar, footer, c) {
+  var clientPath = c ? c.path : "";
+  var clientMarket = c && c.intake ? c.intake.outbound : "";
+  var price = clientMarket === "outbound-india" ? "$1,599/mo" : clientMarket === "outbound-us" ? "$2,499/mo" : "";
+  var marketLabel = clientMarket === "outbound-india" ? "India" : clientMarket === "outbound-us" ? "US & Other" : "";
+
   var pointsHtml = s.points.map(function(p) {
     return '<div class="ob-point">' + escapeHTML(p) + '</div>';
   }).join("");
 
   var modelsHtml = s.models.map(function(m) {
-    return '<div class="ob-model">' +
+    var isActive = (m.name === "7-day sprint" && clientPath === "7-day") || (m.name === "14-day buildout" && clientPath === "14-day");
+    return '<div class="ob-model' + (isActive ? ' ob-model-active' : '') + '">' +
+      (isActive ? '<div class="ob-model-badge">Your plan</div>' : '') +
       '<div class="ob-model-name">' + escapeHTML(m.name) + '</div>' +
       '<div class="ob-model-desc">' + escapeHTML(m.desc) + '</div>' +
     '</div>';
@@ -760,6 +784,24 @@ function renderOutboundSlide(s, topbar, footer) {
   var infraHtml = s.infra.items.map(function(item) {
     return '<div class="ob-infra-item">' + escapeHTML(item) + '</div>';
   }).join("");
+
+  var addOnHtml = s.addOnInfra.items.map(function(item) {
+    return '<div class="ob-infra-item ob-infra-included">' + escapeHTML(item) + '</div>';
+  }).join("");
+
+  var extrasHtml = s.addOnInfra.extras.map(function(item) {
+    return '<div class="ob-extra">' + escapeHTML(item) + '</div>';
+  }).join("");
+
+  var pricingHtml = price ? (
+    '<div class="ob-pricing">' +
+      '<div class="ob-section-label" style="margin-top:28px">Pricing</div>' +
+      '<div class="ob-price-card">' +
+        '<div class="ob-price-market">' + escapeHTML(marketLabel) + '</div>' +
+        '<div class="ob-price-amount">' + escapeHTML(price) + '</div>' +
+      '</div>' +
+    '</div>'
+  ) : '';
 
   return '<div class="ppt-fullscreen">' + topbar +
     '<div class="ob-slide">' +
@@ -774,7 +816,10 @@ function renderOutboundSlide(s, topbar, footer) {
         '<div class="ob-models">' + modelsHtml + '</div>' +
         '<div class="ob-section-label" style="margin-top:28px">' + escapeHTML(s.infra.title) + '</div>' +
         '<div class="ob-infra">' + infraHtml + '</div>' +
-        '<div class="ob-cta">' + escapeHTML(s.infra.cta) + '</div>' +
+        '<div class="ob-section-label" style="margin-top:28px">' + escapeHTML(s.addOnInfra.title) + '</div>' +
+        '<div class="ob-infra">' + addOnHtml + '</div>' +
+        '<div class="ob-extras">' + extrasHtml + '</div>' +
+        pricingHtml +
       '</div>' +
     '</div>' + footer + '</div>';
 }
