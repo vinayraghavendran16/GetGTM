@@ -353,6 +353,38 @@
   .prop-pdf-preview .pkg-list { margin: 0 0 12px; padding: 0; list-style: none; }
   .prop-pdf-preview .pkg-list li { padding: 4px 0; border-bottom: 1px solid #eee; font-size: 11px; }
   .prop-pdf-preview .footer { border-top: 1px solid #e5e5e5; padding-top: 8px; font-size: 9px; color: #888; text-align: center; margin-top: 20px; }
+
+  .timeline-bar { background: var(--surface-2); border: 0.5px solid var(--border); border-radius: 8px;
+    padding: 14px 20px 10px; margin-bottom: 12px; overflow-x: auto; }
+  .tl-track { display: flex; align-items: flex-start; gap: 0; min-width: max-content; }
+  .tl-node { display: flex; flex-direction: column; align-items: center; min-width: 60px; }
+  .tl-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--border); margin-bottom: 4px; }
+  .tl-done .tl-dot { background: #15803d; }
+  .tl-active .tl-dot { background: #a855f7; box-shadow: 0 0 0 3px #e9d5ff; }
+  .tl-blocked .tl-dot { background: #b91c1c; }
+  .tl-pending .tl-dot { background: var(--border); }
+  .tl-label { font-size: 9px; color: var(--text-secondary); text-align: center; max-width: 70px; line-height: 1.2; }
+  .tl-done .tl-label { color: #15803d; }
+  .tl-active .tl-label { color: #a855f7; font-weight: 600; }
+  .tl-blocked .tl-label { color: #b91c1c; }
+  .tl-date { font-size: 8px; color: var(--text-muted); margin-top: 2px; }
+  .tl-connector { flex: 1; height: 2px; background: var(--border); min-width: 12px; margin-top: 5px; align-self: flex-start; }
+  .tl-summary { font-size: 11px; color: var(--text-secondary); margin-top: 8px; }
+
+  .del-row { display: grid; grid-template-columns: 1fr 120px 120px 1fr; gap: 8px; padding: 8px 0;
+    border-bottom: 0.5px solid var(--border); align-items: center; }
+  @media (max-width: 768px) { .del-row { grid-template-columns: 1fr; gap: 4px; } }
+  .del-item { }
+  .del-select { padding: 5px 8px; border: 0.5px solid var(--border); border-radius: 4px;
+    background: var(--surface-1); font-size: 11px; }
+  .del-date { padding: 5px 8px; border: 0.5px solid var(--border); border-radius: 4px;
+    background: var(--surface-1); font-size: 11px; }
+  .del-notes { padding: 5px 8px; border: 0.5px solid var(--border); border-radius: 4px;
+    background: var(--surface-1); font-size: 11px; }
+
+  .del-update { display: flex; gap: 8px; align-items: start; margin-bottom: 8px; }
+  .del-update input, .del-update textarea { padding: 6px 8px; border: 0.5px solid var(--border);
+    border-radius: 4px; background: var(--surface-1); font-size: 12px; font-family: inherit; }
 </style>
 </head>
 <body>
@@ -716,12 +748,17 @@ function renderClient() {
         </div>
       </div>
 
+      <div class="timeline-bar" id="timeline-bar">
+        ${renderTimelineBar(c)}
+      </div>
+
       <div class="tabs">
         <button data-action="tab" data-tab="offers" class="${ui.tab==='offers'?'active':''}">Offers</button>
         <button data-action="tab" data-tab="intake" class="${ui.tab==='intake'?'active':''}">Client Intake</button>
         <button data-action="tab" data-tab="overview" class="${ui.tab==='overview'?'active':''}">Overview</button>
         <button data-action="tab" data-tab="proposal" class="${ui.tab==='proposal'?'active':''}">Proposal</button>
         <button data-action="tab" data-tab="timeline" class="${ui.tab==='timeline'?'active':''}">Timeline</button>
+        ${c.proposal && c.proposal.stage === 'approved' ? '<button data-action="tab" data-tab="delivery" class="' + (ui.tab==='delivery'?'active':'') + '">Delivery</button>' : ''}
         <button data-action="tab" data-tab="outcomes" class="${ui.tab==='outcomes'?'active':''}">Outcomes</button>
       </div>
 
@@ -730,6 +767,7 @@ function renderClient() {
         : ui.tab === "intake" ? renderIntakeTab(c)
         : ui.tab === "overview" ? renderOverviewTab(c)
         : ui.tab === "proposal" ? renderProposalTab(c)
+        : ui.tab === "delivery" ? renderDeliveryTab(c)
         : ui.tab === "timeline" ? renderTimelineTab(c)
         : renderOutcomesTab(c)
       }</div>
@@ -1435,6 +1473,103 @@ function renderProposalTab(c) {
 
 
 
+function renderTimelineBar(c) {
+  var stages = c.stages || [];
+  var total = stages.length;
+  var done = stages.filter(function(s) { return s.status === "Complete"; }).length;
+  var current = stages.find(function(s) { return s.status !== "Complete"; });
+
+  var dots = stages.map(function(s, i) {
+    var st = s.status;
+    var cls = st === "Complete" ? "tl-done" : st === "In Progress" ? "tl-active" : st === "Blocked" ? "tl-blocked" : "tl-pending";
+    var dateStr = s.eta ? new Date(s.eta).toLocaleDateString("en-US", {month:"short",day:"numeric"}) : "";
+    return '<div class="tl-node ' + cls + '" title="' + escapeAttr(s.stage + ': ' + st) + '">' +
+      '<div class="tl-dot"></div>' +
+      '<div class="tl-label">' + escapeHTML(s.stage.length > 12 ? s.stage.substring(0,11) + '..' : s.stage) + '</div>' +
+      (dateStr ? '<div class="tl-date">' + dateStr + '</div>' : '') +
+    '</div>';
+  }).join('<div class="tl-connector' + '"></div>');
+
+  return '<div class="tl-track">' + dots + '</div>' +
+    '<div class="tl-summary">' + done + ' of ' + total + ' complete' +
+    (current ? ' - Current: ' + escapeHTML(current.stage) : ' - All complete') + '</div>';
+}
+
+function renderDeliveryTab(c) {
+  var pr = c.proposal || {};
+  if (!c.delivery) {
+    c.delivery = {
+      sowSignedDate: "", invoiceSentDate: "",
+      onboarding: [
+        { item: "SOW signed and filed", status: "Not Started", date: "", owner: "CRO", notes: "" },
+        { item: "Invoice sent (Part 1)", status: "Not Started", date: "", owner: "Finance", notes: "" },
+        { item: "Shared Slack/Teams channel created", status: "Not Started", date: "", owner: "CS", notes: "" },
+        { item: "Drive folder + Assets subfolder created", status: "Not Started", date: "", owner: "CS", notes: "" },
+        { item: "CRM access granted or tracking sheet created", status: "Not Started", date: "", owner: "Client", notes: "" },
+        { item: "LinkedIn accounts connected", status: "Not Started", date: "", owner: "Client", notes: "" },
+        { item: "Sales Navigator access confirmed", status: "Not Started", date: "", owner: "Client", notes: "" },
+        { item: "Email domains purchased", status: "Not Started", date: "", owner: "GTME", notes: "" },
+        { item: "Email domains warming", status: "Not Started", date: "", owner: "GTME", notes: "" },
+        { item: "Kickoff call completed", status: "Not Started", date: "", owner: "CS / GTME", notes: "" },
+        { item: "ICP fitment document approved", status: "Not Started", date: "", owner: "Strategist / Client", notes: "" },
+        { item: "TAM & launch list built", status: "Not Started", date: "", owner: "Research", notes: "" },
+        { item: "Messaging approved", status: "Not Started", date: "", owner: "Content / Client", notes: "" },
+        { item: "Campaign built and QA passed", status: "Not Started", date: "", owner: "GTME", notes: "" },
+        { item: "First campaign launched", status: "Not Started", date: "", owner: "GTME", notes: "" },
+        { item: "MSP signed off by both parties", status: "Not Started", date: "", owner: "CS / Client", notes: "" },
+      ],
+      weeklyUpdates: []
+    };
+  }
+  var del = c.delivery;
+  var onDone = del.onboarding.filter(function(o) { return o.status === "Complete"; }).length;
+  var onTotal = del.onboarding.length;
+  var onProg = Math.round((onDone / onTotal) * 100);
+
+  var html = '<div class="card" style="margin-bottom:16px">';
+  html += '<div class="card-head"><div><h2>Delivery</h2><div class="sub">SOW signed. Track onboarding through first campaign launch.</div></div></div>';
+  html += '<div class="card-body">';
+
+  // Progress
+  html += '<div class="kpis" style="margin-bottom:16px"><div class="kpi"><div class="label">Onboarding</div><div class="value">' + onProg + '%</div>';
+  html += '<div class="progress" style="margin-top:6px"><div style="width:' + onProg + '%"></div></div></div>';
+  html += '<div class="kpi"><div class="label">Items done</div><div class="value">' + onDone + ' / ' + onTotal + '</div></div>';
+  html += '<div class="kpi"><div class="label">SOW Signed</div><div class="value" style="font-size:14px">' + escapeHTML(del.sowSignedDate || "Pending") + '</div></div></div>';
+
+  // Onboarding checklist
+  html += '<h3 style="font-size:14px;font-weight:600;margin:0 0 12px">Onboarding & launch checklist</h3>';
+
+  del.onboarding.forEach(function(item, i) {
+    var statusClass = item.status === "Complete" ? "done" : item.status === "In Progress" ? "pending" : item.status === "Blocked" ? "at-risk" : "";
+    html += '<div class="del-row">';
+    html += '<div class="del-item"><strong>' + escapeHTML(item.item) + '</strong><div class="small">' + escapeHTML(item.owner) + '</div></div>';
+    html += '<select data-delivery="' + i + '" data-key="status" class="del-select">';
+    ["Not Started","In Progress","Blocked","Complete"].forEach(function(s) {
+      html += '<option' + (item.status === s ? ' selected' : '') + '>' + s + '</option>';
+    });
+    html += '</select>';
+    html += '<input type="date" data-delivery="' + i + '" data-key="date" value="' + escapeAttr(item.date) + '" class="del-date">';
+    html += '<input data-delivery="' + i + '" data-key="notes" value="' + escapeAttr(item.notes) + '" placeholder="Notes" class="del-notes">';
+    html += '</div>';
+  });
+
+  // Weekly updates log
+  html += '<h3 style="font-size:14px;font-weight:600;margin:20px 0 12px">Weekly updates</h3>';
+  html += '<button class="btn sm" data-action="add-weekly-update" style="margin-bottom:12px">+ Add update</button>';
+
+  (del.weeklyUpdates || []).forEach(function(u, i) {
+    html += '<div class="del-update">';
+    html += '<input type="date" data-weekly="' + i + '" data-key="date" value="' + escapeAttr(u.date) + '" style="width:130px">';
+    html += '<textarea data-weekly="' + i + '" data-key="note" placeholder="What happened this week?" style="flex:1;min-height:40px">' + escapeHTML(u.note) + '</textarea>';
+    html += '<button class="btn ghost sm" data-action="delete-weekly" data-i="' + i + '">x</button>';
+    html += '</div>';
+  });
+
+  html += '</div></div>';
+  return html;
+}
+
+
 function renderTimelineTab(c) {
   return `
     <div class="card">
@@ -1607,6 +1742,16 @@ function attachHandlers() {
         ui.tab = "overview";
         render();
       }
+      else if (action === "add-weekly-update") {
+        const cl = state.clients[ui.clientId];
+        if (!cl.delivery) cl.delivery = { onboarding: [], weeklyUpdates: [] };
+        cl.delivery.weeklyUpdates.push({ date: new Date().toISOString().slice(0,10), note: "" });
+        await saveState(); render();
+      } else if (action === "delete-weekly") {
+        const cl = state.clients[ui.clientId];
+        cl.delivery.weeklyUpdates.splice(+el.dataset.i, 1);
+        await saveState(); render();
+      }
       else if (action === "add-outcome") {
         const c = state.clients[ui.clientId];
         c.outcomes.push({ date: new Date().toISOString().slice(0,10), metric: "", target: "", actual: "" });
@@ -1660,6 +1805,26 @@ function attachHandlers() {
       const i = arr.indexOf(id);
       if (i >= 0) arr.splice(i, 1); else arr.push(id);
       saveState(); render();
+    });
+  });
+
+  document.querySelectorAll("[data-delivery]").forEach(el => {
+    var handler = function() {
+      var cl = state.clients[ui.clientId];
+      if (!cl.delivery) return;
+      var idx = parseInt(el.dataset.delivery);
+      cl.delivery.onboarding[idx][el.dataset.key] = el.value;
+      if (el.dataset.key === "status") { saveState(); render(); } else { save(); }
+    };
+    el.addEventListener("input", handler);
+    el.addEventListener("change", handler);
+  });
+  document.querySelectorAll("[data-weekly]").forEach(el => {
+    el.addEventListener("input", function() {
+      var cl = state.clients[ui.clientId];
+      if (!cl.delivery) return;
+      cl.delivery.weeklyUpdates[parseInt(el.dataset.weekly)][el.dataset.key] = el.value;
+      save();
     });
   });
 
