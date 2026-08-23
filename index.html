@@ -385,11 +385,18 @@
   .del-update { display: flex; gap: 8px; align-items: start; margin-bottom: 8px; }
   .del-update input, .del-update textarea { padding: 6px 8px; border: 0.5px solid var(--border);
     border-radius: 4px; background: var(--surface-1); font-size: 12px; font-family: inherit; }
+
+  .fb-status { display: inline-block; padding: 2px 6px; border-radius: 3px;
+    font-size: 9px; font-weight: 600; }
+  .fb-status.connected { background: #dcfce7; color: #15803d; }
+  .fb-status.local { background: #fef3c7; color: #b45309; }
 </style>
 </head>
 <body>
 <div id="app"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
 const STORAGE_KEY = "getgtm_tracker_v9";
 const PW = "getgtm";
@@ -408,25 +415,80 @@ const PATHS = {
 
 let state = { clients: {} };
 let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: null };
+var isClientView = false;
+function roAttr() { return isClientView ? " disabled" : ""; }
+function roStyle() { return isClientView ? " style=\"opacity:.7;pointer-events:none\"" : ""; }
+var clientViewId = null;
+
+// ===== FIREBASE CONFIG =====
+// Replace these with your Firebase project config
+var FIREBASE_CONFIG = {
+  apiKey: "AIzaSyD-N-tTRixCjLXVc-cdF4k-qLsGTKVHKMI",
+  authDomain: "getgtm-tracker-d0f97.firebaseapp.com",
+  databaseURL: "https://getgtm-tracker-d0f97-default-rtdb.firebaseio.com",
+  projectId: "getgtm-tracker-d0f97",
+  storageBucket: "getgtm-tracker-d0f97.firebasestorage.app",
+  messagingSenderId: "67031319371",
+  appId: "1:67031319371:web:038747a95c8add7231dece"
+};
+
+var db = null;
+var dbRef = null;
+var useFirebase = false;
+
+function initFirebase() {
+  try {
+    if (FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.databaseURL && typeof firebase !== "undefined") {
+      firebase.initializeApp(FIREBASE_CONFIG);
+      db = firebase.database();
+      dbRef = db.ref("getgtm_tracker");
+      useFirebase = true;
+      // Listen for real-time changes
+      dbRef.on("value", function(snapshot) {
+        var data = snapshot.val();
+        if (data && data.clients) {
+          state = data;
+          render();
+        }
+      });
+      console.log("Firebase connected - real-time sync active");
+    } else {
+      console.log("Firebase not configured - using local storage");
+    }
+  } catch (e) {
+    console.log("Firebase init failed, falling back to localStorage:", e.message);
+    useFirebase = false;
+  }
+}
 
 async function loadState() {
   try {
-    let r = window.localStorage.getItem(STORAGE_KEY);
-    if (!r) {
-      for (const old of ["getgtm_tracker_v5","getgtm_tracker_v4","getgtm_tracker_v3"]) {
-        const prev = window.localStorage.getItem(old);
-        if (prev) { r = prev; window.localStorage.setItem(STORAGE_KEY, prev); break; }
+    if (useFirebase) {
+      var snapshot = await dbRef.once("value");
+      var data = snapshot.val();
+      if (data && data.clients) state = data;
+    } else {
+      var r = window.localStorage.getItem(STORAGE_KEY);
+      if (!r) {
+        for (var old of ["getgtm_tracker_v8","getgtm_tracker_v7","getgtm_tracker_v6","getgtm_tracker_v5","getgtm_tracker_v4"]) {
+          var prev = window.localStorage.getItem(old);
+          if (prev) { r = prev; window.localStorage.setItem(STORAGE_KEY, prev); break; }
+        }
       }
+      if (r) state = JSON.parse(r);
     }
-    if (r) state = JSON.parse(r);
-  } catch (e) {}
+  } catch (e) { console.log("loadState error:", e); }
   if (!state.clients) state.clients = {};
 }
 
 async function saveState() {
   try {
+    if (useFirebase) {
+      await dbRef.set(state);
+    }
+    // Always save to localStorage as backup
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (e) {}
+  } catch (e) { console.log("saveState error:", e); }
 }
 
 const DRIVE_CLIENT_FOLDERS_ID = "15m4KeuxmdMlmYgu_APaRcSa3K4Rr0Iz7";
@@ -718,18 +780,12 @@ function renderClient() {
   return `
     <div class="topbar">
       <div class="brand"><div class="logo">GTM</div> <strong>${escapeHTML(c.name)}</strong></div>
-      <div class="badge">Client view</div>
+      ${isClientView ? '<div class="badge" style="background:#15803d">Live - synced</div>' : '<div class="badge">Client view</div>'}
     </div>
     <div class="wrap">
-      <div class="breadcrumb"><a data-action="back">← Back</a></div>
+      ${isClientView ? '' : '<div class="breadcrumb"><a data-action="back">← Back</a></div>'}
       
-      <div class="share-box">
-        Share this link with your team:
-        <div class="share-link">
-          <input type="text" readonly value="${window.location.href}">
-          <button class="btn sm ghost" onclick="navigator.clipboard.writeText(window.location.href)">Copy</button>
-        </div>
-      </div>
+      ${isClientView ? '<div class="share-box" style="background:#dcfce7;border-color:#86efac;color:#15803d"><strong>Your engagement tracker</strong> - this page updates in real time as your project progresses.</div>' : '<div class="share-box">Share this link with your team:<div class="share-link"><input type="text" readonly value="' + window.location.origin + window.location.pathname + '?client=' + c.id + '"><button class="btn sm ghost" onclick="navigator.clipboard.writeText(\'' + window.location.origin + window.location.pathname + '?client=' + c.id + '\')">Copy</button></div></div>'}
 
       <div class="card" style="margin-bottom:16px">
         <div class="card-head">
@@ -753,10 +809,10 @@ function renderClient() {
       </div>
 
       <div class="tabs">
-        <button data-action="tab" data-tab="offers" class="${ui.tab==='offers'?'active':''}">Offers</button>
-        <button data-action="tab" data-tab="intake" class="${ui.tab==='intake'?'active':''}">Client Intake</button>
+        ${isClientView ? '' : '<button data-action="tab" data-tab="offers" class="' + (ui.tab==='offers'?'active':'') + '">Offers</button>'}
+        ${isClientView ? '' : '<button data-action="tab" data-tab="intake" class="' + (ui.tab==='intake'?'active':'') + '">Client Intake</button>'}
         <button data-action="tab" data-tab="overview" class="${ui.tab==='overview'?'active':''}">Overview</button>
-        <button data-action="tab" data-tab="proposal" class="${ui.tab==='proposal'?'active':''}">Proposal</button>
+        ${isClientView ? '' : '<button data-action="tab" data-tab="proposal" class="' + (ui.tab==='proposal'?'active':'') + '">Proposal</button>'}
         <button data-action="tab" data-tab="timeline" class="${ui.tab==='timeline'?'active':''}">Timeline</button>
         ${c.proposal && c.proposal.stage === 'approved' ? '<button data-action="tab" data-tab="delivery" class="' + (ui.tab==='delivery'?'active':'') + '">Delivery</button>' : ''}
         <button data-action="tab" data-tab="outcomes" class="${ui.tab==='outcomes'?'active':''}">Outcomes</button>
@@ -1783,7 +1839,7 @@ function attachHandlers() {
       const action = el.dataset.action;
       if (action === "login") {
         doLogin();
-      } else if (action === "logout") { ui.isAuth = false; ui.view = "login"; render(); }
+      } else if (action === "logout") { if (isClientView) return; ui.isAuth = false; ui.view = "login"; render(); }
       else if (action === "new-client") { ui.modal = { type: "new-client" }; render(); }
       else if (action === "modal-close") { ui.modal = null; render(); }
       else if (action === "modal-create") {
@@ -1801,7 +1857,7 @@ function attachHandlers() {
         ui.offerPage = 0;
         render();
       } else if (action === "back") { ui.view = "dashboard"; render(); }
-      else if (action === "tab") { ui.tab = el.dataset.tab; render(); }
+      else if (action === "tab") { if (isClientView && (el.dataset.tab === "offers" || el.dataset.tab === "intake" || el.dataset.tab === "proposal")) return; ui.tab = el.dataset.tab; render(); }
       else if (action === "skip-ppt") { ui.tab = "intake"; render(); }
       else if (action === "offer-prev") {
         ui.offerPage = Math.max(0, (ui.offerPage || 0) - 1);
@@ -1985,7 +2041,26 @@ function escapeHTML(s) { return String(s ?? "").replace(/[&<>"']/g, m => ({"&":"
 function escapeAttr(s) { return escapeHTML(s); }
 
 (async function init() {
-  await loadState();
+  initFirebase();
+  if (!useFirebase) await loadState();
+  else {
+    // Give Firebase a moment to load
+    await new Promise(function(r) { setTimeout(r, 500); });
+    if (!state.clients || Object.keys(state.clients).length === 0) {
+      await loadState();
+    }
+  }
+
+  // Detect client view from URL
+  var params = new URLSearchParams(window.location.search);
+  clientViewId = params.get("client");
+  if (clientViewId && state.clients[clientViewId]) {
+    isClientView = true;
+    ui.clientId = clientViewId;
+    ui.view = "client";
+    ui.tab = "overview";
+  }
+
   render();
 })();
 </script>
