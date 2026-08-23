@@ -251,6 +251,18 @@
   .summary-table .tbl-after { color: #a855f7; font-weight: 600; font-size: 15px; }
   .summary-closing { color: #a855f7; font-size: 16px; font-weight: 500; text-align: center;
     margin-top: 40px; max-width: 680px; line-height: 1.6; }
+
+  .offer-body { flex: 1; display: flex; align-items: center; justify-content: center;
+    background: #000; padding: 48px; }
+  .offer-card { max-width: 600px; width: 100%; }
+  .offer-category { font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: #a855f7; margin-bottom: 12px; }
+  .offer-headline { color: #fff; font-size: 22px; font-weight: 600; margin: 0 0 28px;
+    line-height: 1.3; }
+  .offer-lines { display: flex; flex-direction: column; gap: 14px; }
+  .offer-line { font-size: 15px; color: #ccc; line-height: 1.5; display: flex; gap: 10px;
+    align-items: start; }
+  .offer-check { color: #a855f7; font-size: 16px; flex-shrink: 0; margin-top: 1px; }
 </style>
 </head>
 <body>
@@ -373,57 +385,34 @@ const SLIDES = [
     ],
     closing: "We do not sell you more tools. We operate the system that turns buying signals into conversations and conversations into pipeline."
   },
-  { category: "Outbound GTM", before: {
-      label: "TYPICAL AGENCY",
-      lines: ["Single-channel email blasts", "Generic templates, fake personalization", "No signal layer \u2014 spray and pray", "2% reply rate (industry average)", "Burned domains every 60 days", "Junior SDRs reading scripts", "You manage the tools yourself"],
-      stat: "2% reply rate.", statSub: "Domains that don\u2019t last a quarter."
-    }, after: {
-      label: "GETGTM + HEDDL",
-      lines: ["9 signal channels monitored for intent", "AI ICP scoring before outreach", "Multi-channel: LinkedIn + Email + WhatsApp", "Dedicated GTM Engineer end-to-end", "Heddl platform included \u2014 no extra cost", "7% average reply rate \u2014 3.5\u00D7 industry", "Weekly reviews, CRM integration, handover"],
-      stat: "7% reply rate.", statSub: "Signal-led. Not spray-led."
-  }},
-  { category: "AEO / GEO / Inbound", before: {
-      label: "WITHOUT AEO",
-      lines: ["Buyers ask AI for solutions", "AI cites your competitor\u2019s content", "No presence in answer engines", "SEO alone takes 12+ months", "Community questions go unanswered", "Nobody tracks prompt visibility"],
-      stat: "Invisible.", statSub: "Where buyers actually decide."
-    }, after: {
-      label: "WITH GETGTM AEO",
-      lines: ["Prompt universe mapped to your solution", "Owned content built for AI citation", "Author & publication outreach", "Reddit, LinkedIn, forum presence", "Monthly AI visibility reporting", "35\u201360 day discovery timeline"],
-      stat: "The answer.", statSub: "Not your competitor."
-  }},
-  { category: "Personalized Offline Plays", before: {
-      label: "DIGITAL ONLY",
-      lines: ["100+ marketing emails per inbox/week", "Prospects filter, delete, ignore", "0.12% email response rate", "Zero physical touchpoints", "No pattern interrupt in the deal", "Every agency looks the same in an inbox"],
-      stat: "0.12% response.", statSub: "Filtered before it\u2019s read."
-    }, after: {
-      label: "WITH DELIGHTLOOP",
-      lines: ["AI-matched gift for the right person", "Triggered by deal signals in your CRM", "4.4% direct mail response \u2014 37\u00D7 email", "3\u00D7 more meetings when mail precedes a call", "Global sourcing, warehousing, delivery", "CTA tracking and gifting ROI"],
-      stat: "4.4% response.", statSub: "They held it in their hands."
-  }},
-  { category: "US Calling", before: {
-      label: "COLD CALLING (OLD WAY)",
-      lines: ["80 dials/day, 2.8% connect rate", "Junior reps reading a script", "No signal prioritization", "97 dials go nowhere", "Same voicemail as every other agency", "Pay per hour regardless of outcome"],
-      stat: "97 wasted dials.", statSub: "Per day. Per rep."
-    }, after: {
-      label: "GETGTM CALLING",
-      lines: ["Signal-prioritized call lists", "Trained US-based callers", "30\u201350% higher connects paired with mail", "57% of C-suite prefer phone first", "Pay-per-attended-meeting model", "Call recording, CRM logging, handover"],
-      stat: "Pay for meetings.", statSub: "Not for dials."
-  }},
-  { category: "Definition Lock", before: {
-      label: "MOST TEAMS TODAY",
-      lines: ["5 leaders define \u2018qualified lead\u2019 5 ways", "Pipeline numbers don\u2019t reconcile", "AI tools inherit the confusion", "Churn measured differently by each team", "No source of truth per metric", "Board asks a question, nobody agrees"],
-      stat: "5 definitions.", statSub: "For the same number."
-    }, after: {
-      label: "AFTER 90 MINUTES",
-      lines: ["Every metric conflict resolved in the room", "Signed one-page definitions sheet", "Qualified lead, pipeline, ARR/MRR locked", "Retention, churn, attribution agreed", "AI-influenced revenue defined", "Credits 100% toward full Verdict"],
-      stat: "One number.", statSub: "Signed by everyone."
-  }},
-];
-
-
-const GTME_ROSTER = [
-  { name: "Arjun", email: "arjun@getgtm.ai" },
-  { name: "Nishanth", email: "nishanth@getgtm.ai" },
+  { category: "Outbound", type: "offer",
+    headline: "Signal-led outbound. Powered by Heddl.",
+    lines: ["Heddl platform included - social listening, ICP scoring, multi-channel execution", "9 signal channels monitored for buying intent", "Multi-channel sequences: LinkedIn + Email + WhatsApp", "AI ICP scoring on funding, hires, headcount, intent, geography", "Dedicated GTM Engineer runs campaigns end-to-end", "Weekly performance reviews and CRM integration", "Replaces 5+ point solutions at a fraction of the cost"],
+  },
+  { category: "AEO/GEO - Guided Visibility", type: "offer",
+    headline: "We find the opportunities. You create the content.",
+    lines: ["Priority prompt and topic map for your solution areas", "Visibility baseline across AI answer engines and search", "Up to 8 citation-author targets researched per month", "Daily curation of Reddit, LinkedIn, community and forum opportunities", "Recommended response angles and evidence points for each opportunity", "Monthly content gap brief with recommended pages or updates", "Weekly activity summary and monthly visibility review"],
+  },
+  { category: "AEO/GEO - Managed Authority", type: "offer",
+    headline: "We run the entire authority programme.",
+    lines: ["Everything in Guided Visibility, plus GetGTM creates and publishes", "Up to 4 owned-authority assets per month (pages, articles, FAQs, docs)", "Up to 8 community or social response drafts per week", "Ongoing optimization of owned pages using live buyer questions", "Author, publication and podcast outreach for editorial inclusion", "AI visibility monitoring across your agreed prompt set", "Strategic LinkedIn, Reddit and evidence surface management"],
+  },
+  { category: "DelightLoop - Test", type: "offer",
+    headline: "Test AI-powered gifting on one campaign.",
+    lines: ["One campaign play over one month", "AI-matched hyper-personalized gifts for your target accounts", "Integrated with your existing CRM and campaign workflow", "Full delivery operations handled", "CTA tracking and gifting ROI measurement", "See the impact of physical touchpoints before committing long-term"],
+  },
+  { category: "DelightLoop - Unlimited", type: "offer",
+    headline: "Unlimited campaigns. Unlimited contacts. All year.",
+    lines: ["Unlimited campaign plays and contacts", "Personalized offline plays across your entire pipeline", "AI gift matching triggered by deal signals", "Global sourcing, warehousing and automated delivery", "CTA tracking and ROI measurement across all campaigns", "Annual commitment - the physical layer that runs alongside everything else"],
+  },
+  { category: "Warm Path Calling", type: "offer",
+    headline: "Signal-prioritized calling. Pay for meetings, not dials.",
+    lines: ["Trained US-based callers on your highest-intent accounts", "Signal-prioritized call lists - not random dialing", "Pay-per-attended-meeting model - aligned incentives", "Call recording, CRM logging and handover notes", "Higher connect rates when paired with direct mail and email", "Stacks on top of any outbound plan as an add-on"],
+  },
+  { category: "Definition Lock", type: "offer",
+    headline: "One session. Every metric agreed. Signed.",
+    lines: ["90-minute facilitated session with sales, marketing, CS, finance and RevOps", "Qualified lead, pipeline stage, ARR/MRR/TCV definitions locked", "Retention, churn and attribution definitions agreed", "AI-influenced revenue defined and source-of-truth assigned", "Signed one-page definitions sheet every new hire inherits", "Credits 100% toward a full AI Revenue Verdict"],
+  },
 ];
 
 function newClient(name, path) {
@@ -653,29 +642,13 @@ function renderOffersTab(c) {
   if (slide.type === "problem-summary") {
     return renderProblemSummary(slide, topbar, footer);
   }
-
-  var beforeLines = slide.before.lines.map(function(l) {
-    return '<div class="ppt-line">' + escapeHTML(l) + '</div>';
-  }).join("");
-  var afterLines = slide.after.lines.map(function(l) {
-    return '<div class="ppt-line">' + escapeHTML(l) + '</div>';
-  }).join("");
+  if (slide.type === "offer") {
+    return renderOfferSlide(slide, topbar, footer);
+  }
 
   return '<div class="ppt-fullscreen">' + topbar +
-    '<div class="ppt-slide">' +
-      '<div class="ppt-half ppt-dark">' +
-        '<div class="ppt-label">' + escapeHTML(slide.before.label) + '</div>' +
-        '<div class="ppt-lines">' + beforeLines + '</div>' +
-        '<div class="ppt-stat">' + escapeHTML(slide.before.stat) + '</div>' +
-        '<div class="ppt-stat-sub">' + escapeHTML(slide.before.statSub) + '</div>' +
-      '</div>' +
-      '<div class="ppt-half ppt-light">' +
-        '<div class="ppt-label">' + escapeHTML(slide.after.label) + '</div>' +
-        '<div class="ppt-lines">' + afterLines + '</div>' +
-        '<div class="ppt-stat">' + escapeHTML(slide.after.stat) + '</div>' +
-        '<div class="ppt-stat-sub">' + escapeHTML(slide.after.statSub) + '</div>' +
-      '</div>' +
-    '</div>' + footer + '</div>';
+    '<div style="flex:1;display:flex;align-items:center;justify-content:center;background:#000;color:#888">' +
+    'Unknown slide type</div>' + footer + '</div>';
 }
 
 function renderProblemSlide(s, topbar, footer) {
@@ -725,6 +698,21 @@ function renderProblemSlide(s, topbar, footer) {
       '</div>' +
     '</div>' +
     footer + '</div>';
+}
+
+function renderOfferSlide(s, topbar, footer) {
+  var linesHtml = s.lines.map(function(l) {
+    return '<div class="offer-line"><span class="offer-check">\u2713</span> ' + escapeHTML(l) + '</div>';
+  }).join("");
+
+  return '<div class="ppt-fullscreen">' + topbar +
+    '<div class="offer-body">' +
+      '<div class="offer-card">' +
+        '<div class="offer-category">' + escapeHTML(s.category) + '</div>' +
+        '<h2 class="offer-headline">' + escapeHTML(s.headline) + '</h2>' +
+        '<div class="offer-lines">' + linesHtml + '</div>' +
+      '</div>' +
+    '</div>' + footer + '</div>';
 }
 
 function renderProblemSummary(s, topbar, footer) {
