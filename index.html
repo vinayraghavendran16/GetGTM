@@ -513,6 +513,9 @@ async function loadState() {
   if (!state.clients) state.clients = {};
   if (!state.prospects) state.prospects = [];
   if (state.prospects.length === 0) { seedProspects(); await saveState(); }
+  var beforeClientCount = Object.keys(state.clients).length;
+  seedKnownAccounts();
+  if (Object.keys(state.clients).length !== beforeClientCount) { await saveState(); }
   // Migrate all existing clients to current data model
   Object.values(state.clients).forEach(function(c) { migrateClient(c); });
 }
@@ -744,6 +747,101 @@ const SLIDES = [
     lines: ["90-minute facilitated session with sales, marketing, CS, finance and RevOps", "Qualified lead, pipeline stage, ARR/MRR/TCV definitions locked", "Retention, churn and attribution definitions agreed", "AI-influenced revenue defined and source-of-truth assigned", "Signed one-page definitions sheet every new hire inherits", "Credits 100% toward a full AI Revenue Verdict"],
   },
 ];
+
+
+function stagesUpTo(path, upToStageName, inProgressStageName) {
+  var stageList = PATHS[path].stages;
+  var idx = stageList.indexOf(upToStageName);
+  var ipIdx = inProgressStageName ? stageList.indexOf(inProgressStageName) : -1;
+  return stageList.map(function(s, i) {
+    var status = "Not Started";
+    if (i <= idx) status = "Complete";
+    if (i === ipIdx) status = "In Progress";
+    return { stage: s, status: status, eta: "", notes: "" };
+  });
+}
+
+function seedKnownAccounts() {
+  var existingNames = Object.values(state.clients).map(function(c) { return c.name; });
+
+  function addIfMissing(name, overrides) {
+    if (existingNames.indexOf(name) !== -1) return;
+    var c = newClient(name, overrides.path || "7-day");
+    Object.assign(c, overrides.top || {});
+    if (overrides.intake) Object.assign(c.intake, overrides.intake);
+    if (overrides.people) Object.assign(c.people, overrides.people);
+    if (overrides.icp) Object.assign(c.icp, overrides.icp);
+    if (overrides.stages) c.stages = overrides.stages;
+    if (overrides.sow) Object.assign(c.sow, overrides.sow);
+    if (overrides.proposal) Object.assign(c.proposal, overrides.proposal);
+    state.clients[c.id] = c;
+  }
+
+  addIfMissing("Securotix", {
+    path: "7-day",
+    top: { kickoffDate: "2026-07-15" },
+    intake: { website: "https://securotix.com", pocName: "Adhnaan Hussen", pocEmail: "adhnaan.hussen@securotix.com",
+      outbound: "outbound-india", packageNotes: "Confirm exact package tier and monthly value - not confirmed from Gmail, inferred from active daily campaign reports since mid-July." },
+    people: { gtme: "Sean", gtmeEmail: "sean@getgtm.ai", clientPoc: "Adhnaan Hussen", clientPocEmail: "adhnaan.hussen@securotix.com" },
+    proposal: { stage: "approved", approvedDate: "2026-07-14" },
+    sow: { status: "Signed", signedDate: "2026-07-14" },
+    stages: stagesUpTo("7-day", "Launch", "First Review"),
+  });
+
+  addIfMissing("CognitivTrust", {
+    path: "7-day",
+    top: { kickoffDate: "2026-08-25" },
+    intake: { website: "https://cognitivtrust.com", pocName: "Yogesh Trivedi", pocEmail: "yogesh@cognitivtrust.com",
+      outbound: "outbound-india" },
+    people: { gtme: "", clientPoc: "Yogesh Trivedi", clientPocEmail: "yogesh@cognitivtrust.com",
+      signatoryName: "Yogesh Trivedi", signatoryTitle: "" },
+    proposal: { stage: "approved", initialSentDate: "2026-07-23", approvedDate: "2026-08-20" },
+    sow: { status: "Signed", signedDate: "2026-08-20" },
+    stages: stagesUpTo("7-day", "Commercial Handover", "Onboarding"),
+  });
+
+  addIfMissing("SPRY", {
+    path: "7-day",
+    top: { kickoffDate: "2026-08-01" },
+    intake: { website: "https://spryhealth.care", pocName: "Praveen K", pocEmail: "praveenk@spryhealth.care",
+      outbound: "outbound-india", packageNotes: "Referenceability campaign for a 47-lead list, not standard signal-led outbound. Confirm package classification and pricing." },
+    people: { gtme: "Nishanth", gtmeEmail: "nishanth@getgtm.ai", clientPoc: "Praveen K", clientPocEmail: "praveenk@spryhealth.care" },
+    proposal: { stage: "approved" },
+    sow: { status: "Signed" },
+    stages: stagesUpTo("7-day", "Campaign Build", "Launch"),
+  });
+
+  addIfMissing("CloudLeap", {
+    path: "14-day",
+    top: { kickoffDate: "2026-07-22" },
+    intake: { website: "https://cloudleap.com", pocName: "Pritesh Shah", pocEmail: "pritesh@cloudleap.com",
+      outbound: "", packageNotes: "Package/pricing not confirmed from Gmail - agreement was countersigned but commercial terms not visible in searched threads." },
+    people: { clientPoc: "Pritesh Shah", clientPocEmail: "pritesh@cloudleap.com" },
+    proposal: { stage: "approved", approvedDate: "2026-07-20" },
+    sow: { status: "Signed", signedDate: "2026-07-22" },
+    stages: stagesUpTo("14-day", "Infrastructure", "Connecting Accounts"),
+  });
+
+  addIfMissing("Trinet", {
+    path: "7-day",
+    top: {},
+    intake: { pocName: "", pocEmail: "", outbound: "",
+      packageNotes: "No POC email or package details found in Gmail. Account is being planned - Trinet Plan & SPRY Handover meeting held Aug 24, first campaign not yet built." },
+    people: { gtme: "Uday / Tushar", gtmeEmail: "" },
+    proposal: { stage: "approved" },
+    sow: { status: "Signed" },
+    stages: stagesUpTo("7-day", "Onboarding", "ICP Fitment"),
+  });
+
+  addIfMissing("Evoco", {
+    path: "7-day",
+    top: {},
+    intake: { pocName: "", pocEmail: "", outbound: "",
+      packageNotes: "No details found in Gmail beyond account ownership assignment. Needs manual fill." },
+    people: { gtme: "Uday / Tushar", gtmeEmail: "" },
+    stages: stagesUpTo("7-day", "Qualification", "Scoping"),
+  });
+}
 
 function newClient(name, path) {
   const id = "c_" + Math.random().toString(36).slice(2, 10);
