@@ -538,6 +538,10 @@ function migrateClient(c) {
   if (!c.people.gtmeEmail) c.people.gtmeEmail = "";
   if (!c.people.clientPoc) c.people.clientPoc = c.intake.pocName || "";
   if (!c.people.clientPocEmail) c.people.clientPocEmail = c.intake.pocEmail || "";
+  if (!c.people.signatoryName) c.people.signatoryName = "";
+  if (!c.people.signatoryEmail) c.people.signatoryEmail = "";
+  if (!c.people.signatoryTitle) c.people.signatoryTitle = "";
+  if (!c.people.billingAddress) c.people.billingAddress = "";
 
   // Patch proposal
   if (!c.proposal) c.proposal = { stage: "draft", initialSentDate: "", initialNotes: "", scopeNotes: [], finalSentDate: "", finalNotes: "", approvedDate: "", approvalEmail: "", sowGenerated: false };
@@ -725,6 +729,7 @@ function newClient(name, path) {
       cs: "", csEmail: "",
       gtme: "", gtmeEmail: "",
       clientPoc: "", clientPocEmail: "",
+      signatoryName: "", signatoryEmail: "", signatoryTitle: "", billingAddress: "",
     },
     channel: { type: "Slack", link: "" },
     drive: { folderLink: "", assetsLink: "" },
@@ -1238,6 +1243,15 @@ function renderOverviewTab(c) {
         </div>
         <div class="small" style="margin-bottom:4px">Client POC pulls from the Client Intake tab. Edit here to override.</div>
 
+        <h3 style="margin:20px 0 12px;font-size:13px;font-weight:600">Signing authority (for the Proposal)</h3>
+        <div class="grid-2">
+          <div class="field"><label>Authorized signatory name</label><input data-people="signatoryName" value="${escapeAttr(p.signatoryName)}" placeholder="Name on the signature block"></div>
+          <div class="field"><label>Authorized signatory email</label><input data-people="signatoryEmail" type="email" value="${escapeAttr(p.signatoryEmail)}" placeholder="signatory@client.com"></div>
+          <div class="field"><label>Authorized signatory title</label><input data-people="signatoryTitle" value="${escapeAttr(p.signatoryTitle)}" placeholder="e.g. CEO, VP Sales"></div>
+          <div class="field"><label>Billing address</label><input data-people="billingAddress" value="${escapeAttr(p.billingAddress)}" placeholder="Company legal / billing address"></div>
+        </div>
+        <div class="small" style="margin-bottom:4px">Used on the Acceptance page of the proposal. If left blank, defaults to Client POC.</div>
+
         <h3 style="margin:20px 0 12px;font-size:13px;font-weight:600">Comms channel</h3>
         <div class="grid-2">
           <div class="field"><label>Platform</label>
@@ -1512,23 +1526,27 @@ function buildProposalHTML(c, isForPDF) {
     '</ul></div>';
 
   // 10 Acceptance
+  var sigName = p.signatoryName || pocName;
+  var sigTitle = p.signatoryTitle || "[Designation]";
   html += '<div class="sect' + (isForPDF ? ' page-break' : '') + '"><span class="sect-num">10</span><h2>Acceptance</h2><div class="sect-line"></div>' +
     '<p style="margin-bottom:24px">Accepted and agreed by the authorised signatories of the Parties below.</p>' +
     '<table style="border:none;margin-bottom:0"><tr style="border:none">' +
     '<td style="border:none;width:50%;vertical-align:top;padding:0 20px 0 0">' +
     '<div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:32px">For getGTM.ai</div>' +
     '<div style="border-top:1px solid #1c1917;padding-top:8px;margin-top:24px">' +
-    '<div style="font-weight:700;font-size:13px">' + escapeHTML(cro) + '</div>' +
+    '<div style="font-weight:700;font-size:13px">Rajiv Mukherjee</div>' +
     '<div style="font-size:11px;color:#666">Founder & MD, getGTM.ai</div>' +
     '<div style="font-size:11px;color:#666;margin-top:8px">Date: ____________</div></div>' +
     '</td>' +
     '<td style="border:none;width:50%;vertical-align:top;padding:0 0 0 20px">' +
     '<div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:32px">For ' + escapeHTML(c.name) + '</div>' +
     '<div style="border-top:1px solid #1c1917;padding-top:8px;margin-top:24px">' +
-    '<div style="font-weight:700;font-size:13px">' + escapeHTML(pocName) + '</div>' +
-    '<div style="font-size:11px;color:#666">[Designation], ' + escapeHTML(c.name) + '</div>' +
+    '<div style="font-weight:700;font-size:13px">' + escapeHTML(sigName) + '</div>' +
+    '<div style="font-size:11px;color:#666">' + escapeHTML(sigTitle) + ', ' + escapeHTML(c.name) + '</div>' +
     '<div style="font-size:11px;color:#666;margin-top:8px">Date: ____________</div></div>' +
-    '</td></tr></table></div>';
+    '</td></tr></table>' +
+    (p.billingAddress ? '<div style="margin-top:20px;font-size:10px;color:#888"><strong>Billing address:</strong> ' + escapeHTML(p.billingAddress) + '</div>' : '') +
+    '</div>';
 
   // Footer
   html += '<div class="footer">CONFIDENTIAL PROPOSAL | GETGTM.AI | ' + escapeHTML(cro) + ' - ' + escapeHTML(croEmail) + '</div>';
