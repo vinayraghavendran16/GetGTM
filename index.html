@@ -414,7 +414,33 @@ const PATHS = {
 };
 
 let state = { clients: {} };
-let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: null };
+let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: null, dashboardTab: "engagements" };
+
+function seedProspects() {
+  state.prospects = [
+    {
+      id: "p_" + Math.random().toString(36).slice(2,10),
+      name: "Yogesh Trivedi", company: "CognitivTrust", email: "yogesh@cognitivtrust.com",
+      dateContacted: "2026-07-23", status: "Kickoff Scheduled",
+      nextStep: "Kickoff call Aug 25, 10:30am IST", source: "Vinay sent, Rajiv looped in",
+      notes: "Proposal sent Jul 23. Objections on differentiation addressed Jul 30. Met in person Aug 12 in Bangalore. Kickoff meeting accepted for Aug 25."
+    },
+    {
+      id: "p_" + Math.random().toString(36).slice(2,10),
+      name: "Sandeep Mane", company: "Rescribe (Scorg Technologies)", email: "sandeep.mane@scorgtechnologies.com",
+      dateContacted: "2026-08-21", status: "Follow-up Sent",
+      nextStep: "Awaiting infra details and availability to connect this week", source: "Vinay sent, Rajiv cc'd",
+      notes: "Call held Aug 21. Follow-up sent Aug 24 asking for current infra details and scheduling."
+    },
+    {
+      id: "p_" + Math.random().toString(36).slice(2,10),
+      name: "Dinesh", company: "Inspiration Digital", email: "dinesh@inspirationdigital.co",
+      dateContacted: "2026-07-16", status: "Stalled",
+      nextStep: "Send short proposal - overdue, thread gone quiet since Jul 23", source: "Rajiv led, Vinay cc'd",
+      notes: "Partners hesitant due to past bad experience with cold outbound vendors. Objection addressed Jul 22. Dinesh requested a short proposal Jul 23 to share with partners. No response since."
+    },
+  ];
+}
 var isClientView = false;
 function roAttr() { return isClientView ? " disabled" : ""; }
 function roStyle() { return isClientView ? " style=\"opacity:.7;pointer-events:none\"" : ""; }
@@ -485,6 +511,8 @@ async function loadState() {
     }
   } catch (e) { console.log("loadState error:", e); }
   if (!state.clients) state.clients = {};
+  if (!state.prospects) state.prospects = [];
+  if (state.prospects.length === 0) { seedProspects(); await saveState(); }
   // Migrate all existing clients to current data model
   Object.values(state.clients).forEach(function(c) { migrateClient(c); });
 }
@@ -811,6 +839,7 @@ function renderDashboard() {
   const active = clients.filter(c => progressOf(c) > 0 && progressOf(c) < 100).length;
   const launched = clients.filter(c => progressOf(c) === 100).length;
   const atRisk = clients.filter(c => c.stages.some(s => s.status === "Blocked")).length;
+  const dTab = ui.dashboardTab || "engagements";
 
   return `
     <div class="topbar">
@@ -821,6 +850,17 @@ function renderDashboard() {
       </div>
     </div>
     <div class="wrap">
+      <div class="tabs" style="margin-bottom:16px">
+        <button data-action="dtab" data-dtab="engagements" class="${dTab==='engagements'?'active':''}">Engagements</button>
+        <button data-action="dtab" data-dtab="prospects" class="${dTab==='prospects'?'active':''}">Prospects</button>
+      </div>
+      ${dTab === "prospects" ? renderProspectsView() : renderEngagementsView(clients, active, launched, atRisk)}
+    </div>
+  `;
+}
+
+function renderEngagementsView(clients, active, launched, atRisk) {
+  return `
       <div class="kpis">
         <div class="kpi"><div class="label">Total</div><div class="value">${clients.length}</div></div>
         <div class="kpi"><div class="label">In flight</div><div class="value">${active}</div></div>
@@ -859,7 +899,62 @@ function renderDashboard() {
           `}
         </div>
       </div>
-    </div>
+  `;
+}
+
+var PROSPECT_STATUSES = ["New", "Contacted", "Follow-up Sent", "In Conversation", "Objection Handling",
+  "Proposal Requested", "Kickoff Scheduled", "Stalled", "Not a Fit", "Converted"];
+
+function renderProspectsView() {
+  const prospects = (state.prospects || []).slice().sort((a,b) => (b.dateContacted||"").localeCompare(a.dateContacted||""));
+  const active = prospects.filter(p => !["Stalled","Not a Fit","Converted"].includes(p.status)).length;
+  const stalled = prospects.filter(p => p.status === "Stalled").length;
+  const converted = prospects.filter(p => p.status === "Converted").length;
+
+  return `
+      <div class="kpis">
+        <div class="kpi"><div class="label">Total prospects</div><div class="value">${prospects.length}</div></div>
+        <div class="kpi"><div class="label">Active</div><div class="value">${active}</div></div>
+        <div class="kpi"><div class="label">Stalled</div><div class="value" style="color:${stalled?'var(--danger)':'inherit'}">${stalled}</div></div>
+        <div class="kpi"><div class="label">Converted</div><div class="value" style="color:var(--success)">${converted}</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Prospects</h2>
+          <div style="display:flex;gap:8px">
+            <button class="btn ghost sm" data-action="refresh-prospects-note">Pulled from Gmail</button>
+            <button class="btn" data-action="add-prospect">+ Add prospect</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div class="small" style="padding:12px 16px;border-bottom:0.5px solid var(--border)">Seeded from Gmail on-demand - threads where Rajiv led, looped Vinay in, or Vinay reached out directly. Ask to refresh anytime.</div>
+          ${prospects.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">No prospects yet.</div>` : `
+            <table>
+              <thead><tr>
+                <th>Name / Company</th><th>Date contacted</th><th>Status</th><th>Next step</th><th>Source</th><th></th>
+              </tr></thead>
+              <tbody>
+                ${prospects.map(p => `
+                  <tr>
+                    <td><strong>${escapeHTML(p.name)}</strong><div class="small">${escapeHTML(p.company)}</div></td>
+                    <td><input type="date" data-prospect="${p.id}" data-key="dateContacted" value="${escapeAttr(p.dateContacted)}" style="border:none;background:transparent;padding:0;width:120px"></td>
+                    <td>
+                      <select data-prospect="${p.id}" data-key="status" class="del-select">
+                        ${PROSPECT_STATUSES.map(s => `<option ${p.status===s?'selected':''}>${s}</option>`).join("")}
+                      </select>
+                    </td>
+                    <td><input data-prospect="${p.id}" data-key="nextStep" value="${escapeAttr(p.nextStep)}" style="border:none;background:transparent;padding:0;width:220px"></td>
+                    <td><div class="small">${escapeHTML(p.source)}</div></td>
+                    <td><button class="btn ghost sm" data-action="delete-prospect" data-id="${p.id}">Remove</button></td>
+                  </tr>
+                  ${p.notes ? `<tr><td colspan="6" style="padding-top:0"><div class="small" style="color:var(--text-muted);padding:0 0 8px">${escapeHTML(p.notes)}</div></td></tr>` : ""}
+                `).join("")}
+              </tbody>
+            </table>
+          `}
+        </div>
+      </div>
   `;
 }
 
@@ -2029,6 +2124,23 @@ function attachHandlers() {
         doLogin();
       } else if (action === "logout") { if (isClientView) return; ui.isAuth = false; ui.view = "login"; render(); }
       else if (action === "new-client") { ui.modal = { type: "new-client" }; render(); }
+      else if (action === "dtab") { ui.dashboardTab = el.dataset.dtab; render(); }
+      else if (action === "add-prospect") {
+        state.prospects.push({
+          id: "p_" + Math.random().toString(36).slice(2,10),
+          name: "New prospect", company: "", email: "",
+          dateContacted: new Date().toISOString().slice(0,10), status: "New",
+          nextStep: "", source: "Manually added", notes: ""
+        });
+        saveState(); render();
+      }
+      else if (action === "delete-prospect") {
+        state.prospects = state.prospects.filter(p => p.id !== el.dataset.id);
+        saveState(); render();
+      }
+      else if (action === "refresh-prospects-note") {
+        alert("Ask Claude to pull the latest prospects from Gmail and I'll refresh this list with real threads.");
+      }
       else if (action === "modal-close") { ui.modal = null; render(); }
       else if (action === "modal-create") {
         const nameEl = document.getElementById("nc-name");
@@ -2182,6 +2294,17 @@ function attachHandlers() {
       cl.delivery.weeklyUpdates[parseInt(el.dataset.weekly)][el.dataset.key] = el.value;
       save();
     });
+  });
+
+  document.querySelectorAll("[data-prospect]").forEach(el => {
+    var handler = function() {
+      var p = state.prospects.find(function(x) { return x.id === el.dataset.prospect; });
+      if (!p) return;
+      p[el.dataset.key] = el.value;
+      if (el.dataset.key === "status") { saveState(); render(); } else { save(); }
+    };
+    el.addEventListener("input", handler);
+    el.addEventListener("change", handler);
   });
 
   document.querySelectorAll("[data-proposal]").forEach(el => {
