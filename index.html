@@ -98,6 +98,7 @@
       font-size: 10px; font-weight: 600; letter-spacing: .2px; }
     .badge.done { background: var(--success-light); color: var(--success); }
     .badge.pending { background: var(--info-light); color: var(--info); }
+    .badge.at-risk { background: #fee2e2; color: #b91c1c; }
 
     .field { margin-bottom: 12px; }
     .field label { display: block; font-size: 11px; font-weight: 600;
@@ -417,60 +418,67 @@ const PATHS = {
 var REVENUE_CONTRACTS = {
   "Securotix": {
     agreementDate: "2026-06-19", term: "3-month initial, then month-to-month", sourceDoc: "SECUROTIX GETGTM AGREEMENT SERVICE.pdf",
+    sourceUrl: "https://drive.google.com/file/d/1_XCtWEHldhO3B7m1oPFhb_TkgW_9MOD8/view?usp=drivesdk",
     confirmed: true,
     schedule: [
-      { label: "Month 1", period: "Jun 19 - Jul 18", base: 1500, max: 1500, formula: "Fixed: $1,000 advance + $500 setup on campaign go-live. No performance component in Month 1." },
-      { label: "Month 2", period: "Jul 19 - Aug 18", base: 1000, max: 1599, formula: "$1,000 advance + up to $599 performance (Tufin $299 on 4+ qualifying responses, 1Kosmos $300 on 4+ qualifying responses). Each assessed independently, non-cumulative." },
-      { label: "Month 3", period: "Aug 19 - Sep 18", base: 1000, max: 1599, formula: "Same structure as Month 2." },
-      { label: "Month 4", period: "Sep 19 - Oct 18", base: 1000, max: 1599, formula: "Same structure, continuing month-to-month." },
+      { label: "Month 1", period: "Jun 19 - Jul 18", start: "2026-06-19", end: "2026-07-18", base: 1500, max: 1500, formula: "Fixed: $1,000 advance + $500 setup on campaign go-live. No performance component in Month 1." },
+      { label: "Month 2", period: "Jul 19 - Aug 18", start: "2026-07-19", end: "2026-08-18", base: 1000, max: 1599, formula: "$1,000 advance + up to $599 performance (Tufin $299 on 4+ qualifying responses, 1Kosmos $300 on 4+ qualifying responses). Each assessed independently, non-cumulative." },
+      { label: "Month 3", period: "Aug 19 - Sep 18", start: "2026-08-19", end: "2026-09-18", base: 1000, max: 1599, formula: "Same structure as Month 2." },
+      { label: "Month 4", period: "Sep 19 - Oct 18", start: "2026-09-19", end: "2026-10-18", base: 1000, max: 1599, formula: "Same structure, continuing month-to-month." },
     ],
     notes: "Two product lines (Tufin, 1Kosmos) each carry independent KPI thresholds. Performance fee is all-or-nothing per product line at 4+ qualifying responses/month, not prorated."
   },
   "CloudLeap": {
     agreementDate: "2026-07-22", term: "Month-to-month from signing", sourceDoc: "Final CloudLeap GTM Services Agreement 18072026.pdf",
+    sourceUrl: "https://drive.google.com/file/d/1zgnX5t2V_NKSsXMCrQX1nje1AgWKZRbY/view?usp=drivesdk",
     confirmed: true,
     schedule: [
-      { label: "Month 1", period: "Jul 22 - Aug 21", base: 750, max: 750, formula: "Fixed: $500 advance + $250 setup on campaign go-live. No performance component in Month 1." },
-      { label: "Month 2", period: "Aug 22 - Sep 21", base: 500, max: 1500, formula: "$500 advance + Tranche 1 ($500 at 2+ meetings AND 2+ replies) + Tranche 2 (+$500 at 5+ meetings AND 8+ replies, subsumes Tranche 1). Plus uncapped bonuses: $60/meeting beyond 5, $30/reply beyond 8." },
-      { label: "Month 3", period: "Sep 22 - Oct 21", base: 500, max: 1500, formula: "Same structure as Month 2. Bonus amounts beyond the $1,500 ceiling are uncapped and performance-dependent." },
+      { label: "Month 1", period: "Jul 22 - Aug 21", start: "2026-07-22", end: "2026-08-21", base: 750, max: 750, formula: "Fixed: $500 advance + $250 setup on campaign go-live. No performance component in Month 1." },
+      { label: "Month 2", period: "Aug 22 - Sep 21", start: "2026-08-22", end: "2026-09-21", base: 500, max: 1500, formula: "$500 advance + Tranche 1 ($500 at 2+ meetings AND 2+ replies) + Tranche 2 (+$500 at 5+ meetings AND 8+ replies, subsumes Tranche 1). Plus uncapped bonuses: $60/meeting beyond 5, $30/reply beyond 8." },
+      { label: "Month 3", period: "Sep 22 - Oct 21", start: "2026-09-22", end: "2026-10-21", base: 500, max: 1500, formula: "Same structure as Month 2. Bonus amounts beyond the $1,500 ceiling are uncapped and performance-dependent." },
     ],
     notes: "The $1,500 max is the fixed-tranche ceiling only. Bonuses for meetings/replies beyond Tranche 2 thresholds ($60/meeting, $30/reply) are uncapped and not included in the max column - actuals can exceed max in a strong month."
   },
   "EduInfra": {
     agreementDate: "2026-07-27", term: "3 months fixed (Jul 27 - Oct 31), renewable", sourceDoc: "EduInfra SOW 27July countersigned.pdf",
+    sourceUrl: "https://drive.google.com/file/d/1sZ5uIqjm5rkZZ_TfQNuJKYhlx8fxCv8I/view?usp=drivesdk",
     confirmed: true,
     schedule: [
-      { label: "Month 1", period: "Jul 27 - Aug 26", base: 800, max: 1599, formula: "$800 advance + $799 if 100+ qualifying replies delivered in the month." },
-      { label: "Month 2", period: "Aug 27 - Sep 26", base: 800, max: 1599, formula: "Same structure as Month 1." },
-      { label: "Month 3 (final)", period: "Sep 27 - Oct 31", base: 800, max: 1599, formula: "Same structure, plus a Success Bonus (amount TBD, mutually determined in writing) if 300 total qualifying replies across the full term are achieved with the right ICP fit." },
+      { label: "Month 1", period: "Jul 27 - Aug 26", start: "2026-07-27", end: "2026-08-26", base: 800, max: 1599, formula: "$800 advance + $799 if 100+ qualifying replies delivered in the month." },
+      { label: "Month 2", period: "Aug 27 - Sep 26", start: "2026-08-27", end: "2026-09-26", base: 800, max: 1599, formula: "Same structure as Month 1." },
+      { label: "Month 3 (final)", period: "Sep 27 - Oct 31", start: "2026-09-27", end: "2026-10-31", base: 800, max: 1599, formula: "Same structure, plus a Success Bonus (amount TBD, mutually determined in writing) if 300 total qualifying replies across the full term are achieved with the right ICP fit." },
     ],
     notes: "Outcome-linked model - no separate onboarding fee, same $800 base + $799/100-replies structure every month. Success bonus at term-end is uncapped and not yet numerically defined in the contract."
   },
   "SPRY": {
     agreementDate: "2026-08-05", term: "2-month pilot (Aug 5 - Oct 4)", sourceDoc: "SPRY Final Agreement 5 Aug.pdf (Rev. 2 Addendum - supersedes the Jul 22 proposal)",
+    sourceUrl: "https://drive.google.com/file/d/12E48K_GxINLiN0lJS6sFH_5aNZuklFHm/view?usp=drivesdk",
     confirmed: true,
     schedule: [
-      { label: "Month 1", period: "Aug 5 - Sep 4", base: 1250, max: 1250, formula: "Fixed: list build, referral-ask content, campaign execution. No performance component in Month 1." },
-      { label: "Month 2 (final)", period: "Sep 5 - Oct 4", base: 750, max: 1500, formula: "$750 advance + $750 performance incentive if 3+ qualified meetings (SQL converted to Opportunity) are booked across the full 2-month pilot." },
+      { label: "Month 1", period: "Aug 5 - Sep 4", start: "2026-08-05", end: "2026-09-04", base: 1250, max: 1250, formula: "Fixed: list build, referral-ask content, campaign execution. No performance component in Month 1." },
+      { label: "Month 2 (final)", period: "Sep 5 - Oct 4", start: "2026-09-05", end: "2026-10-04", base: 750, max: 1500, formula: "$750 advance + $750 performance incentive if 3+ qualified meetings (SQL converted to Opportunity) are booked across the full 2-month pilot." },
     ],
     notes: "Optional calling add-on ($500/mo + $100/meeting) not included in base/max - only applies if separately activated. Supersedes the earlier Jul 22 proposal, which had different terms ($1,500/mo core, 10 meetings included) - use this signed Aug 5 addendum as source of truth."
   },
   "CognitivTrust": {
     agreementDate: "", term: "Not yet signed - kickoff scheduled Aug 25", sourceDoc: "No contract on file in Drive as of this report",
+    sourceUrl: "",
     confirmed: false,
     schedule: [
-      { label: "Month 1 (est.)", period: "TBD on signing", base: 1000, max: 1599, formula: "Estimated from proposal only, NOT a signed contract: $1,000 advance + up to $599 performance, matching the India-tier structure used in the sent proposal." },
+      { label: "Month 1 (est.)", period: "TBD on signing", start: "", end: "", base: 1000, max: 1599, formula: "Estimated from proposal only, NOT a signed contract: $1,000 advance + up to $599 performance, matching the India-tier structure used in the sent proposal." },
     ],
     notes: "No signed agreement found in Drive. Figures shown are carried over from the proposal sent Jul 23 and are unconfirmed. Upload the signed contract to replace this estimate."
   },
   "Trinet": {
     agreementDate: "", term: "Unknown", sourceDoc: "No contract on file in Drive",
+    sourceUrl: "",
     confirmed: false,
     schedule: [],
     notes: "No contract or proposal document found in Drive or Gmail. Planning meeting held Aug 24 but no commercial terms visible yet. Needs manual entry once signed."
   },
   "Evoco": {
     agreementDate: "", term: "Unknown", sourceDoc: "No contract on file in Drive",
+    sourceUrl: "",
     confirmed: false,
     schedule: [],
     notes: "No contract, proposal, or commercial detail found in Drive or Gmail beyond account ownership assignment. Needs manual entry once signed."
@@ -478,7 +486,7 @@ var REVENUE_CONTRACTS = {
 };
 
 let state = { clients: {} };
-let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: null, dashboardTab: "engagements" };
+let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: null, dashboardTab: "clients" };
 
 function seedProspects() {
   state.prospects = [
@@ -580,7 +588,9 @@ async function loadState() {
   if (state.prospects.length === 0) { seedProspects(); await saveState(); }
   var beforeClientCount = Object.keys(state.clients).length;
   seedKnownAccounts();
-  if (Object.keys(state.clients).length !== beforeClientCount) { await saveState(); }
+  enrichKnownAccounts();
+  Object.values(state.clients).forEach(function(c) { migrateClient(c); });
+  await saveState();
   // Migrate all existing clients to current data model
   Object.values(state.clients).forEach(function(c) { migrateClient(c); });
 }
@@ -621,6 +631,19 @@ function migrateClient(c) {
   }
   if (!c.intake.packageNotes) c.intake.packageNotes = "";
   if (!c.intake.website) c.intake.website = "";
+  if (c.intake.termType === undefined) c.intake.termType = "";
+  if (c.intake.termEndDate === undefined) c.intake.termEndDate = "";
+  if (c.intake.contractRef === undefined) c.intake.contractRef = "";
+  if (c.intake.contractUrl === undefined) c.intake.contractUrl = "";
+  if (c.accountStatus === undefined || c.accountStatus === null) c.accountStatus = "";
+  if (!c.accountStatus) {
+    // Auto-derive initial status: only set if never explicitly set before
+    if (c.proposal && c.proposal.stage === "approved") {
+      var launchStage = c.stages.find(function(s) { return s.stage === "Launch"; });
+      c.accountStatus = (launchStage && launchStage.status === "Complete") ? "Active" : "Onboarding";
+    }
+  }
+  if (c.lostMRR === undefined) c.lostMRR = "";
   if (!c.intake.pocName) c.intake.pocName = "";
   if (!c.intake.pocEmail) c.intake.pocEmail = "";
 
@@ -839,6 +862,7 @@ function seedKnownAccounts() {
     if (overrides.stages) c.stages = overrides.stages;
     if (overrides.sow) Object.assign(c.sow, overrides.sow);
     if (overrides.proposal) Object.assign(c.proposal, overrides.proposal);
+    migrateClient(c);
     state.clients[c.id] = c;
   }
 
@@ -908,13 +932,65 @@ function seedKnownAccounts() {
   });
 }
 
+
+function enrichKnownAccounts() {
+  var fills = {
+    "Securotix": {
+      intake: { termType: "3-month initial, then month-to-month", contractRef: "SECUROTIX GETGTM AGREEMENT SERVICE.pdf",
+        contractUrl: "https://drive.google.com/file/d/1_XCtWEHldhO3B7m1oPFhb_TkgW_9MOD8/view?usp=drivesdk" },
+      people: { signatoryName: "Abdussalam Ahmad", signatoryTitle: "CEO",
+        billingAddress: "Office #325, Aqariah 2 Commercial Complex, Musa bin Nusair Street, Olaya, Riyadh 11351, KSA" },
+      icp: { roles: "CISO, Network Security Manager, Security Architect (Tufin); IAM Manager, CIO, CISO, Digital Transformation Lead (1Kosmos)" },
+      sow: { value: "$1,500 Month 1; up to $1,599/mo from Month 2 (base $1,000 + up to $599 performance)" },
+    },
+    "CloudLeap": {
+      intake: { termType: "Month-to-month from signing", contractRef: "Final CloudLeap GTM Services Agreement 18072026.pdf",
+        contractUrl: "https://drive.google.com/file/d/1zgnX5t2V_NKSsXMCrQX1nje1AgWKZRbY/view?usp=drivesdk" },
+      people: { signatoryName: "Pritesh Shah", signatoryTitle: "Co-Founder",
+        billingAddress: "100 Summit Dr, Burlington, MA 01803, USA" },
+      icp: { roles: "VP/Director Supply Chain & Logistics, Director Transportation/Distribution, VP/Director IT ERP & Systems, VP Operations & Fulfillment, Warehouse/DC Systems Managers" },
+      sow: { value: "$750 Month 1; from Month 2, $500 base + up to $1,000 tranches (max $1,500 fixed) + uncapped bonuses" },
+    },
+    "EduInfra": {
+      intake: { termType: "3 months fixed (Jul 27 - Oct 31), renewable", termEndDate: "2026-10-31",
+        contractRef: "EduInfra SOW 27July countersigned.pdf",
+        contractUrl: "https://drive.google.com/file/d/1sZ5uIqjm5rkZZ_TfQNuJKYhlx8fxCv8I/view?usp=drivesdk" },
+      people: { signatoryName: "Ganesh Babu", signatoryTitle: "Founder & CEO",
+        billingAddress: "WeWork, Krishe Emerald, Kondapur Main Road, Gachibowli, Hyderabad, Telangana 500084, India" },
+      icp: { geography: "India" },
+      sow: { value: "$800/mo base + $799 per 100 qualifying replies + TBD success bonus at 300 replies across term" },
+    },
+    "SPRY": {
+      intake: { termType: "2-month pilot (Aug 5 - Oct 4)", termEndDate: "2026-10-04",
+        contractRef: "SPRY Final Agreement 5 Aug.pdf",
+        contractUrl: "https://drive.google.com/file/d/12E48K_GxINLiN0lJS6sFH_5aNZuklFHm/view?usp=drivesdk" },
+      people: { signatoryName: "Brijraj Bhuptani", signatoryTitle: "President",
+        billingAddress: "1207 Del Ave #481, Wilmington, DE 19806, USA" },
+      icp: { industry: "Healthcare practice management (physical therapy)" },
+      sow: { value: "$1,250 Month 1; $750 base + up to $750 performance incentive Month 2 (max $1,500)" },
+    },
+  };
+
+  Object.keys(fills).forEach(function(name) {
+    var c = Object.values(state.clients).find(function(cl) { return cl.name === name; });
+    if (!c) return;
+    var f = fills[name];
+    if (f.intake) Object.keys(f.intake).forEach(function(k) { if (!c.intake[k]) c.intake[k] = f.intake[k]; });
+    if (f.people) Object.keys(f.people).forEach(function(k) { if (!c.people[k]) c.people[k] = f.people[k]; });
+    if (f.icp) Object.keys(f.icp).forEach(function(k) { if (!c.icp[k]) c.icp[k] = f.icp[k]; });
+    if (f.sow) Object.keys(f.sow).forEach(function(k) { if (!c.sow[k]) c.sow[k] = f.sow[k]; });
+  });
+}
+
 function newClient(name, path) {
   const id = "c_" + Math.random().toString(36).slice(2, 10);
   return {
     id, name, path, createdAt: new Date().toISOString(),
     kickoffDate: "", targetLaunchDate: "",
     intake: { clientName: name, website: "", pocName: "", pocEmail: "",
-      outbound: "", aeo: "", delight: "", addons: [], packageNotes: "" },
+      outbound: "", aeo: "", delight: "", addons: [], packageNotes: "",
+      termType: "", termEndDate: "", contractRef: "", contractUrl: "" },
+    accountStatus: "", lostMRR: "",
     people: {
       cro: "Vinay Raghavendran", croEmail: "vinay@getgtm.ai",
       cs: "", csEmail: "",
@@ -998,11 +1074,13 @@ function renderLogin() {
 }
 
 function renderDashboard() {
-  const clients = Object.values(state.clients).sort((a,b) => (b.createdAt||"").localeCompare(a.createdAt||""));
-  const active = clients.filter(c => progressOf(c) > 0 && progressOf(c) < 100).length;
-  const launched = clients.filter(c => progressOf(c) === 100).length;
-  const atRisk = clients.filter(c => c.stages.some(s => s.status === "Blocked")).length;
-  const dTab = ui.dashboardTab || "engagements";
+  const allClients = Object.values(state.clients).sort((a,b) => (b.createdAt||"").localeCompare(a.createdAt||""));
+  const signedClients = allClients.filter(c => c.proposal && c.proposal.stage === "approved");
+  const newEngagements = allClients.filter(c => !c.proposal || c.proposal.stage !== "approved");
+  const active = signedClients.filter(c => progressOf(c) > 0 && progressOf(c) < 100).length;
+  const launched = signedClients.filter(c => progressOf(c) === 100).length;
+  const atRisk = signedClients.filter(c => c.stages.some(s => s.status === "Blocked")).length;
+  const dTab = ui.dashboardTab || "clients";
 
   return `
     <div class="topbar">
@@ -1014,19 +1092,23 @@ function renderDashboard() {
     </div>
     <div class="wrap">
       <div class="tabs" style="margin-bottom:16px">
-        <button data-action="dtab" data-dtab="engagements" class="${dTab==='engagements'?'active':''}">Engagements</button>
+        <button data-action="dtab" data-dtab="clients" class="${dTab==='clients'?'active':''}">Clients</button>
+        <button data-action="dtab" data-dtab="new-engagements" class="${dTab==='new-engagements'?'active':''}">New Engagements</button>
         <button data-action="dtab" data-dtab="prospects" class="${dTab==='prospects'?'active':''}">Prospects</button>
         <button data-action="dtab" data-dtab="reporting" class="${dTab==='reporting'?'active':''}">Reporting</button>
       </div>
-      ${dTab === "prospects" ? renderProspectsView() : dTab === "reporting" ? renderReportingView() : renderEngagementsView(clients, active, launched, atRisk)}
+      ${dTab === "prospects" ? renderProspectsView()
+        : dTab === "reporting" ? renderReportingView()
+        : dTab === "new-engagements" ? renderNewEngagementsView(newEngagements)
+        : renderClientsView(signedClients, active, launched, atRisk)}
     </div>
   `;
 }
 
-function renderEngagementsView(clients, active, launched, atRisk) {
+function renderClientsView(clients, active, launched, atRisk) {
   return `
       <div class="kpis">
-        <div class="kpi"><div class="label">Total</div><div class="value">${clients.length}</div></div>
+        <div class="kpi"><div class="label">Total clients</div><div class="value">${clients.length}</div></div>
         <div class="kpi"><div class="label">In flight</div><div class="value">${active}</div></div>
         <div class="kpi"><div class="label">Launched</div><div class="value">${launched}</div></div>
         <div class="kpi"><div class="label">At risk</div><div class="value" style="color:${atRisk?'var(--danger)':'inherit'}">${atRisk}</div></div>
@@ -1034,27 +1116,63 @@ function renderEngagementsView(clients, active, launched, atRisk) {
 
       <div class="card">
         <div class="card-head">
-          <h2>Engagements</h2>
-          <button class="btn" data-action="new-client">+ New engagement</button>
+          <h2>Clients</h2>
         </div>
         <div class="card-body" style="padding:0">
-          ${clients.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">No engagements yet. <button class="btn" style="margin-top:12px" data-action="new-client">Create one</button></div>` : `
+          ${clients.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">No signed clients yet. Approve a proposal in New Engagements to move an account here.</div>` : `
             <table>
               <thead><tr>
-                <th>Client</th><th>Path</th><th>Kickoff</th><th>Progress</th><th>Next step</th><th>SOW</th><th></th>
+                <th>Client</th><th>Status</th><th>Path</th><th>Progress</th><th>Next step</th><th>SOW</th><th></th>
               </tr></thead>
               <tbody>
                 ${clients.map(c => {
                   const prog = progressOf(c);
                   const next = c.stages.find(s => s.status !== "Complete");
                   const url = window.location.origin + window.location.pathname + "?client=" + c.id;
+                  const statusColor = c.accountStatus === "Active" ? "done" : c.accountStatus === "Churned" ? "at-risk" : "pending";
                   return `<tr>
                     <td><strong onclick="window.openClient('${c.id}')" style="cursor:pointer">${escapeHTML(c.name)}</strong></td>
+                    <td><span class="badge ${statusColor}">${escapeHTML(c.accountStatus || "-")}</span></td>
                     <td><span class="badge pending">${PATHS[c.path].label}</span></td>
-                    <td>${escapeHTML(c.kickoffDate || "-")}</td>
                     <td><div class="progress" style="width:120px"><div style="width:${prog}%"></div></div><div class="small">${prog}%</div></td>
                     <td><div class="small">${escapeHTML(next?.stage || "Done")}</div></td>
                     <td><span class="badge ${c.sow.status === 'Signed' ? 'done' : 'pending'}">${escapeHTML(c.sow.status || "-")}</span></td>
+                    <td><div style="display:flex;gap:6px"><button class="btn ghost sm" onclick="navigator.clipboard.writeText('${escapeAttr(url)}');alert('Link copied!')">Share</button><button class="btn ghost sm" data-action="delete-client" data-id="${c.id}" style="color:var(--danger)">Delete</button></div></td>
+                  </tr>`;
+                }).join("")}
+              </tbody>
+            </table>
+          `}
+        </div>
+      </div>
+  `;
+}
+
+function renderNewEngagementsView(clients) {
+  return `
+      <div class="kpis">
+        <div class="kpi"><div class="label">In pipeline</div><div class="value">${clients.length}</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>New Engagements</h2>
+          <button class="btn" data-action="new-client">+ New engagement</button>
+        </div>
+        <div class="card-body" style="padding:0">
+          ${clients.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">Nothing in the pipeline. <button class="btn" style="margin-top:12px" data-action="new-client">Create one</button></div>` : `
+            <table>
+              <thead><tr>
+                <th>Prospect</th><th>Path</th><th>Proposal stage</th><th></th>
+              </tr></thead>
+              <tbody>
+                ${clients.map(c => {
+                  const stageLabel = { draft: "Draft", sent: "Scope Review", final: "Final Sent" }[c.proposal ? c.proposal.stage : "draft"] || "Draft";
+                  const url = window.location.origin + window.location.pathname + "?client=" + c.id;
+                  return `<tr>
+                    <td><strong onclick="window.openClient('${c.id}')" style="cursor:pointer">${escapeHTML(c.name)}</strong></td>
+                    <td><span class="badge pending">${PATHS[c.path].label}</span></td>
+                    <td><span class="badge pending">${escapeHTML(stageLabel)}</span></td>
                     <td><div style="display:flex;gap:6px"><button class="btn ghost sm" onclick="navigator.clipboard.writeText('${escapeAttr(url)}');alert('Link copied!')">Share</button><button class="btn ghost sm" data-action="delete-client" data-id="${c.id}" style="color:var(--danger)">Delete</button></div></td>
                   </tr>`;
                 }).join("")}
@@ -1128,12 +1246,22 @@ function renderReportingView() {
   if (!state.revenueActuals) state.revenueActuals = {};
   var names = Object.keys(REVENUE_CONTRACTS);
   var today = new Date();
+  var ACCOUNT_STATUSES = ["Onboarding", "Active", "At Risk", "Paused", "Renewed", "Churned"];
 
   var totalBase = 0, totalMax = 0, totalActual = 0, actualEntries = 0;
+  var mrr = 0, churnedCount = 0, churnedMRR = 0;
 
   var clientBlocks = names.map(function(name) {
     var contract = REVENUE_CONTRACTS[name];
+    var c = Object.values(state.clients).find(function(cl) { return cl.name === name; });
+    var status = c ? (c.accountStatus || "") : "";
     var clientBase = 0, clientMax = 0;
+
+    if (status === "Churned") {
+      churnedCount++;
+      var lost = c && c.lostMRR ? parseFloat(c.lostMRR) : 0;
+      if (!isNaN(lost)) churnedMRR += lost;
+    }
 
     var rows = contract.schedule.map(function(row) {
       var key = reportKey(name, row.label);
@@ -1144,10 +1272,15 @@ function renderReportingView() {
       totalMax += row.max;
       if (actualVal !== "" && !isNaN(parseFloat(actualVal))) { totalActual += parseFloat(actualVal); actualEntries++; }
 
-      return '<tr>' +
-        '<td><strong>' + escapeHTML(row.label) + '</strong><div class="small">' + escapeHTML(row.period) + '</div></td>' +
+      var isCurrent = row.start && row.end && today >= new Date(row.start) && today <= new Date(row.end + "T23:59:59");
+      if (isCurrent && status && ["Onboarding","Active","At Risk","Renewed"].indexOf(status) !== -1) {
+        mrr += (actualVal !== "" && !isNaN(parseFloat(actualVal))) ? parseFloat(actualVal) : row.base;
+      }
+
+      return '<tr' + (isCurrent ? ' style="background:var(--surface-1)"' : '') + '>' +
+        '<td><strong>' + escapeHTML(row.label) + (isCurrent ? ' <span class="badge done" style="font-size:9px">Current</span>' : '') + '</strong><div class="small">' + escapeHTML(row.period) + '</div></td>' +
         '<td>$' + row.base.toLocaleString() + '</td>' +
-        '<td>$' + row.max.toLocaleString() + (row.max > row.base ? '' : '') + '</td>' +
+        '<td>$' + row.max.toLocaleString() + '</td>' +
         '<td><input type="number" placeholder="-" data-report="' + escapeAttr(key) + '" value="' + escapeAttr(actualVal) + '" style="width:90px;border:0.5px solid var(--border);border-radius:4px;padding:4px 6px;background:var(--surface-1)"></td>' +
         '<td><div class="small">' + escapeHTML(row.formula) + '</div></td>' +
         '</tr>';
@@ -1155,11 +1288,27 @@ function renderReportingView() {
 
     var noContract = contract.schedule.length === 0;
 
+    var statusDropdown = c ? (
+      '<select data-account-status="' + c.id + '" style="font-size:11px;padding:4px 8px;border:0.5px solid var(--border);border-radius:4px;background:var(--surface-1)">' +
+        '<option value="">Not set</option>' +
+        ACCOUNT_STATUSES.map(function(s) { return '<option value="' + s + '"' + (status === s ? ' selected' : '') + '>' + s + '</option>'; }).join("") +
+      '</select>'
+    ) : '';
+
+    var lostMrrInput = (c && status === "Churned") ?
+      '<div style="margin-top:8px"><label class="small">Lost MRR ($/mo)</label><br><input type="number" placeholder="0" data-lost-mrr="' + c.id + '" value="' + escapeAttr(c.lostMRR || "") + '" style="width:120px;border:0.5px solid var(--border);border-radius:4px;padding:4px 6px;background:var(--surface-1);margin-top:2px"></div>' : '';
+
+    var sourceLine = contract.sourceUrl
+      ? '<div class="small" style="margin-top:4px;color:var(--text-muted)">Source: <a href="' + escapeAttr(contract.sourceUrl) + '" target="_blank" style="color:var(--brand)">' + escapeHTML(contract.sourceDoc) + '</a></div>'
+      : '<div class="small" style="margin-top:4px;color:var(--text-muted)">Source: ' + escapeHTML(contract.sourceDoc) + '</div>';
+
     return '<div class="card" style="margin-bottom:16px">' +
       '<div class="card-head"><div>' +
         '<h2>' + escapeHTML(name) + (contract.confirmed ? '' : ' <span class="badge pending" style="margin-left:6px">Unconfirmed</span>') + '</h2>' +
         '<div class="sub">' + (contract.agreementDate ? 'Signed ' + escapeHTML(contract.agreementDate) + ' - ' : '') + escapeHTML(contract.term) + '</div>' +
-      '</div></div>' +
+      '</div>' +
+      (c ? '<div>' + statusDropdown + lostMrrInput + '</div>' : '') +
+      '</div>' +
       '<div class="card-body">' +
       (noContract ?
         '<div class="small" style="padding:8px 0;color:var(--text-muted)">' + escapeHTML(contract.notes) + '</div>' :
@@ -1168,22 +1317,23 @@ function renderReportingView() {
         '<tr style="border-top:1px solid var(--border)"><td><strong>Total</strong></td><td><strong>$' + clientBase.toLocaleString() + '</strong></td><td><strong>$' + clientMax.toLocaleString() + '</strong></td><td></td><td></td></tr>' +
         '</tbody></table>' +
         '<div class="small" style="margin-top:10px;color:var(--text-muted)">' + escapeHTML(contract.notes) + '</div>' +
-        '<div class="small" style="margin-top:4px;color:var(--text-muted)">Source: ' + escapeHTML(contract.sourceDoc) + '</div>'
+        sourceLine
       ) +
       '</div></div>';
   }).join("");
 
   return `
       <div class="kpis">
-        <div class="kpi"><div class="label">Contracted base (all accounts)</div><div class="value">$${totalBase.toLocaleString()}</div></div>
-        <div class="kpi"><div class="label">Contracted max (with performance)</div><div class="value">$${totalMax.toLocaleString()}</div></div>
-        <div class="kpi"><div class="label">Actual entered so far</div><div class="value" style="color:var(--success)">$${totalActual.toLocaleString()}</div></div>
-        <div class="kpi"><div class="label">Months reported</div><div class="value">${actualEntries}</div></div>
+        <div class="kpi"><div class="label">MRR (current month, active accounts)</div><div class="value" style="color:var(--brand)">$${mrr.toLocaleString()}</div></div>
+        <div class="kpi"><div class="label">Contracted max (full performance)</div><div class="value">$${totalMax.toLocaleString()}</div></div>
+        <div class="kpi"><div class="label">Churned accounts</div><div class="value" style="color:${churnedCount?'var(--danger)':'inherit'}">${churnedCount}</div></div>
+        <div class="kpi"><div class="label">MRR lost to churn</div><div class="value" style="color:${churnedMRR?'var(--danger)':'inherit'}">$${churnedMRR.toLocaleString()}</div></div>
       </div>
-      <div class="small" style="margin-bottom:16px;color:var(--text-secondary)">Base and max figures come directly from each client's signed GTM Services Agreement in Drive. Base = guaranteed fixed fee. Max = base + full performance/bonus attainment. Actuals vary month to month based on real KPI performance - enter them as invoices are confirmed.</div>
+      <div class="small" style="margin-bottom:16px;color:var(--text-secondary)">MRR sums the current calendar month's contracted base (or actual, if entered) across accounts with status Onboarding, Active, At Risk, or Renewed. Paused and Churned accounts are excluded. Set each account's status in its card below - status is only auto-set once; after that it's yours to manage. Base/max figures come from each client's signed GTM Services Agreement in Drive; actuals vary month to month with real KPI performance.</div>
       ${clientBlocks}
   `;
 }
+
 
 function renderClient() {
   const c = state.clients[ui.clientId];
@@ -1651,6 +1801,15 @@ function renderOverviewTab(c) {
         </div>
         ${ig.type === 'Google Sheet' && ig.sheetLink ? `<a href="${escapeAttr(ig.sheetLink)}" target="_blank" class="btn sm ghost">Open tracking sheet →</a>` : ''}
         <div class="field" style="margin-top:12px"><label>Notes</label><textarea data-integration="notes" placeholder="Handover cadence, field mapping, owners">${escapeHTML(ig.notes)}</textarea></div>
+
+        <h3 style="margin:20px 0 12px;font-size:13px;font-weight:600">Contract</h3>
+        <div class="grid-2">
+          <div class="field"><label>Term type</label><input data-intake="termType" value="${escapeAttr(c.intake.termType)}" placeholder="e.g. Month-to-month, 3-month fixed, 2-month pilot"></div>
+          <div class="field"><label>Term end date</label><input type="date" data-intake="termEndDate" value="${escapeAttr(c.intake.termEndDate)}"></div>
+          <div class="field"><label>Contract filename</label><input data-intake="contractRef" value="${escapeAttr(c.intake.contractRef)}" placeholder="Signed agreement filename"></div>
+          <div class="field"><label>Contract link</label><input data-intake="contractUrl" value="${escapeAttr(c.intake.contractUrl)}" placeholder="Drive URL to signed contract"></div>
+        </div>
+        ${c.intake.contractUrl ? `<a href="${escapeAttr(c.intake.contractUrl)}" target="_blank" class="btn sm ghost" style="margin-top:4px">Open signed contract →</a>` : `<div class="small" style="margin-top:4px;color:var(--text-muted)">No contract linked yet.</div>`}
 
       <div style="display:flex;gap:10px;align-items:center;margin-top:24px;padding-top:20px;border-top:0.5px solid var(--border)">
         <button class="btn" data-action="go-to-proposal" style="display:flex;align-items:center;gap:8px">
@@ -2532,6 +2691,23 @@ function attachHandlers() {
       var cl = state.clients[ui.clientId];
       if (!cl.delivery) return;
       cl.delivery.weeklyUpdates[parseInt(el.dataset.weekly)][el.dataset.key] = el.value;
+      save();
+    });
+  });
+
+  document.querySelectorAll("[data-account-status]").forEach(el => {
+    el.addEventListener("change", function() {
+      var c = state.clients[el.dataset.accountStatus];
+      if (!c) return;
+      c.accountStatus = el.value;
+      saveState(); render();
+    });
+  });
+  document.querySelectorAll("[data-lost-mrr]").forEach(el => {
+    el.addEventListener("input", function() {
+      var c = state.clients[el.dataset.lostMrr];
+      if (!c) return;
+      c.lostMRR = el.value;
       save();
     });
   });
