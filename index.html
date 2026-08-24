@@ -1316,6 +1316,13 @@ function renderOverviewTab(c) {
         ${ig.type === 'Google Sheet' && ig.sheetLink ? `<a href="${escapeAttr(ig.sheetLink)}" target="_blank" class="btn sm ghost">Open tracking sheet →</a>` : ''}
         <div class="field" style="margin-top:12px"><label>Notes</label><textarea data-integration="notes" placeholder="Handover cadence, field mapping, owners">${escapeHTML(ig.notes)}</textarea></div>
 
+      <div style="display:flex;gap:10px;align-items:center;margin-top:24px;padding-top:20px;border-top:0.5px solid var(--border)">
+        <button class="btn" data-action="go-to-proposal" style="display:flex;align-items:center;gap:8px">
+          Generate initial proposal →
+        </button>
+        <span class="small" style="color:var(--text-muted)">Saves overview and opens the Proposal tab</span>
+      </div>
+
       </div>
     </div>
   `;
@@ -1962,6 +1969,10 @@ function attachHandlers() {
       }
       else if (action === "generate-pdf") {
         generateProposalPDF(state.clients[ui.clientId]);
+      } else if (action === "go-to-proposal") {
+        await saveState();
+        ui.tab = "proposal";
+        render();
       } else if (action === "mark-initial-sent") {
         const cl = state.clients[ui.clientId];
         cl.proposal.stage = "sent";
