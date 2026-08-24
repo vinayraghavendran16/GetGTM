@@ -413,6 +413,70 @@ const PATHS = {
   },
 };
 
+
+var REVENUE_CONTRACTS = {
+  "Securotix": {
+    agreementDate: "2026-06-19", term: "3-month initial, then month-to-month", sourceDoc: "SECUROTIX GETGTM AGREEMENT SERVICE.pdf",
+    confirmed: true,
+    schedule: [
+      { label: "Month 1", period: "Jun 19 - Jul 18", base: 1500, max: 1500, formula: "Fixed: $1,000 advance + $500 setup on campaign go-live. No performance component in Month 1." },
+      { label: "Month 2", period: "Jul 19 - Aug 18", base: 1000, max: 1599, formula: "$1,000 advance + up to $599 performance (Tufin $299 on 4+ qualifying responses, 1Kosmos $300 on 4+ qualifying responses). Each assessed independently, non-cumulative." },
+      { label: "Month 3", period: "Aug 19 - Sep 18", base: 1000, max: 1599, formula: "Same structure as Month 2." },
+      { label: "Month 4", period: "Sep 19 - Oct 18", base: 1000, max: 1599, formula: "Same structure, continuing month-to-month." },
+    ],
+    notes: "Two product lines (Tufin, 1Kosmos) each carry independent KPI thresholds. Performance fee is all-or-nothing per product line at 4+ qualifying responses/month, not prorated."
+  },
+  "CloudLeap": {
+    agreementDate: "2026-07-22", term: "Month-to-month from signing", sourceDoc: "Final CloudLeap GTM Services Agreement 18072026.pdf",
+    confirmed: true,
+    schedule: [
+      { label: "Month 1", period: "Jul 22 - Aug 21", base: 750, max: 750, formula: "Fixed: $500 advance + $250 setup on campaign go-live. No performance component in Month 1." },
+      { label: "Month 2", period: "Aug 22 - Sep 21", base: 500, max: 1500, formula: "$500 advance + Tranche 1 ($500 at 2+ meetings AND 2+ replies) + Tranche 2 (+$500 at 5+ meetings AND 8+ replies, subsumes Tranche 1). Plus uncapped bonuses: $60/meeting beyond 5, $30/reply beyond 8." },
+      { label: "Month 3", period: "Sep 22 - Oct 21", base: 500, max: 1500, formula: "Same structure as Month 2. Bonus amounts beyond the $1,500 ceiling are uncapped and performance-dependent." },
+    ],
+    notes: "The $1,500 max is the fixed-tranche ceiling only. Bonuses for meetings/replies beyond Tranche 2 thresholds ($60/meeting, $30/reply) are uncapped and not included in the max column - actuals can exceed max in a strong month."
+  },
+  "EduInfra": {
+    agreementDate: "2026-07-27", term: "3 months fixed (Jul 27 - Oct 31), renewable", sourceDoc: "EduInfra SOW 27July countersigned.pdf",
+    confirmed: true,
+    schedule: [
+      { label: "Month 1", period: "Jul 27 - Aug 26", base: 800, max: 1599, formula: "$800 advance + $799 if 100+ qualifying replies delivered in the month." },
+      { label: "Month 2", period: "Aug 27 - Sep 26", base: 800, max: 1599, formula: "Same structure as Month 1." },
+      { label: "Month 3 (final)", period: "Sep 27 - Oct 31", base: 800, max: 1599, formula: "Same structure, plus a Success Bonus (amount TBD, mutually determined in writing) if 300 total qualifying replies across the full term are achieved with the right ICP fit." },
+    ],
+    notes: "Outcome-linked model - no separate onboarding fee, same $800 base + $799/100-replies structure every month. Success bonus at term-end is uncapped and not yet numerically defined in the contract."
+  },
+  "SPRY": {
+    agreementDate: "2026-08-05", term: "2-month pilot (Aug 5 - Oct 4)", sourceDoc: "SPRY Final Agreement 5 Aug.pdf (Rev. 2 Addendum - supersedes the Jul 22 proposal)",
+    confirmed: true,
+    schedule: [
+      { label: "Month 1", period: "Aug 5 - Sep 4", base: 1250, max: 1250, formula: "Fixed: list build, referral-ask content, campaign execution. No performance component in Month 1." },
+      { label: "Month 2 (final)", period: "Sep 5 - Oct 4", base: 750, max: 1500, formula: "$750 advance + $750 performance incentive if 3+ qualified meetings (SQL converted to Opportunity) are booked across the full 2-month pilot." },
+    ],
+    notes: "Optional calling add-on ($500/mo + $100/meeting) not included in base/max - only applies if separately activated. Supersedes the earlier Jul 22 proposal, which had different terms ($1,500/mo core, 10 meetings included) - use this signed Aug 5 addendum as source of truth."
+  },
+  "CognitivTrust": {
+    agreementDate: "", term: "Not yet signed - kickoff scheduled Aug 25", sourceDoc: "No contract on file in Drive as of this report",
+    confirmed: false,
+    schedule: [
+      { label: "Month 1 (est.)", period: "TBD on signing", base: 1000, max: 1599, formula: "Estimated from proposal only, NOT a signed contract: $1,000 advance + up to $599 performance, matching the India-tier structure used in the sent proposal." },
+    ],
+    notes: "No signed agreement found in Drive. Figures shown are carried over from the proposal sent Jul 23 and are unconfirmed. Upload the signed contract to replace this estimate."
+  },
+  "Trinet": {
+    agreementDate: "", term: "Unknown", sourceDoc: "No contract on file in Drive",
+    confirmed: false,
+    schedule: [],
+    notes: "No contract or proposal document found in Drive or Gmail. Planning meeting held Aug 24 but no commercial terms visible yet. Needs manual entry once signed."
+  },
+  "Evoco": {
+    agreementDate: "", term: "Unknown", sourceDoc: "No contract on file in Drive",
+    confirmed: false,
+    schedule: [],
+    notes: "No contract, proposal, or commercial detail found in Drive or Gmail beyond account ownership assignment. Needs manual entry once signed."
+  },
+};
+
 let state = { clients: {} };
 let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: null, dashboardTab: "engagements" };
 
@@ -511,6 +575,7 @@ async function loadState() {
     }
   } catch (e) { console.log("loadState error:", e); }
   if (!state.clients) state.clients = {};
+  if (!state.revenueActuals) state.revenueActuals = {};
   if (!state.prospects) state.prospects = [];
   if (state.prospects.length === 0) { seedProspects(); await saveState(); }
   var beforeClientCount = Object.keys(state.clients).length;
@@ -951,8 +1016,9 @@ function renderDashboard() {
       <div class="tabs" style="margin-bottom:16px">
         <button data-action="dtab" data-dtab="engagements" class="${dTab==='engagements'?'active':''}">Engagements</button>
         <button data-action="dtab" data-dtab="prospects" class="${dTab==='prospects'?'active':''}">Prospects</button>
+        <button data-action="dtab" data-dtab="reporting" class="${dTab==='reporting'?'active':''}">Reporting</button>
       </div>
-      ${dTab === "prospects" ? renderProspectsView() : renderEngagementsView(clients, active, launched, atRisk)}
+      ${dTab === "prospects" ? renderProspectsView() : dTab === "reporting" ? renderReportingView() : renderEngagementsView(clients, active, launched, atRisk)}
     </div>
   `;
 }
@@ -1053,6 +1119,69 @@ function renderProspectsView() {
           `}
         </div>
       </div>
+  `;
+}
+
+function reportKey(clientName, monthLabel) { return clientName + "__" + monthLabel; }
+
+function renderReportingView() {
+  if (!state.revenueActuals) state.revenueActuals = {};
+  var names = Object.keys(REVENUE_CONTRACTS);
+  var today = new Date();
+
+  var totalBase = 0, totalMax = 0, totalActual = 0, actualEntries = 0;
+
+  var clientBlocks = names.map(function(name) {
+    var contract = REVENUE_CONTRACTS[name];
+    var clientBase = 0, clientMax = 0;
+
+    var rows = contract.schedule.map(function(row) {
+      var key = reportKey(name, row.label);
+      var actualVal = state.revenueActuals[key] || "";
+      clientBase += row.base;
+      clientMax += row.max;
+      totalBase += row.base;
+      totalMax += row.max;
+      if (actualVal !== "" && !isNaN(parseFloat(actualVal))) { totalActual += parseFloat(actualVal); actualEntries++; }
+
+      return '<tr>' +
+        '<td><strong>' + escapeHTML(row.label) + '</strong><div class="small">' + escapeHTML(row.period) + '</div></td>' +
+        '<td>$' + row.base.toLocaleString() + '</td>' +
+        '<td>$' + row.max.toLocaleString() + (row.max > row.base ? '' : '') + '</td>' +
+        '<td><input type="number" placeholder="-" data-report="' + escapeAttr(key) + '" value="' + escapeAttr(actualVal) + '" style="width:90px;border:0.5px solid var(--border);border-radius:4px;padding:4px 6px;background:var(--surface-1)"></td>' +
+        '<td><div class="small">' + escapeHTML(row.formula) + '</div></td>' +
+        '</tr>';
+    }).join("");
+
+    var noContract = contract.schedule.length === 0;
+
+    return '<div class="card" style="margin-bottom:16px">' +
+      '<div class="card-head"><div>' +
+        '<h2>' + escapeHTML(name) + (contract.confirmed ? '' : ' <span class="badge pending" style="margin-left:6px">Unconfirmed</span>') + '</h2>' +
+        '<div class="sub">' + (contract.agreementDate ? 'Signed ' + escapeHTML(contract.agreementDate) + ' - ' : '') + escapeHTML(contract.term) + '</div>' +
+      '</div></div>' +
+      '<div class="card-body">' +
+      (noContract ?
+        '<div class="small" style="padding:8px 0;color:var(--text-muted)">' + escapeHTML(contract.notes) + '</div>' :
+        '<table><thead><tr><th>Month</th><th>Contracted base</th><th>Contracted max</th><th>Actual invoiced</th><th>Formula</th></tr></thead>' +
+        '<tbody>' + rows +
+        '<tr style="border-top:1px solid var(--border)"><td><strong>Total</strong></td><td><strong>$' + clientBase.toLocaleString() + '</strong></td><td><strong>$' + clientMax.toLocaleString() + '</strong></td><td></td><td></td></tr>' +
+        '</tbody></table>' +
+        '<div class="small" style="margin-top:10px;color:var(--text-muted)">' + escapeHTML(contract.notes) + '</div>' +
+        '<div class="small" style="margin-top:4px;color:var(--text-muted)">Source: ' + escapeHTML(contract.sourceDoc) + '</div>'
+      ) +
+      '</div></div>';
+  }).join("");
+
+  return `
+      <div class="kpis">
+        <div class="kpi"><div class="label">Contracted base (all accounts)</div><div class="value">$${totalBase.toLocaleString()}</div></div>
+        <div class="kpi"><div class="label">Contracted max (with performance)</div><div class="value">$${totalMax.toLocaleString()}</div></div>
+        <div class="kpi"><div class="label">Actual entered so far</div><div class="value" style="color:var(--success)">$${totalActual.toLocaleString()}</div></div>
+        <div class="kpi"><div class="label">Months reported</div><div class="value">${actualEntries}</div></div>
+      </div>
+      <div class="small" style="margin-bottom:16px;color:var(--text-secondary)">Base and max figures come directly from each client's signed GTM Services Agreement in Drive. Base = guaranteed fixed fee. Max = base + full performance/bonus attainment. Actuals vary month to month based on real KPI performance - enter them as invoices are confirmed.</div>
+      ${clientBlocks}
   `;
 }
 
@@ -2404,6 +2533,19 @@ function attachHandlers() {
       if (!cl.delivery) return;
       cl.delivery.weeklyUpdates[parseInt(el.dataset.weekly)][el.dataset.key] = el.value;
       save();
+    });
+  });
+
+  document.querySelectorAll("[data-report]").forEach(el => {
+    el.addEventListener("input", function() {
+      if (!state.revenueActuals) state.revenueActuals = {};
+      state.revenueActuals[el.dataset.report] = el.value;
+      save();
+    });
+    el.addEventListener("change", function() {
+      if (!state.revenueActuals) state.revenueActuals = {};
+      state.revenueActuals[el.dataset.report] = el.value;
+      saveState(); render();
     });
   });
 
