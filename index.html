@@ -862,6 +862,7 @@ function seedKnownAccounts() {
     if (overrides.stages) c.stages = overrides.stages;
     if (overrides.sow) Object.assign(c.sow, overrides.sow);
     if (overrides.proposal) Object.assign(c.proposal, overrides.proposal);
+    if (overrides.accountStatus) c.accountStatus = overrides.accountStatus;
     migrateClient(c);
     state.clients[c.id] = c;
   }
@@ -929,6 +930,26 @@ function seedKnownAccounts() {
       packageNotes: "No details found in Gmail beyond account ownership assignment. Needs manual fill." },
     people: { gtme: "Uday / Tushar", gtmeEmail: "" },
     stages: stagesUpTo("7-day", "Qualification", "Scoping"),
+  });
+
+  addIfMissing("EduInfra", {
+    path: "7-day",
+    top: { kickoffDate: "2026-07-27" },
+    intake: { website: "", pocName: "Ganesh Babu", pocEmail: "ganesh@agxperiential.com",
+      outbound: "outbound-india",
+      packageNotes: "Onboarding/delivery stage history not confirmed from Gmail - only the signed contract was found. Adjust the Timeline tab if the real stage progression differed. Marked Churned per direct instruction; exact churn date and reason not on file - add to notes if known.",
+      termType: "3 months fixed (Jul 27 - Oct 31), renewable", termEndDate: "2026-10-31",
+      contractRef: "EduInfra SOW 27July countersigned.pdf",
+      contractUrl: "https://drive.google.com/file/d/1sZ5uIqjm5rkZZ_TfQNuJKYhlx8fxCv8I/view?usp=drivesdk" },
+    people: { clientPoc: "Ganesh Babu", clientPocEmail: "ganesh@agxperiential.com",
+      signatoryName: "Ganesh Babu", signatoryTitle: "Founder & CEO",
+      billingAddress: "WeWork, Krishe Emerald, Kondapur Main Road, Gachibowli, Hyderabad, Telangana 500084, India" },
+    icp: { geography: "India" },
+    proposal: { stage: "approved", approvedDate: "2026-07-27" },
+    sow: { status: "Signed", signedDate: "2026-07-27",
+      value: "$800/mo base + $799 per 100 qualifying replies + TBD success bonus at 300 replies across term" },
+    stages: stagesUpTo("7-day", "Commercial Handover", "Onboarding"),
+    accountStatus: "Churned",
   });
 }
 
@@ -1324,8 +1345,10 @@ function renderReportingView() {
 
   return `
       <div class="kpis">
-        <div class="kpi"><div class="label">MRR (current month, active accounts)</div><div class="value" style="color:var(--brand)">$${mrr.toLocaleString()}</div></div>
-        <div class="kpi"><div class="label">Contracted max (full performance)</div><div class="value">$${totalMax.toLocaleString()}</div></div>
+        <div class="kpi"><div class="label">MRR (current month, active)</div><div class="value" style="color:var(--brand)">$${mrr.toLocaleString()}</div></div>
+        <div class="kpi"><div class="label">Contracted base (all accounts)</div><div class="value">$${totalBase.toLocaleString()}</div></div>
+        <div class="kpi"><div class="label">Contracted max (with performance)</div><div class="value">$${totalMax.toLocaleString()}</div></div>
+        <div class="kpi"><div class="label">Actual entered so far</div><div class="value" style="color:var(--success)">$${totalActual.toLocaleString()}</div></div>
         <div class="kpi"><div class="label">Churned accounts</div><div class="value" style="color:${churnedCount?'var(--danger)':'inherit'}">${churnedCount}</div></div>
         <div class="kpi"><div class="label">MRR lost to churn</div><div class="value" style="color:${churnedMRR?'var(--danger)':'inherit'}">$${churnedMRR.toLocaleString()}</div></div>
       </div>
