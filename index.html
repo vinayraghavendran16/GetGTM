@@ -449,6 +449,8 @@ function initFirebase() {
         if (data && data.clients) {
           // Only update state.clients, never overwrite ui state
           state.clients = data.clients;
+          // Migrate any clients that have old data models
+          Object.values(state.clients).forEach(function(c) { migrateClient(c); });
           // Debounce: don't re-render if we just saved (avoid loop)
           if (!window._fbSaveInProgress) {
             render();
@@ -483,6 +485,8 @@ async function loadState() {
     }
   } catch (e) { console.log("loadState error:", e); }
   if (!state.clients) state.clients = {};
+  // Migrate all existing clients to current data model
+  Object.values(state.clients).forEach(function(c) { migrateClient(c); });
 }
 
 async function saveState() {
@@ -503,6 +507,82 @@ const GTME_ROSTER = [
   { name: "Arjun", email: "arjun@getgtm.ai" },
   { name: "Nishanth", email: "nishanth@getgtm.ai" },
 ];
+
+function migrateClient(c) {
+  // Patch intake fields added after initial release
+  if (!c.intake) c.intake = {};
+  if (!c.intake.outbound) c.intake.outbound = c.intake.package || "";
+  if (!c.intake.aeo) c.intake.aeo = "";
+  if (!c.intake.delight) c.intake.delight = "";
+  if (!Array.isArray(c.intake.addons)) {
+    // Migrate old callingAddon + optional fields
+    var addons = [];
+    if (c.intake.callingAddon) addons.push("us-calling");
+    if (Array.isArray(c.intake.optional)) {
+      c.intake.optional.forEach(function(o) { if (!addons.includes(o)) addons.push(o); });
+    }
+    c.intake.addons = addons;
+  }
+  if (!c.intake.packageNotes) c.intake.packageNotes = "";
+  if (!c.intake.website) c.intake.website = "";
+  if (!c.intake.pocName) c.intake.pocName = "";
+  if (!c.intake.pocEmail) c.intake.pocEmail = "";
+
+  // Patch people
+  if (!c.people) c.people = {};
+  if (!c.people.cro) c.people.cro = "Vinay Raghavendran";
+  if (!c.people.croEmail) c.people.croEmail = "vinay@getgtm.ai";
+  if (!c.people.cs) c.people.cs = "";
+  if (!c.people.csEmail) c.people.csEmail = "";
+  if (!c.people.gtme) c.people.gtme = "";
+  if (!c.people.gtmeEmail) c.people.gtmeEmail = "";
+  if (!c.people.clientPoc) c.people.clientPoc = c.intake.pocName || "";
+  if (!c.people.clientPocEmail) c.people.clientPocEmail = c.intake.pocEmail || "";
+
+  // Patch proposal
+  if (!c.proposal) c.proposal = { stage: "draft", initialSentDate: "", initialNotes: "", scopeNotes: [], finalSentDate: "", finalNotes: "", approvedDate: "", approvalEmail: "", sowGenerated: false };
+  if (!c.proposal.stage) c.proposal.stage = "draft";
+  if (!Array.isArray(c.proposal.scopeNotes)) c.proposal.scopeNotes = [];
+
+  // Patch sow
+  if (!c.sow) c.sow = { status: "Not Started", value: "", signedDate: "" };
+
+  // Patch stages - always ensure full set
+  var fullStages = [
+    "Qualification","Scoping","Proposal","Commercial Handover","Onboarding",
+    "ICP Fitment","TAM & List","Messaging","Campaign Build","Launch","First Review"
+  ];
+  if (!Array.isArray(c.stages) || c.stages.length === 0) {
+    c.stages = fullStages.map(function(s) { return { stage: s, status: "Not Started", eta: "", notes: "" }; });
+  } else if (c.stages.length < fullStages.length) {
+    // Add any missing stages
+    var existingNames = c.stages.map(function(s) { return s.stage; });
+    fullStages.forEach(function(s) {
+      if (!existingNames.includes(s)) c.stages.push({ stage: s, status: "Not Started", eta: "", notes: "" });
+    });
+  }
+
+  // Patch goals
+  if (!c.goals) c.goals = {};
+  if (!c.goals.m1) c.goals.m1 = { replies: "", meetings: "" };
+  if (!c.goals.m2) c.goals.m2 = { replies: "", meetings: "" };
+  if (!c.goals.m3) c.goals.m3 = { replies: "", meetings: "" };
+
+  // Patch ICP
+  if (!c.icp) c.icp = { geography: "", industry: "", companySize: "", revenue: "", roles: "", exclusions: "", currentAccounts: "", competitors: "" };
+
+  // Patch channel, drive, integration
+  if (!c.channel) c.channel = { type: "Slack", link: "" };
+  if (!c.drive) c.drive = { folderLink: "", assetsLink: "" };
+  if (!c.integration) c.integration = { type: "Google Sheet", sheetLink: "", crmName: "", notes: "" };
+
+  // Patch outcomes
+  if (!Array.isArray(c.outcomes)) c.outcomes = [];
+
+  return c;
+}
+
+
 
 const OUTBOUND_PLANS = [
   { id: "outbound-india", name: "Outbound - India", price: "$1,599/mo",
@@ -691,7 +771,7 @@ function render() {
   let html = "";
   if (ui.view === "login") html = renderLogin();
   else if (ui.view === "dashboard") html = renderDashboard();
-  else if (ui.view === "client") { var cl = state.clients[ui.clientId]; if (cl) syncTimelineFromDelivery(cl); html = renderClient(); }
+  else if (ui.view === "client") { var cl = state.clients[ui.clientId]; if (cl) { migrateClient(cl); syncTimelineFromDelivery(cl); } html = renderClient(); }
 
   document.querySelectorAll(".modal-backdrop").forEach(el => el.remove());
   app.innerHTML = html;
