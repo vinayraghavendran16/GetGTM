@@ -1692,14 +1692,14 @@ function renderProposalTab(c) {
 
 
 function syncTimelineFromDelivery(c) {
-  if (!c.delivery || !c.stages) return;
-  var del = c.delivery.onboarding;
+  if (!c.stages) return;
+  var del = (c.delivery && c.delivery.onboarding) || [];
   var stageMap = {};
   del.forEach(function(item) { stageMap[item.item] = item.status; });
 
   function allDone() {
     var items = Array.prototype.slice.call(arguments);
-    return items.every(function(name) { return stageMap[name] === "Complete"; });
+    return items.length > 0 && items.every(function(name) { return stageMap[name] === "Complete"; });
   }
   function anyBlocked() {
     var items = Array.prototype.slice.call(arguments);
@@ -1710,16 +1710,37 @@ function syncTimelineFromDelivery(c) {
     return items.some(function(name) { return stageMap[name] === "In Progress" || stageMap[name] === "Complete"; });
   }
 
+  var propStage = c.proposal ? c.proposal.stage : "";
+
   c.stages.forEach(function(stage) {
     var s = stage.stage;
     var newStatus = stage.status;
 
-    // Proposal approved = Qualification + Scoping + Proposal + Commercial Handover done
-    if (c.proposal && c.proposal.stage === "approved") {
-      if (s === "Qualification" || s === "Scoping" || s === "Proposal" || s === "Proposal / Scoping") newStatus = "Complete";
-      if (s === "Commercial Handover") {
+    // Qualification: moves as soon as any package is selected in intake
+    if (s === "Qualification") {
+      if (c.intake && c.intake.outbound) newStatus = "Complete";
+    }
+
+    // Scoping: in progress once overview/goals/ICP started, complete once proposal drafted
+    if (s === "Scoping") {
+      var hasGoals = c.goals && (c.goals.m1.replies || c.goals.m2.replies);
+      var hasICP = c.icp && (c.icp.geography || c.icp.industry);
+      if (propStage) newStatus = "Complete";
+      else if (hasGoals || hasICP) newStatus = "In Progress";
+    }
+
+    // Proposal stage tracks the proposal workflow directly
+    if (s === "Proposal" || s === "Proposal / Scoping") {
+      if (propStage === "draft") newStatus = "In Progress";
+      else if (propStage === "sent" || propStage === "final") newStatus = "In Progress";
+      else if (propStage === "approved") newStatus = "Complete";
+    }
+
+    // Commercial Handover: in progress once approved, complete once SOW+invoice done
+    if (s === "Commercial Handover") {
+      if (propStage === "approved") {
         if (allDone("SOW signed and filed", "Invoice sent (Part 1)")) newStatus = "Complete";
-        else if (anyStarted("SOW signed and filed", "Invoice sent (Part 1)")) newStatus = "In Progress";
+        else newStatus = "In Progress";
       }
     }
 
