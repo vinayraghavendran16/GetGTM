@@ -447,8 +447,12 @@ function initFirebase() {
       dbRef.on("value", function(snapshot) {
         var data = snapshot.val();
         if (data && data.clients) {
-          state = data;
-          render();
+          // Only update state.clients, never overwrite ui state
+          state.clients = data.clients;
+          // Debounce: don't re-render if we just saved (avoid loop)
+          if (!window._fbSaveInProgress) {
+            render();
+          }
         }
       });
       console.log("Firebase connected - real-time sync active");
@@ -484,7 +488,9 @@ async function loadState() {
 async function saveState() {
   try {
     if (useFirebase) {
+      window._fbSaveInProgress = true;
       await dbRef.set(state);
+      setTimeout(function() { window._fbSaveInProgress = false; }, 500);
     }
     // Always save to localStorage as backup
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
