@@ -891,7 +891,7 @@ function renderEngagementsView(clients, active, launched, atRisk) {
                     <td><div class="progress" style="width:120px"><div style="width:${prog}%"></div></div><div class="small">${prog}%</div></td>
                     <td><div class="small">${escapeHTML(next?.stage || "Done")}</div></td>
                     <td><span class="badge ${c.sow.status === 'Signed' ? 'done' : 'pending'}">${escapeHTML(c.sow.status || "-")}</span></td>
-                    <td><button class="btn ghost sm" onclick="navigator.clipboard.writeText('${escapeAttr(url)}');alert('Link copied!')">Share</button></td>
+                    <td><div style="display:flex;gap:6px"><button class="btn ghost sm" onclick="navigator.clipboard.writeText('${escapeAttr(url)}');alert('Link copied!')">Share</button><button class="btn ghost sm" data-action="delete-client" data-id="${c.id}" style="color:var(--danger)">Delete</button></div></td>
                   </tr>`;
                 }).join("")}
               </tbody>
@@ -2124,6 +2124,15 @@ function attachHandlers() {
         doLogin();
       } else if (action === "logout") { if (isClientView) return; ui.isAuth = false; ui.view = "login"; render(); }
       else if (action === "new-client") { ui.modal = { type: "new-client" }; render(); }
+      else if (action === "delete-client") {
+        var cl = state.clients[el.dataset.id];
+        var clName = cl ? cl.name : "this engagement";
+        if (confirm("Delete " + clName + "? This removes all data for this engagement - intake, overview, proposal, timeline, delivery, outcomes. This cannot be undone.")) {
+          delete state.clients[el.dataset.id];
+          await saveState();
+          render();
+        }
+      }
       else if (action === "dtab") { ui.dashboardTab = el.dataset.dtab; render(); }
       else if (action === "add-prospect") {
         state.prospects.push({
@@ -2135,8 +2144,12 @@ function attachHandlers() {
         saveState(); render();
       }
       else if (action === "delete-prospect") {
-        state.prospects = state.prospects.filter(p => p.id !== el.dataset.id);
-        saveState(); render();
+        var pr = state.prospects.find(function(x) { return x.id === el.dataset.id; });
+        var prName = pr ? (pr.name + (pr.company ? " (" + pr.company + ")" : "")) : "this prospect";
+        if (confirm("Remove " + prName + " from Prospects? This cannot be undone.")) {
+          state.prospects = state.prospects.filter(p => p.id !== el.dataset.id);
+          saveState(); render();
+        }
       }
       else if (action === "refresh-prospects-note") {
         alert("Ask Claude to pull the latest prospects from Gmail and I'll refresh this list with real threads.");
