@@ -1350,6 +1350,7 @@ function buildProposalHTML(c, isForPDF) {
   var pathLabel = c.path === "7-day" ? "7-day sprint" : c.path === "14-day" ? "14-day buildout" : "Niche GTM";
   var price = it.outbound === "outbound-india" ? "$1,599" : it.outbound === "outbound-us" ? "$2,499" : "TBD";
   var market = it.outbound === "outbound-india" ? "India" : "US & Other";
+  var monthlyBase = it.outbound === "outbound-india" ? 1599 : it.outbound === "outbound-us" ? 2499 : 1599;
 
   var packages = [];
   if (it.outbound) packages.push(it.outbound === "outbound-india" ? "Signal-led Outbound (India) - $1,599/mo" : "Signal-led Outbound (US) - $2,499/mo");
@@ -1448,39 +1449,89 @@ function buildProposalHTML(c, isForPDF) {
     '<tr><td><strong>Playbook Transfer</strong></td><td>At end of term: full outreach playbook, sequences, ICP definitions, and signal configuration handed to ' + escapeHTML(c.name) + '.</td></tr>' +
     '</tbody></table></div>';
 
-  // 06 Commercial terms (static)
-  html += '<div class="sect"><span class="sect-num">06</span><h2>Commercial Terms</h2><div class="sect-line"></div>' +
-    '<table><thead><tr><th>Component</th><th>Amount</th><th>When due</th></tr></thead><tbody>' +
-    '<tr><td><strong>Month 1 - Onboarding & Setup</strong></td><td>' + escapeHTML(price) + '</td><td>On signing</td></tr>' +
-    '<tr><td><strong>Month 2+ - Monthly retainer</strong></td><td>' + escapeHTML(price) + '/mo</td><td>1st of each month</td></tr>' +
-    '</tbody></table>' +
-    '<p style="font-size:10px;color:#888">Fees are all-inclusive of tooling, enrichment credits, and platform usage. Payments in USD.</p></div>';
+  // ===== STANDARD TEMPLATE - SECTIONS 06-10 =====
+  // These sections are FIXED across every client proposal. Only the client name,
+  // price figures (derived from the selected plan), and term dates are substituted.
+  // The structure, legal language, and clause order never change.
 
-  // 07 Obligations (static)
-  html += '<div class="sect"><span class="sect-num">07</span><h2>Obligations</h2><div class="sect-line"></div>' +
+  var setupFee = Math.round(monthlyBase * 0.375);  // e.g. $599 on $1,599
+  var advanceFee = monthlyBase - setupFee;           // e.g. $1,000 on $1,599
+  var perfFee = setupFee;                            // performance cap mirrors setup fee
+  var termStart = new Date();
+  var termEnd = new Date(termStart); termEnd.setMonth(termEnd.getMonth() + 3);
+  var termStartStr = termStart.toLocaleDateString("en-US", {year:"numeric",month:"long",day:"numeric"});
+  var termEndStr = termEnd.toLocaleDateString("en-US", {year:"numeric",month:"long",day:"numeric"});
+
+  // 06 Commercial Terms & Payment Schedule
+  html += '<div class="sect' + (isForPDF ? ' page-break' : '') + '"><span class="sect-num">06</span><h2>Commercial Terms & Payment Schedule</h2><div class="sect-line"></div>' +
+    '<h3 style="font-size:13px;font-weight:600;margin:0 0 8px">6.1 Month 1 - Onboarding & Setup ($' + monthlyBase.toLocaleString() + ')</h3>' +
+    '<table><thead><tr><th>#</th><th>Milestone</th><th>Amount</th><th>Due</th></tr></thead><tbody>' +
+    '<tr><td>1</td><td>Advance on signing of the agreement</td><td><strong>$' + advanceFee.toLocaleString() + '</strong></td><td>On date of signing</td></tr>' +
+    '<tr><td>2</td><td>Setup completion, on go-live of the first campaign</td><td><strong>$' + setupFee.toLocaleString() + '</strong></td><td>Within 5 business days of go-live</td></tr>' +
+    '<tr><td colspan="2"><strong>Total - Month 1</strong></td><td colspan="2"><strong>$' + monthlyBase.toLocaleString() + '</strong></td></tr>' +
+    '</tbody></table>' +
+    '<h3 style="font-size:13px;font-weight:600;margin:16px 0 8px">6.2 Month 2 Onwards - Monthly Retainer (up to $' + monthlyBase.toLocaleString() + ')</h3>' +
+    '<table><thead><tr><th>Component</th><th>Amount</th><th>When due</th></tr></thead><tbody>' +
+    '<tr><td>Monthly advance retainer (fixed)</td><td><strong>$' + advanceFee.toLocaleString() + '</strong></td><td>1st of each service month, or on invoice</td></tr>' +
+    '<tr><td>Performance component (variable, on KPIs)</td><td><strong>up to $' + perfFee.toLocaleString() + '</strong></td><td>Invoiced by 5th of following month on KPI verification</td></tr>' +
+    '<tr><td><strong>Total - Monthly</strong></td><td><strong>up to $' + monthlyBase.toLocaleString() + '</strong></td><td>Advance + variable on KPIs</td></tr>' +
+    '</tbody></table>' +
+    '<p style="font-size:10px;color:#888;margin-top:8px">Fees are all-inclusive of tooling, enrichment credits, and platform usage. The performance component is variable and tied solely to KPI achievement in Section 04; partial attainment results in a proportional payment. The advance retainer is non-refundable once a service month has commenced. Payments in USD (or INR at the prevailing RBI reference rate); late payment attracts interest at 1.5% per month.</p></div>';
+
+  // 07 KPI Verification & Partial Attainment
+  html += '<div class="sect"><span class="sect-num">07</span><h2>KPI Verification & Partial Attainment</h2><div class="sect-line"></div>' +
+    '<p><strong>Qualifying response.</strong> A direct reply from a named decision-maker within the ' + escapeHTML(c.name) + '-approved ICP who (a) explicitly expresses interest in the platform, (b) agrees to or requests an introductory meeting or product overview, and (c) holds a role consistent with the ICP definition in Section 03.</p>' +
+    '<p><strong>Not qualifying:</strong> auto-replies, out-of-office messages, unsubscribe requests, neutral acknowledgements without expressed interest, or replies from individuals outside the approved ICP.</p>' +
+    '<p><strong>Partial attainment.</strong> Each KPI threshold is assessed independently. Where a threshold is met, its performance fee is payable in full; where it is not, that fee is not payable for that month. Performance fees do not carry forward. The advance retainer remains payable regardless of KPI outcome.</p>' +
+    '<p><strong>Verification.</strong> Conducted jointly at the end of each calendar month against a KPI evidence report (screenshots, email threads, or CRM entries). ' + escapeHTML(c.name) + ' confirms or disputes within 5 business days; absent a timely dispute, claimed KPIs are deemed accepted.</p>' +
+    '</div>';
+
+  // 08 Obligations of the Parties
+  html += '<div class="sect"><span class="sect-num">08</span><h2>Obligations of the Parties</h2><div class="sect-line"></div>' +
     '<div class="obligations">' +
     '<div class="obl-col"><div class="obl-label">GETGTM.AI</div><ul>' +
-    '<li>Deliver programmes with reasonable skill and care</li>' +
-    '<li>Provide weekly activity reports and monthly KPI evidence</li>' +
-    '<li>Maintain confidentiality of all client data</li>' +
-    '<li>Assign a dedicated GTM lead</li></ul></div>' +
+    '<li>Deliver both programmes with reasonable skill and care, per agreed timelines.</li>' +
+    '<li>Provide weekly activity reports and a monthly KPI evidence report by the 3rd.</li>' +
+    '<li>Maintain confidentiality of all ' + escapeHTML(c.name) + ' data, prospects, and results.</li>' +
+    '<li>Assign a dedicated GTM lead as primary point of contact.</li></ul></div>' +
     '<div class="obl-col"><div class="obl-label">' + escapeHTML(c.name).toUpperCase() + '</div><ul>' +
-    '<li>Provide product info and ICP guidance within 5 business days</li>' +
-    '<li>Provide domains/mailboxes and LinkedIn accounts</li>' +
-    '<li>Designate a contact to receive leads and join reviews</li>' +
-    '<li>Respond to KPI verification within 5 business days</li></ul></div>' +
+    '<li>Provide product info, approved messaging, and ICP guidance within 5 business days of kickoff.</li>' +
+    '<li>Provide 2-3 domains/mailboxes and 2-3 LinkedIn accounts for the outreach.</li>' +
+    '<li>Designate a contact to receive leads, confirm meetings, and join reviews.</li>' +
+    '<li>Respond to KPI verification requests within 5 business days; make payments per Section 06.</li></ul></div>' +
     '</div></div>';
 
-  // 08 Team
-  html += '<div class="sect"><span class="sect-num">08</span><h2>Your GetGTM Team</h2><div class="sect-line"></div>' +
-    '<table><thead><tr><th>Role</th><th>Name</th><th>Email</th></tr></thead><tbody>' +
-    '<tr><td><strong>CRO</strong></td><td>' + escapeHTML(cro) + '</td><td>' + escapeHTML(croEmail) + '</td></tr>' +
-    '<tr><td><strong>CS</strong></td><td>' + escapeHTML(cs) + '</td><td>' + escapeHTML(p.csEmail || "") + '</td></tr>' +
-    '<tr><td><strong>GTM Engineer</strong></td><td>' + escapeHTML(gtme) + '</td><td>' + escapeHTML(p.gtmeEmail || "") + '</td></tr>' +
-    '</tbody></table></div>';
+  // 09 Terms & Ways of Working
+  html += '<div class="sect"><span class="sect-num">09</span><h2>Terms & Ways of Working</h2><div class="sect-line"></div>' +
+    '<ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.8">' +
+    '<li><strong>Brand representation.</strong> All outreach runs from ' + escapeHTML(c.name) + "'s own domains, mailboxes, and LinkedIn accounts.</li>" +
+    '<li><strong>Email infrastructure.</strong> New mailboxes require a 12-14 day warm-up before full-volume sending begins.</li>' +
+    '<li><strong>LinkedIn access.</strong> Requires 2-3 LinkedIn accounts, preferably from ' + escapeHTML(c.name) + "'s founder or customer-facing team.</li>" +
+    '<li><strong>Full visibility.</strong> Target lists, sequences, activity, replies, and credit utilisation are all visible inside Heddl.app.</li>' +
+    '<li><strong>Term.</strong> Initial 3-month term (' + termStartStr + ' - ' + termEndStr + '), continuing month-to-month thereafter; either party may terminate after the initial term with 30 days\' written notice.</li>' +
+    '</ul></div>';
+
+  // 10 Acceptance
+  html += '<div class="sect' + (isForPDF ? ' page-break' : '') + '"><span class="sect-num">10</span><h2>Acceptance</h2><div class="sect-line"></div>' +
+    '<p style="margin-bottom:24px">Accepted and agreed by the authorised signatories of the Parties below.</p>' +
+    '<table style="border:none;margin-bottom:0"><tr style="border:none">' +
+    '<td style="border:none;width:50%;vertical-align:top;padding:0 20px 0 0">' +
+    '<div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:32px">For getGTM.ai</div>' +
+    '<div style="border-top:1px solid #1c1917;padding-top:8px;margin-top:24px">' +
+    '<div style="font-weight:700;font-size:13px">' + escapeHTML(cro) + '</div>' +
+    '<div style="font-size:11px;color:#666">Founder & MD, getGTM.ai</div>' +
+    '<div style="font-size:11px;color:#666;margin-top:8px">Date: ____________</div></div>' +
+    '</td>' +
+    '<td style="border:none;width:50%;vertical-align:top;padding:0 0 0 20px">' +
+    '<div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:32px">For ' + escapeHTML(c.name) + '</div>' +
+    '<div style="border-top:1px solid #1c1917;padding-top:8px;margin-top:24px">' +
+    '<div style="font-weight:700;font-size:13px">' + escapeHTML(pocName) + '</div>' +
+    '<div style="font-size:11px;color:#666">[Designation], ' + escapeHTML(c.name) + '</div>' +
+    '<div style="font-size:11px;color:#666;margin-top:8px">Date: ____________</div></div>' +
+    '</td></tr></table></div>';
 
   // Footer
-  html += '<div class="footer">CONFIDENTIAL PROPOSAL | GETGTM.AI | ' + escapeHTML(croEmail) + '</div>';
+  html += '<div class="footer">CONFIDENTIAL PROPOSAL | GETGTM.AI | ' + escapeHTML(cro) + ' - ' + escapeHTML(croEmail) + '</div>';
 
   html += (isForPDF ? '</body></html>' : '</div>');
   return html;
