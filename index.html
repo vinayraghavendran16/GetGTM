@@ -1840,9 +1840,14 @@ function attachHandlers() {
     pwEl.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doLogin(); } });
   }
 
-  document.querySelectorAll("[data-action]").forEach(el => {
-    el.addEventListener("click", async (e) => {
-      const action = el.dataset.action;
+  if (window.__actionHandler) {
+    document.removeEventListener("click", window.__actionHandler);
+    window.__actionHandler = null;
+  }
+  const actionHandler = async function(e) {
+    const el = e.target.closest("[data-action]");
+    if (!el) return;
+    const action = el.dataset.action;
       if (action === "login") {
         doLogin();
       } else if (action === "logout") { if (isClientView) return; ui.isAuth = false; ui.view = "login"; render(); }
@@ -1932,8 +1937,9 @@ function attachHandlers() {
         await saveState();
         render();
       }
-    });
-  });
+  };
+  window.__actionHandler = actionHandler;
+  document.addEventListener("click", actionHandler);
 
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
   const save = debounce(saveState, 300);
