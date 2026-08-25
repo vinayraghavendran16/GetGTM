@@ -61,10 +61,10 @@
 
     .wrap { max-width: 1200px; margin: 0 auto; padding: 20px; }
     .card { background: var(--surface-2); border: 0.5px solid var(--border);
-      border-radius: 8px; overflow: hidden; }
-    .card-head { padding: 14px 18px; border-bottom: 0.5px solid var(--border);
+      border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .card-head { padding: 16px 18px; border-bottom: 0.5px solid var(--border);
       display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .card-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+    .card-head h2 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.2px; }
     .card-head .sub { color: var(--text-secondary); font-size: 12px; }
     .card-body { padding: 16px 18px; }
 
@@ -78,13 +78,14 @@
     .btn.ghost:hover { background: var(--surface-1); }
     .btn.sm { padding: 5px 9px; font-size: 11px; }
 
-    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 12px; margin-bottom: 18px; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px; margin-bottom: 20px; }
     .kpi { background: var(--surface-1); border: 0.5px solid var(--border);
-      border-radius: 6px; padding: 12px 14px; }
-    .kpi .label { color: var(--text-secondary); font-size: 11px; font-weight: 600;
-      text-transform: uppercase; letter-spacing: .4px; }
-    .kpi .value { font-size: 20px; font-weight: 600; margin-top: 4px; }
+      border-radius: 8px; padding: 14px 16px; transition: border-color 0.15s ease; }
+    .kpi:hover { border-color: var(--brand); }
+    .kpi .label { color: var(--text-secondary); font-size: 10.5px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .5px; }
+    .kpi .value { font-size: 22px; font-weight: 700; margin-top: 6px; letter-spacing: -0.3px; }
 
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th { text-align: left; font-weight: 600; color: var(--text-secondary);
@@ -94,11 +95,20 @@
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: var(--surface-1); }
 
-    .badge { display: inline-block; padding: 3px 8px; border-radius: 3px;
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 999px;
       font-size: 10px; font-weight: 600; letter-spacing: .2px; }
     .badge.done { background: var(--success-light); color: var(--success); }
     .badge.pending { background: var(--info-light); color: var(--info); }
     .badge.at-risk { background: #fee2e2; color: #b91c1c; }
+    .badge.onboarding { background: #ede9fe; color: #7c3aed; }
+    .badge.active-status { background: #dcfce7; color: #15803d; }
+    .badge.at-risk-status { background: #fef3c7; color: #b45309; }
+    .badge.paused-status { background: #f1f5f9; color: #64748b; }
+    .badge.churned-status { background: #fee2e2; color: #b91c1c; }
+    .badge.renewed-status { background: #dbeafe; color: #1d4ed8; }
+
+    .row-actions { display: flex; gap: 6px; align-items: center; }
+    .row-actions .btn { padding: 4px 10px; font-size: 11px; border-radius: 5px; }
 
     .field { margin-bottom: 12px; }
     .field label { display: block; font-size: 11px; font-weight: 600;
@@ -116,12 +126,12 @@
       overflow: hidden; width: 100%; }
     .progress > div { height: 100%; background: var(--brand); }
 
-    .tabs { display: flex; gap: 2px; border-bottom: 0.5px solid var(--border);
-      margin-bottom: 16px; }
-    .tabs button { background: none; border: none; padding: 8px 12px;
-      color: var(--text-secondary); font-weight: 500; border-bottom: 2px solid transparent;
-      cursor: pointer; white-space: nowrap; }
-    .tabs button.active { color: var(--text-primary); border-bottom-color: var(--brand); }
+    .tabs { display: flex; gap: 4px; border-bottom: 0.5px solid var(--border);
+      margin-bottom: 18px; }
+    .tabs button { background: none; border: none; padding: 10px 14px;
+      color: var(--text-secondary); font-weight: 500; font-size: 13.5px; border-bottom: 2px solid transparent;
+      cursor: pointer; white-space: nowrap; transition: color 0.15s ease; }
+    .tabs button.active { color: var(--text-primary); font-weight: 600; border-bottom-color: var(--brand); }
     .tabs button:hover { color: var(--text-primary); }
 
     .share-box { background: var(--brand-light); border: 0.5px solid #d8b4fe;
@@ -578,7 +588,30 @@ function refreshProspectsFromGmail() {
     notes: "Howard introduced Vinay as a partner-org resource who has already researched new market entry opportunities and engagement models for QNu Labs. A prepared growth plan deck (QNu_Labs_GetGTM_Growth_Plan.pptx) was attached to the intro. This came through Heddl's partner channel, not a direct GetGTM-sourced lead."
   })) added++;
 
-  return added;
+  // Update existing prospects when their Gmail thread has moved since we last checked.
+  // Only touches status/nextStep/notes - never overwrites name/company/email/dateContacted/source,
+  // and only writes when something actually changed (so this is safe to call every refresh).
+  var updated = 0;
+  function updateIfExists(companyName, fields) {
+    var p = state.prospects.find(function(x) { return (x.company || "").trim().toLowerCase() === companyName.trim().toLowerCase(); });
+    if (!p) return false;
+    var changed = false;
+    Object.keys(fields).forEach(function(k) { if (p[k] !== fields[k]) { p[k] = fields[k]; changed = true; } });
+    return changed;
+  }
+
+  if (updateIfExists("CognitivTrust", {
+    status: "Converted",
+    nextStep: "Kickoff completed Aug 25 - now tracked in the Delivery tab of the CognitivTrust engagement",
+    notes: "Kickoff call held Aug 25 (rescheduled once same-morning after brief timing confusion - Yogesh proposed 12:30pm after an initial 10:30am slot mix-up). Fireflies meeting recap generated. Now converted and being tracked as a signed client."
+  })) updated++;
+  if (updateIfExists("QNu Labs", {
+    status: "Follow-up Sent",
+    nextStep: "Awaiting response to specific opportunities/engagement models sent Aug 25",
+    notes: "Howard introduced Vinay Aug 21 via Heddl's partner channel, with a prepared growth plan deck attached. Vinay followed up directly Aug 25 with mapped new-market entry opportunities and engagement models covering outbound, inbound, and AEO."
+  })) updated++;
+
+  return { added: added, updated: updated };
 }
 
 var isClientView = false;
@@ -686,8 +719,8 @@ function initFirebase() {
             if (!window._prospectSeedDone) {
               window._prospectSeedDone = true;
               if (state.prospects.length === 0) seedProspects();
-              var added = refreshProspectsFromGmail();
-              if (added > 0) { state.lastGmailRefresh = new Date().toLocaleDateString("en-US", {year:"numeric",month:"short",day:"numeric"}); }
+              var result = refreshProspectsFromGmail();
+              if (result.added > 0 || result.updated > 0) { state.lastGmailRefresh = new Date().toLocaleDateString("en-US", {year:"numeric",month:"short",day:"numeric"}); }
               saveState("prospects");
             }
             if (!window._fbSaveInProgress) render();
@@ -738,8 +771,8 @@ async function loadState() {
   // runs for the localStorage fallback (useFirebase === false).
   if (!useFirebase) {
     if (state.prospects.length === 0) { seedProspects(); await saveState(); }
-    var _addedOnInit = refreshProspectsFromGmail();
-    if (_addedOnInit > 0) { state.lastGmailRefresh = new Date().toLocaleDateString("en-US", {year:"numeric",month:"short",day:"numeric"}); await saveState(); }
+    var _resultOnInit = refreshProspectsFromGmail();
+    if (_resultOnInit.added > 0 || _resultOnInit.updated > 0) { state.lastGmailRefresh = new Date().toLocaleDateString("en-US", {year:"numeric",month:"short",day:"numeric"}); await saveState(); }
     var beforeClientCount = Object.keys(state.clients).length;
     seedKnownAccounts();
     enrichKnownAccounts();
@@ -1447,8 +1480,8 @@ function renderDashboard() {
     </div>
     <div class="wrap">
       <div class="tabs" style="margin-bottom:16px">
-        <button data-action="dtab" data-dtab="clients" class="${dTab==='clients'?'active':''}">Clients</button>
         <button data-action="dtab" data-dtab="new-engagements" class="${dTab==='new-engagements'?'active':''}">New Engagements</button>
+        <button data-action="dtab" data-dtab="clients" class="${dTab==='clients'?'active':''}">Clients</button>
         <button data-action="dtab" data-dtab="prospects" class="${dTab==='prospects'?'active':''}">Prospects</button>
         <button data-action="dtab" data-dtab="reporting" class="${dTab==='reporting'?'active':''}">Reporting</button>
       </div>
@@ -1484,7 +1517,7 @@ function renderClientsView(clients, active, launched, atRisk) {
                   const prog = progressOf(c);
                   const next = c.stages.find(s => s.status !== "Complete");
                   const url = window.location.origin + window.location.pathname + "?client=" + c.id;
-                  const statusColor = c.accountStatus === "Active" ? "done" : c.accountStatus === "Churned" ? "at-risk" : "pending";
+                  const statusColor = c.accountStatus === "Active" ? "active-status" : c.accountStatus === "Churned" ? "churned-status" : c.accountStatus === "At Risk" ? "at-risk-status" : c.accountStatus === "Paused" ? "paused-status" : c.accountStatus === "Renewed" ? "renewed-status" : c.accountStatus === "Onboarding" ? "onboarding" : "pending";
                   return `<tr>
                     <td><strong onclick="window.openClient('${c.id}')" style="cursor:pointer">${escapeHTML(c.name)}</strong></td>
                     <td><span class="badge ${statusColor}">${escapeHTML(c.accountStatus || "-")}</span></td>
@@ -1492,7 +1525,7 @@ function renderClientsView(clients, active, launched, atRisk) {
                     <td><div class="progress" style="width:120px"><div style="width:${prog}%"></div></div><div class="small">${prog}%</div></td>
                     <td><div class="small">${escapeHTML(next?.stage || "Done")}</div></td>
                     <td><span class="badge ${c.sow.status === 'Signed' ? 'done' : 'pending'}">${escapeHTML(c.sow.status || "-")}</span></td>
-                    <td><div style="display:flex;gap:6px"><button class="btn ghost sm" onclick="navigator.clipboard.writeText('${escapeAttr(url)}');alert('Link copied!')">Share</button><button class="btn ghost sm" data-action="delete-client" data-id="${c.id}" style="color:var(--danger)">Delete</button></div></td>
+                    <td><div class="row-actions"><button class="btn ghost sm" onclick="navigator.clipboard.writeText('${escapeAttr(url)}');alert('Link copied!')">&#128279; Share</button><button class="btn ghost sm" data-action="delete-client" data-id="${c.id}" style="color:var(--danger)">&#128465; Delete</button></div></td>
                   </tr>`;
                 }).join("")}
               </tbody>
@@ -1528,7 +1561,7 @@ function renderNewEngagementsView(clients) {
                     <td><strong onclick="window.openClient('${c.id}')" style="cursor:pointer">${escapeHTML(c.name)}</strong></td>
                     <td><span class="badge pending">${PATHS[c.path].label}</span></td>
                     <td><span class="badge pending">${escapeHTML(stageLabel)}</span></td>
-                    <td><div style="display:flex;gap:6px"><button class="btn ghost sm" onclick="navigator.clipboard.writeText('${escapeAttr(url)}');alert('Link copied!')">Share</button><button class="btn ghost sm" data-action="delete-client" data-id="${c.id}" style="color:var(--danger)">Delete</button></div></td>
+                    <td><div class="row-actions"><button class="btn ghost sm" onclick="navigator.clipboard.writeText('${escapeAttr(url)}');alert('Link copied!')">&#128279; Share</button><button class="btn ghost sm" data-action="delete-client" data-id="${c.id}" style="color:var(--danger)">&#128465; Delete</button></div></td>
                   </tr>`;
                 }).join("")}
               </tbody>
@@ -1570,7 +1603,7 @@ function renderProspectsView() {
         </div>
         <div class="card-body" style="padding:0">
           <div class="small" style="padding:12px 16px;border-bottom:0.5px solid var(--border)">
-            ${state.lastGmailRefresh ? 'Last refreshed ' + escapeHTML(state.lastGmailRefresh) + '. ' : ''}Threads where Rajiv led, looped Vinay in, Sean led, or Vinay/Sean reached out directly. Click Refresh to pull the latest, or just ask Claude in chat to "refresh prospects from Gmail" - it searches live and adds anything new. Never duplicates. Potential monthly value is manual - no package is signed yet, so nothing is assumed.
+            ${state.lastGmailRefresh ? 'Last refreshed ' + escapeHTML(state.lastGmailRefresh) + '. ' : ''}Threads where Rajiv led, looped Vinay in, Sean led, or Vinay/Sean reached out directly. Click Refresh to pull the latest - adds anything new and updates existing rows if their conversation has moved since last check. Never duplicates. Potential monthly value is manual - no package is signed yet, so nothing is assumed.
           </div>
           ${prospects.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">No prospects yet.</div>` : `
             <table>
@@ -1599,7 +1632,7 @@ function renderProspectsView() {
                     <td><input type="number" placeholder="-" data-prospect="${p.id}" data-key="potentialValue" value="${escapeAttr(p.potentialValue || "")}" style="width:90px;border:0.5px solid var(--border);border-radius:4px;padding:4px 6px;background:var(--surface-1)"></td>
                     <td><input data-prospect="${p.id}" data-key="nextStep" value="${escapeAttr(p.nextStep)}" style="border:none;background:transparent;padding:0;width:200px"></td>
                     <td><div class="small">${escapeHTML(p.source)}</div></td>
-                    <td><div style="display:flex;gap:6px;align-items:center">${convertCell}<button class="btn ghost sm" data-action="delete-prospect" data-id="${p.id}">Remove</button></div></td>
+                    <td><div class="row-actions">${convertCell}<button class="btn ghost sm" data-action="delete-prospect" data-id="${p.id}">&#128465; Remove</button></div></td>
                   </tr>
                   ${p.notes ? `<tr><td colspan="7" style="padding-top:0"><div class="small" style="color:var(--text-muted);padding:0 0 8px">${escapeHTML(p.notes)}</div></td></tr>` : ""}
                 `;}).join("")}
@@ -2978,14 +3011,17 @@ function attachHandlers() {
         }
       }
       else if (action === "refresh-prospects") {
-        var addedCount = refreshProspectsFromGmail();
+        var result = refreshProspectsFromGmail();
         state.lastGmailRefresh = new Date().toLocaleDateString("en-US", {year:"numeric",month:"short",day:"numeric"});
-        await saveState();
+        await saveState("prospects");
         render();
-        if (addedCount > 0) {
-          alert(addedCount + " new prospect" + (addedCount > 1 ? "s" : "") + " added from Gmail.");
+        if (result.added > 0 || result.updated > 0) {
+          var parts = [];
+          if (result.added > 0) parts.push(result.added + " new prospect" + (result.added > 1 ? "s" : ""));
+          if (result.updated > 0) parts.push(result.updated + " updated with newer activity");
+          alert(parts.join(", ") + ".");
         } else {
-          alert("No new prospects found. This checks against threads I already know about - ask Claude in chat to search Gmail fresh for anything more recent, and I'll add it here the same way.");
+          alert("No changes found. This checks against threads I already know about - ask Claude in chat to search Gmail fresh, and I'll add or update anything new the same way.");
         }
       }
       else if (action === "modal-close") { ui.modal = null; render(); }
@@ -3003,7 +3039,14 @@ function attachHandlers() {
         ui.tab = "offers";
         ui.offerPage = 0;
         render();
-      } else if (action === "back") { ui.view = "dashboard"; render(); }
+      } else if (action === "back") {
+        var leavingClient = state.clients[ui.clientId];
+        if (leavingClient) {
+          ui.dashboardTab = (leavingClient.proposal && leavingClient.proposal.stage === "approved") ? "clients" : "new-engagements";
+        }
+        ui.view = "dashboard";
+        render();
+      }
       else if (action === "tab") { if (isClientView && (el.dataset.tab === "offers" || el.dataset.tab === "intake" || el.dataset.tab === "proposal")) return; ui.tab = el.dataset.tab; render(); }
       else if (action === "skip-ppt") { ui.tab = "intake"; render(); }
       else if (action === "offer-prev") {
