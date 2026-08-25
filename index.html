@@ -543,6 +543,20 @@ function refreshProspectsFromGmail() {
     source: "Sean led (picking up from colleague Hailey)",
     notes: "Budget objection raised earlier with Hailey. Sean followed up Aug 18 repositioning away from managed GetGTM service (too much for a bootstrapped, founder-led team) toward Heddl self-serve instead - pay-as-you-go, one inbox for LinkedIn/email/WhatsApp, signal-based ICP scoring. Calendar link sent for a Heddl-specific call."
   })) added++;
+  if (addIfMissing({
+    name: "Alan", company: "CLICK.BLUE", email: "alan@click.blue",
+    dateContacted: "2026-08-25", status: "New",
+    nextStep: "Awaiting call booking - calendar link sent same day",
+    source: "Warm intro via Elizabeth (landownerleaseinfo.org)",
+    notes: "Elizabeth introduced Alan same-day (Aug 25) with a short outline: trigger outreach from real-time buying signals, automate pipeline so lead flow is less dependent on referrals, build a steadier meeting calendar. Vinay replied immediately asking about 2027 priorities and sent a calendar link."
+  })) added++;
+  if (addIfMissing({
+    name: "Hermaan Kohli", company: "QNu Labs", email: "hermaan.kohli@qnulabs.com",
+    dateContacted: "2026-08-21", status: "New",
+    nextStep: "Follow up on the intro - no reply visible yet, offered a call to discuss specifics",
+    source: "Partner referral via Howard (autotechco.co / Heddl ecosystem)",
+    notes: "Howard introduced Vinay as a partner-org resource who has already researched new market entry opportunities and engagement models for QNu Labs. A prepared growth plan deck (QNu_Labs_GetGTM_Growth_Plan.pptx) was attached to the intro. This came through Heddl's partner channel, not a direct GetGTM-sourced lead."
+  })) added++;
 
   return added;
 }
@@ -629,12 +643,17 @@ function initFirebase() {
       // Clients: readable by anyone (client share links need this), writable only when signed in (enforced by rules)
       clientsRef.on("value", function(snapshot) {
         var data = snapshot.val();
-        if (data) {
-          state.clients = data;
+        state.clients = data || {};
+        Object.values(state.clients).forEach(function(c) { migrateClient(c); });
+        if (!window._clientSeedDone) {
+          window._clientSeedDone = true;
+          seedKnownAccounts();
+          enrichKnownAccounts();
           Object.values(state.clients).forEach(function(c) { migrateClient(c); });
-          applyClientViewRouting();
-          if (!window._fbSaveInProgress) render();
+          saveState("clients");
         }
+        applyClientViewRouting();
+        if (!window._fbSaveInProgress) render();
       }, function(err) { console.log("clients read error:", err.message); });
 
       // Auth state drives whether we also listen to team-only data
@@ -644,6 +663,13 @@ function initFirebase() {
           ui.isAuth = true;
           prospectsRef.on("value", function(snapshot) {
             state.prospects = snapshot.val() || [];
+            if (!window._prospectSeedDone) {
+              window._prospectSeedDone = true;
+              if (state.prospects.length === 0) seedProspects();
+              var added = refreshProspectsFromGmail();
+              if (added > 0) { state.lastGmailRefresh = new Date().toLocaleDateString("en-US", {year:"numeric",month:"short",day:"numeric"}); }
+              saveState("prospects");
+            }
             if (!window._fbSaveInProgress) render();
           }, function(err) { console.log("prospects read error:", err.message); });
           revenueActualsRef.on("value", function(snapshot) {
@@ -688,28 +714,28 @@ async function loadState() {
   if (!state.clients) state.clients = {};
   if (!state.revenueActuals) state.revenueActuals = {};
   if (!state.prospects) state.prospects = [];
-  if (!useFirebase || authUser) {
+  // Firebase path seeds via the reactive listeners in initFirebase() instead - this block only
+  // runs for the localStorage fallback (useFirebase === false).
+  if (!useFirebase) {
     if (state.prospects.length === 0) { seedProspects(); await saveState(); }
     var _addedOnInit = refreshProspectsFromGmail();
     if (_addedOnInit > 0) { state.lastGmailRefresh = new Date().toLocaleDateString("en-US", {year:"numeric",month:"short",day:"numeric"}); await saveState(); }
+    var beforeClientCount = Object.keys(state.clients).length;
+    seedKnownAccounts();
+    enrichKnownAccounts();
+    Object.values(state.clients).forEach(function(c) { migrateClient(c); });
+    await saveState();
   }
-  var beforeClientCount = Object.keys(state.clients).length;
-  seedKnownAccounts();
-  enrichKnownAccounts();
-  Object.values(state.clients).forEach(function(c) { migrateClient(c); });
-  await saveState();
 }
 
-async function saveState() {
+async function saveState(scope) {
   try {
     if (useFirebase) {
       window._fbSaveInProgress = true;
-      var writes = [clientsRef.set(state.clients)];
-      // Only attempt team-only paths if actually signed in - avoids permission-denied errors for client view / logged-out visitors
-      if (authUser) {
-        writes.push(prospectsRef.set(state.prospects || []));
-        writes.push(revenueActualsRef.set(state.revenueActuals || {}));
-      }
+      var writes = [];
+      if (!scope || scope === "clients") writes.push(clientsRef.set(state.clients));
+      if (authUser && (!scope || scope === "prospects")) writes.push(prospectsRef.set(state.prospects || []));
+      if (authUser && (!scope || scope === "revenueActuals")) writes.push(revenueActualsRef.set(state.revenueActuals || {}));
       await Promise.all(writes);
       setTimeout(function() { window._fbSaveInProgress = false; }, 500);
     }
