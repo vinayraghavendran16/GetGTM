@@ -1213,6 +1213,9 @@ function renderProspectsView() {
   const active = prospects.filter(p => !["Stalled","Not a Fit","Converted"].includes(p.status)).length;
   const stalled = prospects.filter(p => p.status === "Stalled").length;
   const converted = prospects.filter(p => p.status === "Converted").length;
+  const potentialMRR = prospects
+    .filter(p => !["Stalled","Not a Fit","Converted"].includes(p.status))
+    .reduce((sum, p) => sum + (parseFloat(p.potentialValue) || 0), 0);
 
   return `
       <div class="kpis">
@@ -1220,6 +1223,7 @@ function renderProspectsView() {
         <div class="kpi"><div class="label">Active</div><div class="value">${active}</div></div>
         <div class="kpi"><div class="label">Stalled</div><div class="value" style="color:${stalled?'var(--danger)':'inherit'}">${stalled}</div></div>
         <div class="kpi"><div class="label">Converted</div><div class="value" style="color:var(--success)">${converted}</div></div>
+        <div class="kpi"><div class="label">Potential MRR if converted</div><div class="value" style="color:var(--brand)">$${potentialMRR.toLocaleString()}</div></div>
       </div>
 
       <div class="card">
@@ -1231,11 +1235,11 @@ function renderProspectsView() {
           </div>
         </div>
         <div class="card-body" style="padding:0">
-          <div class="small" style="padding:12px 16px;border-bottom:0.5px solid var(--border)">Seeded from Gmail on-demand - threads where Rajiv led, looped Vinay in, or Vinay reached out directly. Ask to refresh anytime.</div>
+          <div class="small" style="padding:12px 16px;border-bottom:0.5px solid var(--border)">Seeded from Gmail on-demand - threads where Rajiv led, looped Vinay in, or Vinay reached out directly. Ask to refresh anytime. Potential monthly value is manual - no package is signed yet, so nothing is assumed.</div>
           ${prospects.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">No prospects yet.</div>` : `
             <table>
               <thead><tr>
-                <th>Name / Company</th><th>Date contacted</th><th>Status</th><th>Next step</th><th>Source</th><th></th>
+                <th>Name / Company</th><th>Date contacted</th><th>Status</th><th>Potential $/mo</th><th>Next step</th><th>Source</th><th></th>
               </tr></thead>
               <tbody>
                 ${prospects.map(p => `
@@ -1247,11 +1251,12 @@ function renderProspectsView() {
                         ${PROSPECT_STATUSES.map(s => `<option ${p.status===s?'selected':''}>${s}</option>`).join("")}
                       </select>
                     </td>
-                    <td><input data-prospect="${p.id}" data-key="nextStep" value="${escapeAttr(p.nextStep)}" style="border:none;background:transparent;padding:0;width:220px"></td>
+                    <td><input type="number" placeholder="-" data-prospect="${p.id}" data-key="potentialValue" value="${escapeAttr(p.potentialValue || "")}" style="width:90px;border:0.5px solid var(--border);border-radius:4px;padding:4px 6px;background:var(--surface-1)"></td>
+                    <td><input data-prospect="${p.id}" data-key="nextStep" value="${escapeAttr(p.nextStep)}" style="border:none;background:transparent;padding:0;width:200px"></td>
                     <td><div class="small">${escapeHTML(p.source)}</div></td>
                     <td><button class="btn ghost sm" data-action="delete-prospect" data-id="${p.id}">Remove</button></td>
                   </tr>
-                  ${p.notes ? `<tr><td colspan="6" style="padding-top:0"><div class="small" style="color:var(--text-muted);padding:0 0 8px">${escapeHTML(p.notes)}</div></td></tr>` : ""}
+                  ${p.notes ? `<tr><td colspan="7" style="padding-top:0"><div class="small" style="color:var(--text-muted);padding:0 0 8px">${escapeHTML(p.notes)}</div></td></tr>` : ""}
                 `).join("")}
               </tbody>
             </table>
@@ -1270,7 +1275,7 @@ function renderReportingView() {
   var ACCOUNT_STATUSES = ["Onboarding", "Active", "At Risk", "Paused", "Renewed", "Churned"];
 
   var totalBase = 0, totalMax = 0, totalActual = 0, actualEntries = 0;
-  var mrr = 0, churnedCount = 0, churnedMRR = 0;
+  var mrr = 0, mrrMax = 0, churnedCount = 0, churnedMRR = 0;
 
   var clientBlocks = names.map(function(name) {
     var contract = REVENUE_CONTRACTS[name];
@@ -1296,6 +1301,7 @@ function renderReportingView() {
       var isCurrent = row.start && row.end && today >= new Date(row.start) && today <= new Date(row.end + "T23:59:59");
       if (isCurrent && status && ["Onboarding","Active","At Risk","Renewed"].indexOf(status) !== -1) {
         mrr += (actualVal !== "" && !isNaN(parseFloat(actualVal))) ? parseFloat(actualVal) : row.base;
+        mrrMax += row.max;
       }
 
       return '<tr' + (isCurrent ? ' style="background:var(--surface-1)"' : '') + '>' +
@@ -1343,16 +1349,22 @@ function renderReportingView() {
       '</div></div>';
   }).join("");
 
+  var prospectPotentialMRR = (state.prospects || [])
+    .filter(function(p) { return ["Stalled","Not a Fit","Converted"].indexOf(p.status) === -1; })
+    .reduce(function(sum, p) { var v = parseFloat(p.potentialValue); return sum + (isNaN(v) ? 0 : v); }, 0);
+
   return `
       <div class="kpis">
         <div class="kpi"><div class="label">MRR (current month, active)</div><div class="value" style="color:var(--brand)">$${mrr.toLocaleString()}</div></div>
+        <div class="kpi"><div class="label">MRR max (full performance)</div><div class="value" style="color:var(--brand)">$${mrrMax.toLocaleString()}</div></div>
+        <div class="kpi"><div class="label">Potential MRR from prospects</div><div class="value">$${prospectPotentialMRR.toLocaleString()}</div></div>
         <div class="kpi"><div class="label">Contracted base (all accounts)</div><div class="value">$${totalBase.toLocaleString()}</div></div>
         <div class="kpi"><div class="label">Contracted max (with performance)</div><div class="value">$${totalMax.toLocaleString()}</div></div>
         <div class="kpi"><div class="label">Actual entered so far</div><div class="value" style="color:var(--success)">$${totalActual.toLocaleString()}</div></div>
         <div class="kpi"><div class="label">Churned accounts</div><div class="value" style="color:${churnedCount?'var(--danger)':'inherit'}">${churnedCount}</div></div>
         <div class="kpi"><div class="label">MRR lost to churn</div><div class="value" style="color:${churnedMRR?'var(--danger)':'inherit'}">$${churnedMRR.toLocaleString()}</div></div>
       </div>
-      <div class="small" style="margin-bottom:16px;color:var(--text-secondary)">MRR sums the current calendar month's contracted base (or actual, if entered) across accounts with status Onboarding, Active, At Risk, or Renewed. Paused and Churned accounts are excluded. Set each account's status in its card below - status is only auto-set once; after that it's yours to manage. Base/max figures come from each client's signed GTM Services Agreement in Drive; actuals vary month to month with real KPI performance.</div>
+      <div class="small" style="margin-bottom:16px;color:var(--text-secondary)">MRR sums the current calendar month's contracted base (or actual, if entered) across accounts with status Onboarding, Active, At Risk, or Renewed. MRR max assumes full performance/bonus attainment on those same accounts this month. Potential MRR from prospects is manually entered per prospect (in the Prospects tab) since no package is signed yet - nothing here is assumed. Paused and Churned accounts are excluded from MRR. Set each account's status in its card below - status is only auto-set once; after that it's yours to manage.</div>
       ${clientBlocks}
   `;
 }
@@ -2548,7 +2560,7 @@ function attachHandlers() {
           id: "p_" + Math.random().toString(36).slice(2,10),
           name: "New prospect", company: "", email: "",
           dateContacted: new Date().toISOString().slice(0,10), status: "New",
-          nextStep: "", source: "Manually added", notes: ""
+          nextStep: "", source: "Manually added", notes: "", potentialValue: ""
         });
         saveState(); render();
       }
