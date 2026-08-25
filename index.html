@@ -391,6 +391,26 @@
     font-size: 9px; font-weight: 600; }
   .fb-status.connected { background: #dcfce7; color: #15803d; }
   .fb-status.local { background: #fef3c7; color: #b45309; }
+
+  .docs-content { max-width: 760px; margin: 0 auto; padding: 8px 4px 24px; }
+  .docs-content h1 { font-size: 22px; font-weight: 700; margin: 0 0 8px; }
+  .docs-content .docs-lead { color: var(--text-secondary); font-size: 14px; margin: 0 0 28px; line-height: 1.5; }
+  .docs-content h2 { font-size: 16px; font-weight: 700; margin: 28px 0 10px; padding-top: 16px;
+    border-top: 0.5px solid var(--border); color: var(--brand); }
+  .docs-content h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+  .docs-content h3 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; }
+  .docs-content p { font-size: 13px; line-height: 1.65; margin: 0 0 10px; color: var(--text-primary); }
+  .docs-content ul { margin: 0 0 14px; padding-left: 20px; }
+  .docs-content li { font-size: 13px; line-height: 1.6; margin-bottom: 6px; color: var(--text-primary); }
+  .docs-content code { background: var(--surface-1); padding: 1px 6px; border-radius: 3px; font-size: 12px; }
+
+  .rel-entry { padding: 14px 0; border-top: 0.5px solid var(--border); }
+  .rel-entry:first-of-type { border-top: none; padding-top: 0; }
+  .rel-tag { display: inline-block; background: var(--brand); color: #fff; font-size: 9px;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px;
+    border-radius: 3px; margin-bottom: 8px; }
+  .rel-entry h3 { font-size: 14px; font-weight: 600; margin: 0 0 6px; }
+  .rel-entry p { font-size: 13px; line-height: 1.6; color: var(--text-secondary); margin: 0; }
 </style>
 </head>
 <body>
@@ -1201,6 +1221,7 @@ function render() {
   let html = "";
   if (ui.view === "login") html = renderLogin();
   else if (ui.view === "dashboard") html = renderDashboard();
+  else if (ui.view === "docs") html = renderDocs();
   else if (ui.view === "client") { var cl = state.clients[ui.clientId]; if (cl) { migrateClient(cl); syncTimelineFromDelivery(cl); } html = renderClient(); }
 
   document.querySelectorAll(".modal-backdrop").forEach(el => el.remove());
@@ -1225,6 +1246,7 @@ function renderLogin() {
   return `
     <div class="topbar">
       <div class="brand"><div class="logo">GTM</div> <strong>Engagement Tracker</strong></div>
+      <div style="margin-left:auto"><button class="btn ghost sm" data-action="open-docs">📖 Docs</button></div>
     </div>
     <div class="wrap">
       <div class="login-box">
@@ -1237,6 +1259,170 @@ function renderLogin() {
           </div>
         </div>
       </div>
+    </div>
+  `;
+}
+
+function renderDocs() {
+  var t = ui.docsTab || "howitworks";
+  return `
+    <div class="topbar">
+      <div class="brand"><div class="logo">GTM</div> <strong>Documentation</strong></div>
+      <div style="margin-left:auto"><button class="btn ghost sm" data-action="docs-back">${'\u2190'} Back</button></div>
+    </div>
+    <div class="wrap">
+      <div class="tabs" style="margin-bottom:16px">
+        <button data-action="docs-tab" data-docs-tab="howitworks" class="${t==='howitworks'?'active':''}">How It Works</button>
+        <button data-action="docs-tab" data-docs-tab="releases" class="${t==='releases'?'active':''}">Release Notes</button>
+      </div>
+      <div class="card"><div class="card-body docs-content">
+        ${t === "releases" ? renderReleaseNotes() : renderHowItWorks()}
+      </div></div>
+    </div>
+  `;
+}
+
+function renderHowItWorks() {
+  return `
+    <h1>How the Engagement Tracker works</h1>
+    <p class="docs-lead">This tool tracks a client relationship from first outreach through to signed, delivered, revenue-generating account - and keeps GetGTM and the client looking at the same live data.</p>
+
+    <h2>Access model</h2>
+    <p>Two ways in:</p>
+    <ul>
+      <li><strong>GetGTM team</strong> - sign in with a team email/password (Firebase Authentication). Full read/write access to everything.</li>
+      <li><strong>Clients</strong> - get a direct link (<code>?client=CLIENT_ID</code>). No login required. They see Overview, Timeline, Delivery, and Outcomes for their own engagement - never Offers, Intake, Proposal, Prospects, or Reporting.</li>
+    </ul>
+
+    <h2>The pipeline: New Engagements to Clients</h2>
+    <p>Every engagement starts in <strong>New Engagements</strong> and only moves to <strong>Clients</strong> once its proposal is approved. This split keeps signed, delivering accounts separate from active sales conversations.</p>
+
+    <h3>1. Offers presentation</h3>
+    <p>A full-screen, prospect-facing slide deck shown on a live call. Covers the problem GetGTM solves, then one page per offering (Outbound, AEO/GEO, DelightLoop, Warm Path Calling, Definition Lock) - no pricing shown. Skip straight to intake if the deck isn't needed.</p>
+
+    <h3>2. Client Intake</h3>
+    <p>Capture company details and select packages: Outbound (required, India or US pricing), AEO/GEO (optional, either/or), DelightLoop (optional, either/or), and add-ons (multi-select). POC name and email sync forward into Overview automatically.</p>
+
+    <h3>3. Overview (Mutual Success Plan)</h3>
+    <p>The working document both sides reference: CRO/CS/GTME assignment, client POC, goals by month (M1/M2/M3 positive replies and meetings), ICP definition, comms channel, Drive folders, CRM integration, signing authority, and contract metadata (term type, end date, signed contract link). A "Generate initial proposal" button saves this and jumps straight to Proposal.</p>
+
+    <h3>4. Proposal workflow</h3>
+    <p>Four stages, each with a purple progress tracker:</p>
+    <ul>
+      <li><strong>Draft</strong> - auto-populated from Intake + Overview. Generate a PDF, or draft the email via Gmail compose (opens pre-filled, one click to send).</li>
+      <li><strong>Scope Review</strong> - GTME/CS add feasibility notes before the final version goes out.</li>
+      <li><strong>Final Sent</strong> - waiting on client approval, tracked via email reference.</li>
+      <li><strong>Approved</strong> - SOW auto-generated, onboarding checklist unlocked, Slack + email notification fires, and the engagement moves to the Clients tab.</li>
+    </ul>
+    <p>Sections 06-10 of every proposal (Commercial Terms, KPI Verification, Obligations, Terms & Ways of Working, Acceptance) are a fixed template - identical structure and legal language for every client, with only names, prices, and dates substituted. This keeps every proposal legally consistent.</p>
+
+    <h2>Timeline - auto-tracked, always visible</h2>
+    <p>A horizontal progress bar sits above every tab (except the full-screen Offers deck), showing all 11 delivery stages from Qualification through First Review. It updates itself: package selection completes Qualification, proposal approval completes Scoping/Proposal, delivery checklist items completing (SOW signed, kickoff done, campaign launched) push the corresponding stage forward. Every stage is still manually overridable from the Timeline tab if reality differs from the auto-read.</p>
+
+    <h2>Delivery</h2>
+    <p>Unlocks once the proposal is approved. A 16-item onboarding-through-launch checklist (SOW signed, invoice sent, Drive/Slack setup, LinkedIn/Sales Nav connected, domains warmed, kickoff held, ICP fitment, TAM built, messaging approved, campaign QA'd, launched, MSP signed off) with status, date, owner, and notes per item - plus a running log of weekly updates.</p>
+
+    <h2>Outcomes</h2>
+    <p>Weekly metric logging against the M1/M2/M3 goals set in Overview.</p>
+
+    <h2>Prospects</h2>
+    <p>A separate pipeline, tracked independently of signed clients - pulled from Gmail. Threads where Rajiv led, looped Vinay in, Sean led, or Vinay/Sean reached out directly. Each row: date contacted, status (New through Converted/Stalled/Not a Fit), a manual "potential $/mo" field, next step, and source.</p>
+    <p><strong>Refresh from Gmail</strong> pulls in anything new without duplicating (matched by company name). This isn't a live API poll - it's triggered either by clicking the button, or by asking Claude in chat to search Gmail fresh; either way the result lands in the same place, safely, every time.</p>
+    <p><strong>Convert to engagement</strong> on any prospect creates a New Engagement pre-filled with their name and email, marks the prospect Converted, and drops straight into Client Intake. If a client with that name already exists, the button becomes "Open engagement" instead, so nothing ever gets duplicated.</p>
+
+    <h2>Reporting</h2>
+    <p>The financial rollup, built from the actual signed GTM Services Agreement for each client (pulled from Drive, not estimated) wherever a contract exists:</p>
+    <ul>
+      <li><strong>MRR</strong> - this calendar month's contracted base (or actual, once entered) summed across every account with status Onboarding/Active/At Risk/Renewed.</li>
+      <li><strong>MRR max</strong> - the same accounts, assuming full performance/bonus attainment.</li>
+      <li><strong>Potential MRR from prospects</strong> - sum of the manual "potential $/mo" field across active prospects. Nothing here is estimated automatically - no package is signed yet, so nothing is assumed.</li>
+      <li><strong>Churn</strong> - mark an account's status Churned and a "Lost MRR" field appears; that feeds the churned-accounts and lost-MRR totals.</li>
+    </ul>
+    <p>Each client's contract card shows the month-by-month schedule (base vs. max vs. an editable actual), the plain-English formula for that month's fee, and a link to the actual signed PDF in Drive.</p>
+
+    <h2>Notifications</h2>
+    <p>Approving a proposal fires a Slack message to #notifications and an email (via EmailJS) to the configured recipient list. Both run directly from the browser - no backend required. More triggers (delivery item blocked, prospect stalled, account churned) can be added the same way whenever needed.</p>
+
+    <h2>Data & sync</h2>
+    <p>Firebase Realtime Database keeps GetGTM's browser and every client's browser looking at the same data, live. Client engagement records are readable and writable by anyone with that client's link (this is what lets clients see live progress and check off their side of the Delivery checklist). Prospects and Reporting data require a signed-in GetGTM team account to read or write at all - a client link never exposes pipeline or financial data.</p>
+    <p>If Firebase is ever unreachable, the tool falls back to the browser's local storage automatically - nothing breaks, it just stops syncing across devices until reconnected.</p>
+  `;
+}
+
+function renderReleaseNotes() {
+  return `
+    <h1>Release notes</h1>
+    <p class="docs-lead">A running history of what's been built, grouped by milestone. Newest first.</p>
+
+    <div class="rel-entry">
+      <div class="rel-tag">Latest</div>
+      <h3>Documentation & release notes</h3>
+      <p>Added this page - an in-app "How It Works" reference and version history, reachable from the topbar on every screen, including before login.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Prospects: Gmail refresh, real prospect data</h3>
+      <p>Replaced the placeholder refresh button with a real one. Found and added Emerald Art Studio, LinkDeal, CLICK.BLUE, and QNu Labs from live Gmail threads. Fixed a critical bug where all seeding/enrichment logic silently stopped running the moment Firebase Authentication went live (it only ran in the old localStorage fallback path) - moved it into the real-time listeners themselves, and fixed a related race condition between concurrent saves.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Notifications: Slack + Email</h3>
+      <p>Proposal approval now fires a real Slack message (Incoming Webhook) and a real email (EmailJS) - both run client-side, no backend needed. Wired and tested end to end.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>PDF generation: page-break fixes</h3>
+      <p>Used real headless Chromium rendering to actually look at generated proposal PDFs page by page. Found and fixed a section splitting across pages mid-content, and removed forced page breaks that were wasting up to half the document as blank pages.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Prospect to Client conversion</h3>
+      <p>Added a Convert button on each prospect that creates a New Engagement pre-filled with their details, with automatic duplicate detection against existing clients.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Security: Firebase Authentication</h3>
+      <p>Replaced the shared password with real email/password sign-in. Split Firebase data into separate paths with different access rules - Prospects and Reporting now require a signed-in team account to even read; client engagement links remain openly accessible (by design, for collaborative delivery tracking).</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Reporting: MRR, MRR max, churn, real contracts</h3>
+      <p>Pulled actual signed GTM Services Agreements from Drive for Securotix, CloudLeap, EduInfra, and SPRY - real commercial terms, not estimates. Added MRR and MRR-max KPIs computed from each contract's real month-by-month schedule, account status tracking (Onboarding/Active/At Risk/Paused/Renewed/Churned) with lost-MRR capture, and potential MRR from active prospects.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Clients vs. New Engagements split</h3>
+      <p>Separated the dashboard into a Clients tab (proposal approved) and a New Engagements tab (still in the sales process). Enriched client Overview pages with real signatory names, billing addresses, and ICP details sourced directly from signed contracts.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Prospects module</h3>
+      <p>New pipeline-tracking tab, seeded from real Gmail threads - separate from signed clients, with status, next steps, and source tracking.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Phase 1: Real-time Firebase sync + client sharing</h3>
+      <p>Moved off single-browser localStorage onto Firebase Realtime Database - GetGTM and clients now see the same live data. Client share links became fully functional, read-write, real-time.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Timeline auto-sync</h3>
+      <p>The persistent horizontal timeline bar now updates itself from real signals - package selection, proposal stage, delivery checklist completion - instead of requiring manual updates at every step.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Delivery tab</h3>
+      <p>16-item onboarding-through-launch checklist with status/date/owner/notes per item, unlocked automatically once a proposal is approved, plus a weekly-updates log.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Proposal workflow + PDF generation</h3>
+      <p>Built the full 4-stage proposal pipeline (Draft, Scope Review, Final Sent, Approved) with auto-populated PDF generation and Gmail-based sending. Standardized sections 06-10 (Commercial Terms, KPI Verification, Obligations, Terms & Ways of Working, Acceptance) into a fixed template used identically across every client.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Core tracker foundation</h3>
+      <p>The original build: full-screen Offers presentation with a three-panel Problem slide, Client Intake with categorized package selection (Outbound required, AEO/GEO and DelightLoop either/or, multi-select add-ons), the Overview / Mutual Success Plan, Timeline stage tracking, and Outcomes logging. GetGTM branding, dark theme, dashboard password gate.</p>
     </div>
   `;
 }
@@ -1255,6 +1441,7 @@ function renderDashboard() {
       <div class="brand"><div class="logo">GTM</div> <strong>Engagement Tracker</strong></div>
       <div style="margin-left:auto;display:flex;gap:12px;align-items:center">
         <div class="meta">All engagements</div>
+        <button class="btn ghost sm" data-action="open-docs">📖 Docs</button>
         <button class="btn ghost sm" data-action="logout">Logout</button>
       </div>
     </div>
@@ -1536,7 +1723,10 @@ function renderClient() {
   return `
     <div class="topbar">
       <div class="brand"><div class="logo">GTM</div> <strong>${escapeHTML(c.name)}</strong></div>
-      ${isClientView ? '<div class="badge" style="background:#15803d">Live - synced</div>' : '<div class="badge">Client view</div>'}
+      <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
+        <button class="btn ghost sm" data-action="open-docs">📖 Docs</button>
+        ${isClientView ? '<div class="badge" style="background:#15803d">Live - synced</div>' : '<div class="badge">Client view</div>'}
+      </div>
     </div>
     <div class="wrap">
       ${isClientView ? '' : '<div class="breadcrumb"><a data-action="back">← Back</a></div>'}
@@ -2728,6 +2918,17 @@ function attachHandlers() {
         if (useFirebase && auth) { auth.signOut(); }
         ui.isAuth = false; ui.view = "login"; render();
       }
+      else if (action === "open-docs") {
+        ui.docsReturnView = ui.view; ui.docsReturnClientId = ui.clientId;
+        ui.view = "docs"; ui.docsTab = ui.docsTab || "howitworks";
+        render();
+      }
+      else if (action === "docs-back") {
+        ui.view = ui.docsReturnView || (ui.isAuth ? "dashboard" : "login");
+        ui.clientId = ui.docsReturnClientId || ui.clientId;
+        render();
+      }
+      else if (action === "docs-tab") { ui.docsTab = el.dataset.docsTab; render(); }
       else if (action === "new-client") { ui.modal = { type: "new-client" }; render(); }
       else if (action === "delete-client") {
         var cl = state.clients[el.dataset.id];
