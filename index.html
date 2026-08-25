@@ -398,6 +398,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script>
 const STORAGE_KEY = "getgtm_tracker_v9";
 const PW = "getgtm";
@@ -533,6 +534,9 @@ var FIREBASE_CONFIG = {
 var db = null;
 var dbRef = null;
 var useFirebase = false;
+var auth = null;
+var authUser = null;
+var clientsRef = null, prospectsRef = null, revenueActualsRef = null;
 
 function initFirebase() {
   try {
@@ -540,22 +544,44 @@ function initFirebase() {
       firebase.initializeApp(FIREBASE_CONFIG);
       db = firebase.database();
       dbRef = db.ref("getgtm_tracker");
+      clientsRef = db.ref("getgtm_tracker/clients");
+      prospectsRef = db.ref("getgtm_tracker/prospects");
+      revenueActualsRef = db.ref("getgtm_tracker/revenueActuals");
+      auth = firebase.auth();
       useFirebase = true;
-      // Listen for real-time changes
-      dbRef.on("value", function(snapshot) {
+
+      // Clients: readable by anyone (client share links need this), writable only when signed in (enforced by rules)
+      clientsRef.on("value", function(snapshot) {
         var data = snapshot.val();
-        if (data && data.clients) {
-          // Only update state.clients, never overwrite ui state
-          state.clients = data.clients;
-          // Migrate any clients that have old data models
+        if (data) {
+          state.clients = data;
           Object.values(state.clients).forEach(function(c) { migrateClient(c); });
-          // Debounce: don't re-render if we just saved (avoid loop)
-          if (!window._fbSaveInProgress) {
-            render();
-          }
+          applyClientViewRouting();
+          if (!window._fbSaveInProgress) render();
         }
+      }, function(err) { console.log("clients read error:", err.message); });
+
+      // Auth state drives whether we also listen to team-only data
+      auth.onAuthStateChanged(function(user) {
+        authUser = user;
+        if (user) {
+          ui.isAuth = true;
+          prospectsRef.on("value", function(snapshot) {
+            state.prospects = snapshot.val() || [];
+            if (!window._fbSaveInProgress) render();
+          }, function(err) { console.log("prospects read error:", err.message); });
+          revenueActualsRef.on("value", function(snapshot) {
+            state.revenueActuals = snapshot.val() || {};
+            if (!window._fbSaveInProgress) render();
+          }, function(err) { console.log("revenueActuals read error:", err.message); });
+        } else {
+          prospectsRef.off();
+          revenueActualsRef.off();
+        }
+        render();
       });
-      console.log("Firebase connected - real-time sync active");
+
+      console.log("Firebase connected - auth-gated real-time sync active");
     } else {
       console.log("Firebase not configured - using local storage");
     }
@@ -568,9 +594,10 @@ function initFirebase() {
 async function loadState() {
   try {
     if (useFirebase) {
-      var snapshot = await dbRef.once("value");
-      var data = snapshot.val();
-      if (data && data.clients) state = data;
+      var clientsSnap = await clientsRef.once("value");
+      var clientsData = clientsSnap.val();
+      if (clientsData) state.clients = clientsData;
+      // Prospects/revenueActuals only readable when signed in - listener above handles that once auth resolves
     } else {
       var r = window.localStorage.getItem(STORAGE_KEY);
       if (!r) {
@@ -585,21 +612,27 @@ async function loadState() {
   if (!state.clients) state.clients = {};
   if (!state.revenueActuals) state.revenueActuals = {};
   if (!state.prospects) state.prospects = [];
-  if (state.prospects.length === 0) { seedProspects(); await saveState(); }
+  if (!useFirebase || authUser) {
+    if (state.prospects.length === 0) { seedProspects(); await saveState(); }
+  }
   var beforeClientCount = Object.keys(state.clients).length;
   seedKnownAccounts();
   enrichKnownAccounts();
   Object.values(state.clients).forEach(function(c) { migrateClient(c); });
   await saveState();
-  // Migrate all existing clients to current data model
-  Object.values(state.clients).forEach(function(c) { migrateClient(c); });
 }
 
 async function saveState() {
   try {
     if (useFirebase) {
       window._fbSaveInProgress = true;
-      await dbRef.set(state);
+      var writes = [clientsRef.set(state.clients)];
+      // Only attempt team-only paths if actually signed in - avoids permission-denied errors for client view / logged-out visitors
+      if (authUser) {
+        writes.push(prospectsRef.set(state.prospects || []));
+        writes.push(revenueActualsRef.set(state.revenueActuals || {}));
+      }
+      await Promise.all(writes);
       setTimeout(function() { window._fbSaveInProgress = false; }, 500);
     }
     // Always save to localStorage as backup
@@ -1073,6 +1106,18 @@ function render() {
 }
 
 function renderLogin() {
+  var errorHtml = ui.loginError ? `<div style="color:#b91c1c;font-size:12px;font-weight:500;margin-bottom:10px">${escapeHTML(ui.loginError)}</div>` : '';
+  var firebaseForm = `
+            <input id="login-email" type="email" placeholder="Team email" autofocus autocomplete="email" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:5px;background:var(--surface-2);color:var(--text-primary);margin-bottom:8px;font-size:14px">
+            <input id="login-password" type="password" placeholder="Password" autocomplete="current-password" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:5px;background:var(--surface-2);color:var(--text-primary);margin-bottom:12px;font-size:14px">
+            ${errorHtml}
+            <button class="btn" data-action="fb-login" style="width:100%">Sign in</button>
+  `;
+  var localForm = `
+            <input id="pw" type="password" placeholder="Password" autofocus autocomplete="off" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:5px;background:var(--surface-2);color:var(--text-primary);margin-bottom:12px;font-size:14px">
+            ${errorHtml}
+            <button class="btn" data-action="login" style="width:100%">Enter</button>
+  `;
   return `
     <div class="topbar">
       <div class="brand"><div class="logo">GTM</div> <strong>Engagement Tracker</strong></div>
@@ -1083,10 +1128,8 @@ function renderLogin() {
           <div class="card-body">
             <h2>Dashboard access</h2>
             <div class="sub">GetGTM team only</div>
-            <input id="pw" type="password" placeholder="Password" autofocus autocomplete="off" style="width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:5px;background:var(--surface-2);color:var(--text-primary);margin-bottom:12px;font-size:14px">
-            <div id="pw-error" style="display:none;color:#b91c1c;font-size:12px;font-weight:500;margin-bottom:10px">Wrong password. Try again.</div>
-            <button class="btn" data-action="login" style="width:100%">Enter</button>
-            <div class="small" style="margin-top:14px;color:var(--text-muted)">Clients get a direct link - no password needed.</div>
+            ${useFirebase ? firebaseForm : localForm}
+            <div class="small" style="margin-top:14px;color:var(--text-muted)">Clients get a direct link - no sign-in needed.</div>
           </div>
         </div>
       </div>
@@ -1242,7 +1285,16 @@ function renderProspectsView() {
                 <th>Name / Company</th><th>Date contacted</th><th>Status</th><th>Potential $/mo</th><th>Next step</th><th>Source</th><th></th>
               </tr></thead>
               <tbody>
-                ${prospects.map(p => `
+                ${prospects.map(p => {
+                  const matchedClient = Object.values(state.clients).find(c => c.name.trim().toLowerCase() === (p.company || "").trim().toLowerCase());
+                  const convertCell = p.status === "Converted"
+                    ? (matchedClient
+                        ? `<button class="btn ghost sm" onclick="window.openClient('${matchedClient.id}')">Open engagement</button>`
+                        : `<span class="small" style="color:var(--text-muted)">Converted</span>`)
+                    : matchedClient
+                      ? `<div><button class="btn ghost sm" onclick="window.openClient('${matchedClient.id}')">Open engagement</button><div class="small" style="color:var(--text-muted);margin-top:2px">Already has one</div></div>`
+                      : `<button class="btn sm" data-action="convert-prospect" data-id="${p.id}">Convert →</button>`;
+                  return `
                   <tr>
                     <td><strong>${escapeHTML(p.name)}</strong><div class="small">${escapeHTML(p.company)}</div></td>
                     <td><input type="date" data-prospect="${p.id}" data-key="dateContacted" value="${escapeAttr(p.dateContacted)}" style="border:none;background:transparent;padding:0;width:120px"></td>
@@ -1254,10 +1306,10 @@ function renderProspectsView() {
                     <td><input type="number" placeholder="-" data-prospect="${p.id}" data-key="potentialValue" value="${escapeAttr(p.potentialValue || "")}" style="width:90px;border:0.5px solid var(--border);border-radius:4px;padding:4px 6px;background:var(--surface-1)"></td>
                     <td><input data-prospect="${p.id}" data-key="nextStep" value="${escapeAttr(p.nextStep)}" style="border:none;background:transparent;padding:0;width:200px"></td>
                     <td><div class="small">${escapeHTML(p.source)}</div></td>
-                    <td><button class="btn ghost sm" data-action="delete-prospect" data-id="${p.id}">Remove</button></td>
+                    <td><div style="display:flex;gap:6px;align-items:center">${convertCell}<button class="btn ghost sm" data-action="delete-prospect" data-id="${p.id}">Remove</button></div></td>
                   </tr>
                   ${p.notes ? `<tr><td colspan="7" style="padding-top:0"><div class="small" style="color:var(--text-muted);padding:0 0 8px">${escapeHTML(p.notes)}</div></td></tr>` : ""}
-                `).join("")}
+                `;}).join("")}
               </tbody>
             </table>
           `}
@@ -2525,12 +2577,22 @@ function attachHandlers() {
   const doLogin = () => {
     const el = document.getElementById("pw");
     if (!el) return;
-    if (el.value === PW) { ui.isAuth = true; ui.view = "dashboard"; render(); }
-    else { el.style.borderColor = "var(--danger)"; el.value = ""; el.focus(); var err = document.getElementById("pw-error"); if (err) { err.style.display = "block"; setTimeout(function(){ err.style.display = "none"; }, 2000); } }
+    if (el.value === PW) { ui.isAuth = true; ui.view = "dashboard"; ui.loginError = null; render(); }
+    else { ui.loginError = "Wrong password. Try again."; render(); }
   };
   const pwEl = document.getElementById("pw");
   if (pwEl) {
     pwEl.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doLogin(); } });
+  }
+  const fbEmailEl = document.getElementById("login-email");
+  const fbPassEl = document.getElementById("login-password");
+  if (fbPassEl) {
+    var doFbLogin = function() {
+      var btn = document.querySelector('[data-action="fb-login"]');
+      if (btn) btn.click();
+    };
+    fbPassEl.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doFbLogin(); } });
+    if (fbEmailEl) fbEmailEl.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doFbLogin(); } });
   }
 
   if (window.__actionHandler) {
@@ -2543,7 +2605,23 @@ function attachHandlers() {
     const action = el.dataset.action;
       if (action === "login") {
         doLogin();
-      } else if (action === "logout") { if (isClientView) return; ui.isAuth = false; ui.view = "login"; render(); }
+      } else if (action === "fb-login") {
+        var emailEl = document.getElementById("login-email");
+        var passEl = document.getElementById("login-password");
+        var emailVal = emailEl ? emailEl.value.trim() : "";
+        var passVal = passEl ? passEl.value : "";
+        try {
+          await auth.signInWithEmailAndPassword(emailVal, passVal);
+          ui.isAuth = true; ui.view = "dashboard"; ui.loginError = null; render();
+        } catch (err) {
+          ui.loginError = "Incorrect email or password.";
+          render();
+        }
+      } else if (action === "logout") {
+        if (isClientView) return;
+        if (useFirebase && auth) { auth.signOut(); }
+        ui.isAuth = false; ui.view = "login"; render();
+      }
       else if (action === "new-client") { ui.modal = { type: "new-client" }; render(); }
       else if (action === "delete-client") {
         var cl = state.clients[el.dataset.id];
@@ -2563,6 +2641,26 @@ function attachHandlers() {
           nextStep: "", source: "Manually added", notes: "", potentialValue: ""
         });
         saveState(); render();
+      }
+      else if (action === "convert-prospect") {
+        var prospect = state.prospects.find(function(x) { return x.id === el.dataset.id; });
+        if (!prospect) return;
+        var companyName = (prospect.company || prospect.name || "New Engagement").trim();
+        var alreadyExists = Object.values(state.clients).some(function(c) { return c.name.trim().toLowerCase() === companyName.toLowerCase(); });
+        if (alreadyExists) {
+          alert(companyName + " already has an engagement. Use \"Open engagement\" instead of creating a duplicate.");
+          return;
+        }
+        if (!confirm("Convert " + prospect.name + " (" + companyName + ") to a new engagement? This creates a New Engagement record and marks the prospect Converted.")) return;
+        var newC = newClient(companyName, "7-day");
+        newC.intake.pocName = prospect.name || "";
+        newC.intake.pocEmail = prospect.email || "";
+        migrateClient(newC);
+        state.clients[newC.id] = newC;
+        prospect.status = "Converted";
+        await saveState();
+        ui.view = "client"; ui.clientId = newC.id; ui.tab = "intake";
+        render();
       }
       else if (action === "delete-prospect") {
         var pr = state.prospects.find(function(x) { return x.id === el.dataset.id; });
@@ -2820,27 +2918,27 @@ function attachHandlers() {
 function escapeHTML(s) { return String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
 function escapeAttr(s) { return escapeHTML(s); }
 
+function applyClientViewRouting() {
+  var params = new URLSearchParams(window.location.search);
+  var cid = params.get("client");
+  if (cid && state.clients[cid] && !ui.isAuth) {
+    isClientView = true;
+    clientViewId = cid;
+    ui.clientId = cid;
+    ui.view = "client";
+    if (!ui.tab || ui.tab === "offers" || ui.tab === "intake" || ui.tab === "proposal") ui.tab = "overview";
+  }
+}
+
 (async function init() {
   initFirebase();
-  if (!useFirebase) await loadState();
-  else {
-    // Give Firebase a moment to load
-    await new Promise(function(r) { setTimeout(r, 500); });
-    if (!state.clients || Object.keys(state.clients).length === 0) {
-      await loadState();
-    }
+  if (!useFirebase) {
+    await loadState();
   }
+  // When useFirebase is true, clientsRef.on("value", ...) in initFirebase() populates
+  // state.clients reactively and calls render() itself once data arrives - no blind wait needed.
 
-  // Detect client view from URL
-  var params = new URLSearchParams(window.location.search);
-  clientViewId = params.get("client");
-  if (clientViewId && state.clients[clientViewId]) {
-    isClientView = true;
-    ui.clientId = clientViewId;
-    ui.view = "client";
-    ui.tab = "overview";
-  }
-
+  applyClientViewRouting();
   render();
 })();
 </script>
