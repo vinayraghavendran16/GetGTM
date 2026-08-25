@@ -399,6 +399,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>
 const STORAGE_KEY = "getgtm_tracker_v9";
 const PW = "getgtm";
@@ -530,6 +531,49 @@ var FIREBASE_CONFIG = {
   messagingSenderId: "67031319371",
   appId: "1:67031319371:web:038747a95c8add7231dece"
 };
+
+// ===== NOTIFICATIONS CONFIG =====
+// Fill these in once Slack + EmailJS are set up. Leave blank to skip that channel silently.
+var NOTIFY_CONFIG = {
+  slackWebhookUrl: "",          // https://hooks.slack.com/services/...
+  emailjsServiceId: "service_uzpb9qo",
+  emailjsTemplateId: "template_vbu7lx5",
+  emailjsPublicKey: "chROI2ESoa5Oj9ViB",
+  emailRecipients: ["vinay@getgtm.ai"],   // testing list - add more as needed
+};
+
+if (NOTIFY_CONFIG.emailjsPublicKey && typeof emailjs !== "undefined") {
+  try { emailjs.init(NOTIFY_CONFIG.emailjsPublicKey); } catch (e) { console.log("EmailJS init failed:", e.message); }
+}
+
+async function notifyTeam(title, message) {
+  // Slack
+  if (NOTIFY_CONFIG.slackWebhookUrl) {
+    try {
+      await fetch(NOTIFY_CONFIG.slackWebhookUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "*" + title + "*\n" + message })
+      });
+    } catch (e) { console.log("Slack notify failed:", e.message); }
+  } else {
+    console.log("[notifyTeam] Slack webhook not configured, skipping. Would have sent:", title, message);
+  }
+
+  // Email via EmailJS
+  if (NOTIFY_CONFIG.emailjsServiceId && NOTIFY_CONFIG.emailjsTemplateId && NOTIFY_CONFIG.emailjsPublicKey && typeof emailjs !== "undefined") {
+    for (const to of NOTIFY_CONFIG.emailRecipients) {
+      try {
+        await emailjs.send(NOTIFY_CONFIG.emailjsServiceId, NOTIFY_CONFIG.emailjsTemplateId, {
+          title: title, message: message, to_email: to
+        });
+      } catch (e) { console.log("EmailJS send failed for", to, ":", e.message); }
+    }
+  } else {
+    console.log("[notifyTeam] EmailJS not configured, skipping. Would have emailed:", NOTIFY_CONFIG.emailRecipients.join(", "));
+  }
+}
 
 var db = null;
 var dbRef = null;
@@ -2724,6 +2768,11 @@ function attachHandlers() {
         cl.sow.status = "Drafting";
         syncTimelineFromDelivery(cl);
         await saveState(); render();
+        notifyTeam(
+          "Proposal approved: " + cl.name,
+          cl.name + "'s proposal was approved on " + cl.proposal.approvedDate + ". SOW is now drafting.\n" +
+          window.location.origin + window.location.pathname + "?client=" + cl.id
+        );
       }
       else if (action === "save-intake") {
         const cl = state.clients[ui.clientId];
