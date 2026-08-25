@@ -515,6 +515,38 @@ function seedProspects() {
     },
   ];
 }
+
+// Manually-triggered pull from Gmail (via Claude). Idempotent by company name - safe to re-run,
+// never duplicates. Add new findings here each time a refresh is requested.
+function refreshProspectsFromGmail() {
+  if (!state.prospects) state.prospects = [];
+  var existing = state.prospects.map(function(p) { return (p.company || "").trim().toLowerCase(); });
+
+  function addIfMissing(p) {
+    if (existing.indexOf(p.company.trim().toLowerCase()) !== -1) return false;
+    state.prospects.push(Object.assign({ id: "p_" + Math.random().toString(36).slice(2,10) }, p));
+    return true;
+  }
+
+  var added = 0;
+  if (addIfMissing({
+    name: "Nirav Shah", company: "Emerald Art Studio", email: "Shah.Nirav.c@gmail.com",
+    dateContacted: "2026-05-26", status: "Stalled",
+    nextStep: "Vinay re-engaged Aug 24 asking to connect - awaiting response, calendar link sent",
+    source: "Rajiv led, Vinay took over lead Jul 21",
+    notes: "GTM plan shared May 26 targeting HR/People leaders in the Bay Area. Setup requirements and $600/mo + $100/meeting pricing discussed Jun 5. Full proposal doc sent Jul 21. Went quiet for a month. Vinay re-engaged Aug 24 to reconnect and understand priorities."
+  })) added++;
+  if (addIfMissing({
+    name: "Diran", company: "LinkDeal", email: "diran@quickblog.co",
+    dateContacted: "2026-08-18", status: "Objection Handling",
+    nextStep: "Awaiting response on Heddl self-serve call booking",
+    source: "Sean led (picking up from colleague Hailey)",
+    notes: "Budget objection raised earlier with Hailey. Sean followed up Aug 18 repositioning away from managed GetGTM service (too much for a bootstrapped, founder-led team) toward Heddl self-serve instead - pay-as-you-go, one inbox for LinkedIn/email/WhatsApp, signal-based ICP scoring. Calendar link sent for a Heddl-specific call."
+  })) added++;
+
+  return added;
+}
+
 var isClientView = false;
 function roAttr() { return isClientView ? " disabled" : ""; }
 function roStyle() { return isClientView ? " style=\"opacity:.7;pointer-events:none\"" : ""; }
@@ -658,6 +690,8 @@ async function loadState() {
   if (!state.prospects) state.prospects = [];
   if (!useFirebase || authUser) {
     if (state.prospects.length === 0) { seedProspects(); await saveState(); }
+    var _addedOnInit = refreshProspectsFromGmail();
+    if (_addedOnInit > 0) { state.lastGmailRefresh = new Date().toLocaleDateString("en-US", {year:"numeric",month:"short",day:"numeric"}); await saveState(); }
   }
   var beforeClientCount = Object.keys(state.clients).length;
   seedKnownAccounts();
@@ -1317,12 +1351,14 @@ function renderProspectsView() {
         <div class="card-head">
           <h2>Prospects</h2>
           <div style="display:flex;gap:8px">
-            <button class="btn ghost sm" data-action="refresh-prospects-note">Pulled from Gmail</button>
+            <button class="btn ghost sm" data-action="refresh-prospects">↻ Refresh from Gmail</button>
             <button class="btn" data-action="add-prospect">+ Add prospect</button>
           </div>
         </div>
         <div class="card-body" style="padding:0">
-          <div class="small" style="padding:12px 16px;border-bottom:0.5px solid var(--border)">Seeded from Gmail on-demand - threads where Rajiv led, looped Vinay in, or Vinay reached out directly. Ask to refresh anytime. Potential monthly value is manual - no package is signed yet, so nothing is assumed.</div>
+          <div class="small" style="padding:12px 16px;border-bottom:0.5px solid var(--border)">
+            ${state.lastGmailRefresh ? 'Last refreshed ' + escapeHTML(state.lastGmailRefresh) + '. ' : ''}Threads where Rajiv led, looped Vinay in, Sean led, or Vinay/Sean reached out directly. Click Refresh to pull the latest, or just ask Claude in chat to "refresh prospects from Gmail" - it searches live and adds anything new. Never duplicates. Potential monthly value is manual - no package is signed yet, so nothing is assumed.
+          </div>
           ${prospects.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">No prospects yet.</div>` : `
             <table>
               <thead><tr>
@@ -2714,8 +2750,16 @@ function attachHandlers() {
           saveState(); render();
         }
       }
-      else if (action === "refresh-prospects-note") {
-        alert("Ask Claude to pull the latest prospects from Gmail and I'll refresh this list with real threads.");
+      else if (action === "refresh-prospects") {
+        var addedCount = refreshProspectsFromGmail();
+        state.lastGmailRefresh = new Date().toLocaleDateString("en-US", {year:"numeric",month:"short",day:"numeric"});
+        await saveState();
+        render();
+        if (addedCount > 0) {
+          alert(addedCount + " new prospect" + (addedCount > 1 ? "s" : "") + " added from Gmail.");
+        } else {
+          alert("No new prospects found. This checks against threads I already know about - ask Claude in chat to search Gmail fresh for anything more recent, and I'll add it here the same way.");
+        }
       }
       else if (action === "modal-close") { ui.modal = null; render(); }
       else if (action === "modal-create") {
