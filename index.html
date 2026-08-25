@@ -1951,7 +1951,7 @@ function buildProposalHTML(c, isForPDF) {
     '.meta-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:#e5e5e5;border:1px solid #e5e5e5;border-radius:8px;overflow:hidden;margin-bottom:24px}' +
     '.meta-cell{background:#fff;padding:14px 16px}.meta-cell .label{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:4px}.meta-cell .val{font-size:13px;font-weight:600}' +
     '.invest{background:#1c1917;color:#fff;border-radius:8px;padding:16px 20px;margin-bottom:30px}.invest .il{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#a855f7;margin-bottom:6px}.invest .iv{font-size:20px;font-weight:700}' +
-    '.sect{margin-bottom:24px}.sect-num{display:inline-block;background:#a855f7;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;margin-right:8px}' +
+    '.sect{margin-bottom:24px;page-break-inside:avoid;break-inside:avoid}.sect-num{display:inline-block;background:#a855f7;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;margin-right:8px}' +
     '.sect h2{font-size:18px;font-weight:700;margin:0 0 4px;display:inline}.sect-line{height:1px;background:#e5e5e5;margin:8px 0 14px}' +
     'table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px}th{text-align:left;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#888;padding:8px 12px;border-bottom:1px solid #ddd}' +
     'td{padding:8px 12px;border-bottom:1px solid #eee}td strong{font-weight:600}' +
@@ -2021,7 +2021,7 @@ function buildProposalHTML(c, isForPDF) {
   html += '</div>';
 
   // 05 Deliverables (static)
-  html += '<div class="sect' + (isForPDF ? ' page-break' : '') + '"><span class="sect-num">05</span><h2>Deliverables & Platform</h2><div class="sect-line"></div>' +
+  html += '<div class="sect"><span class="sect-num">05</span><h2>Deliverables & Platform</h2><div class="sect-line"></div>' +
     '<table><thead><tr><th>Deliverable</th><th>Description</th></tr></thead><tbody>' +
     '<tr><td><strong>ICP & Signal Mapping</strong></td><td>Buyer-tier definition and signal sources configured in Heddl.app.</td></tr>' +
     '<tr><td><strong>Prospect List Build & Enrichment</strong></td><td>Verified accounts and contacts across ICP tiers, enriched with emails and LinkedIn profiles.</td></tr>' +
@@ -2045,7 +2045,7 @@ function buildProposalHTML(c, isForPDF) {
   var termEndStr = termEnd.toLocaleDateString("en-US", {year:"numeric",month:"long",day:"numeric"});
 
   // 06 Commercial Terms & Payment Schedule
-  html += '<div class="sect' + (isForPDF ? ' page-break' : '') + '"><span class="sect-num">06</span><h2>Commercial Terms & Payment Schedule</h2><div class="sect-line"></div>' +
+  html += '<div class="sect"><span class="sect-num">06</span><h2>Commercial Terms & Payment Schedule</h2><div class="sect-line"></div>' +
     '<h3 style="font-size:13px;font-weight:600;margin:0 0 8px">6.1 Month 1 - Onboarding & Setup ($' + monthlyBase.toLocaleString() + ')</h3>' +
     '<table><thead><tr><th>#</th><th>Milestone</th><th>Amount</th><th>Due</th></tr></thead><tbody>' +
     '<tr><td>1</td><td>Advance on signing of the agreement</td><td><strong>$' + advanceFee.toLocaleString() + '</strong></td><td>On date of signing</td></tr>' +
