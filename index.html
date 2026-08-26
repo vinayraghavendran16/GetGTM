@@ -539,9 +539,9 @@ function seedProspects() {
     {
       id: "p_" + Math.random().toString(36).slice(2,10),
       name: "Dinesh", company: "Inspiration Digital", email: "dinesh@inspirationdigital.co",
-      dateContacted: "2026-07-16", status: "Stalled",
-      nextStep: "Send short proposal - overdue, thread gone quiet since Jul 23", source: "Rajiv led, Vinay cc'd",
-      notes: "Partners hesitant due to past bad experience with cold outbound vendors. Objection addressed Jul 22. Dinesh requested a short proposal Jul 23 to share with partners. No response since."
+      dateContacted: "2026-07-16", status: "Closed Lost",
+      nextStep: "Closed - no further action", source: "Rajiv led, Vinay cc'd",
+      notes: "Partners hesitant due to past bad experience with cold outbound vendors. Objection addressed Jul 22. Dinesh requested a short proposal Jul 23 to share with partners. No response since - deal closed."
     },
   ];
 }
@@ -609,6 +609,11 @@ function refreshProspectsFromGmail() {
     status: "Follow-up Sent",
     nextStep: "Awaiting response to specific opportunities/engagement models sent Aug 25",
     notes: "Howard introduced Vinay Aug 21 via Heddl's partner channel, with a prepared growth plan deck attached. Vinay followed up directly Aug 25 with mapped new-market entry opportunities and engagement models covering outbound, inbound, and AEO."
+  })) updated++;
+  if (updateIfExists("Inspiration Digital", {
+    status: "Closed Lost",
+    nextStep: "Closed - no further action",
+    notes: "Partners hesitant due to past bad experience with cold outbound vendors. Objection addressed Jul 22. Dinesh requested a short proposal Jul 23 to share with partners. No response since - deal closed."
   })) updated++;
 
   return { added: added, updated: updated };
@@ -1573,15 +1578,15 @@ function renderNewEngagementsView(clients) {
 }
 
 var PROSPECT_STATUSES = ["New", "Contacted", "Follow-up Sent", "In Conversation", "Objection Handling",
-  "Proposal Requested", "Kickoff Scheduled", "Stalled", "Not a Fit", "Converted"];
+  "Proposal Requested", "Kickoff Scheduled", "Stalled", "Closed Lost", "Not a Fit", "Converted"];
 
 function renderProspectsView() {
   const prospects = (state.prospects || []).slice().sort((a,b) => (b.dateContacted||"").localeCompare(a.dateContacted||""));
-  const active = prospects.filter(p => !["Stalled","Not a Fit","Converted"].includes(p.status)).length;
+  const active = prospects.filter(p => !["Stalled","Closed Lost","Not a Fit","Converted"].includes(p.status)).length;
   const stalled = prospects.filter(p => p.status === "Stalled").length;
   const converted = prospects.filter(p => p.status === "Converted").length;
   const potentialMRR = prospects
-    .filter(p => !["Stalled","Not a Fit","Converted"].includes(p.status))
+    .filter(p => !["Stalled","Closed Lost","Not a Fit","Converted"].includes(p.status))
     .reduce((sum, p) => sum + (parseFloat(p.potentialValue) || 0), 0);
 
   return `
@@ -1728,7 +1733,7 @@ function renderReportingView() {
   }).join("");
 
   var prospectPotentialMRR = (state.prospects || [])
-    .filter(function(p) { return ["Stalled","Not a Fit","Converted"].indexOf(p.status) === -1; })
+    .filter(function(p) { return ["Stalled","Closed Lost","Not a Fit","Converted"].indexOf(p.status) === -1; })
     .reduce(function(sum, p) { var v = parseFloat(p.potentialValue); return sum + (isNaN(v) ? 0 : v); }, 0);
 
   return `
