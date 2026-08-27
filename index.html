@@ -517,7 +517,7 @@ var REVENUE_CONTRACTS = {
   },
 };
 
-let state = { clients: {} };
+let state = { clients: {}, prospects: [], responses: [], revenueActuals: {} };
 let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: null, dashboardTab: "clients" };
 
 function seedProspects() {
@@ -684,7 +684,7 @@ var dbRef = null;
 var useFirebase = false;
 var auth = null;
 var authUser = null;
-var clientsRef = null, prospectsRef = null, revenueActualsRef = null;
+var clientsRef = null, prospectsRef = null, revenueActualsRef = null, responsesRef = null;
 
 function initFirebase() {
   try {
@@ -695,6 +695,7 @@ function initFirebase() {
       clientsRef = db.ref("getgtm_tracker/clients");
       prospectsRef = db.ref("getgtm_tracker/prospects");
       revenueActualsRef = db.ref("getgtm_tracker/revenueActuals");
+      responsesRef = db.ref("getgtm_tracker/responses");
       auth = firebase.auth();
       useFirebase = true;
 
@@ -734,9 +735,14 @@ function initFirebase() {
             state.revenueActuals = snapshot.val() || {};
             if (!window._fbSaveInProgress) render();
           }, function(err) { console.log("revenueActuals read error:", err.message); });
+          responsesRef.on("value", function(snapshot) {
+            state.responses = snapshot.val() || [];
+            if (!window._fbSaveInProgress) render();
+          }, function(err) { console.log("responses read error:", err.message); });
         } else {
           prospectsRef.off();
           revenueActualsRef.off();
+          responsesRef.off();
         }
         render();
       });
@@ -772,6 +778,7 @@ async function loadState() {
   if (!state.clients) state.clients = {};
   if (!state.revenueActuals) state.revenueActuals = {};
   if (!state.prospects) state.prospects = [];
+  if (!state.responses) state.responses = [];
   // Firebase path seeds via the reactive listeners in initFirebase() instead - this block only
   // runs for the localStorage fallback (useFirebase === false).
   if (!useFirebase) {
@@ -794,6 +801,7 @@ async function saveState(scope) {
       if (!scope || scope === "clients") writes.push(clientsRef.set(state.clients));
       if (authUser && (!scope || scope === "prospects")) writes.push(prospectsRef.set(state.prospects || []));
       if (authUser && (!scope || scope === "revenueActuals")) writes.push(revenueActualsRef.set(state.revenueActuals || {}));
+      if (authUser && (!scope || scope === "responses")) writes.push(responsesRef.set(state.responses || []));
       await Promise.all(writes);
       setTimeout(function() { window._fbSaveInProgress = false; }, 500);
     }
@@ -1541,9 +1549,11 @@ function renderDashboard() {
         <button data-action="dtab" data-dtab="new-engagements" class="${dTab==='new-engagements'?'active':''}">New Engagements</button>
         <button data-action="dtab" data-dtab="clients" class="${dTab==='clients'?'active':''}">Clients</button>
         <button data-action="dtab" data-dtab="prospects" class="${dTab==='prospects'?'active':''}">Prospects</button>
+        <button data-action="dtab" data-dtab="responses" class="${dTab==='responses'?'active':''}">Responses</button>
         <button data-action="dtab" data-dtab="reporting" class="${dTab==='reporting'?'active':''}">Reporting</button>
       </div>
       ${dTab === "prospects" ? renderProspectsView()
+        : dTab === "responses" ? renderResponsesView()
         : dTab === "reporting" ? renderReportingView()
         : dTab === "new-engagements" ? renderNewEngagementsView(newEngagements)
         : renderClientsView(signedClients, active, launched, atRisk)}
@@ -1630,6 +1640,8 @@ function renderNewEngagementsView(clients) {
   `;
 }
 
+var RESPONSE_STATUSES = ["Positive Reply", "Meeting Booked", "No Fit", "Not Interested"];
+
 var PROSPECT_STATUSES = ["New", "Contacted", "Follow-up Sent", "In Conversation", "Objection Handling",
   "Proposal Requested", "Kickoff Scheduled", "Stalled", "Closed Lost", "Not a Fit", "Converted"];
 
@@ -1702,10 +1714,70 @@ function renderProspectsView() {
   `;
 }
 
+function renderResponsesView() {
+  var responses = (state.responses || []).slice().sort((a,b) => (b.date||"").localeCompare(a.date||""));
+  var counts = { "Positive Reply": 0, "Meeting Booked": 0, "No Fit": 0, "Not Interested": 0 };
+  responses.forEach(function(r) { if (counts[r.status] !== undefined) counts[r.status]++; });
+  var clientNames = Object.values(state.clients).map(function(c) { return c.name; }).sort();
+
+  return `
+      <div class="kpis">
+        <div class="kpi"><div class="label">Total responses logged</div><div class="value">${responses.length}</div></div>
+        <div class="kpi"><div class="label">Positive replies</div><div class="value" style="color:var(--success)">${counts["Positive Reply"]}</div></div>
+        <div class="kpi"><div class="label">Meetings booked</div><div class="value" style="color:var(--brand)">${counts["Meeting Booked"]}</div></div>
+        <div class="kpi"><div class="label">No fit / Not interested</div><div class="value" style="color:var(--text-secondary)">${counts["No Fit"] + counts["Not Interested"]}</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Response Tracker</h2>
+          <div style="display:flex;gap:8px">
+            <button class="btn ghost sm" data-action="check-response-drive">📷 Check Drive for screenshots</button>
+            <button class="btn" data-action="add-response">+ Add response</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div class="small" style="padding:12px 16px;border-bottom:0.5px solid var(--border)">
+            Upload reply screenshots to a shared Drive folder - ask Claude to check it and it will read each screenshot, add a row with date/client/contact/notes filled in, and leave Status blank for you to classify. Status is always a manual call, never auto-set.
+          </div>
+          ${responses.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">No responses logged yet.</div>` : `
+            <table>
+              <thead><tr><th>Date</th><th>Client</th><th>Contact</th><th>Screenshot ref</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+              <tbody>
+                ${responses.map(function(r, i) { return `
+                  <tr>
+                    <td><input type="date" data-response="${r.id}" data-key="date" value="${escapeAttr(r.date)}" style="border:none;background:transparent;padding:0;width:120px"></td>
+                    <td>
+                      <select data-response="${r.id}" data-key="client" class="del-select">
+                        <option value="">-</option>
+                        ${clientNames.map(function(n) { return `<option ${r.client===n?'selected':''}>${escapeHTML(n)}</option>`; }).join("")}
+                      </select>
+                    </td>
+                    <td><input data-response="${r.id}" data-key="contact" value="${escapeAttr(r.contact)}" placeholder="Name" style="border:none;background:transparent;padding:0;width:130px"></td>
+                    <td><input data-response="${r.id}" data-key="screenshotRef" value="${escapeAttr(r.screenshotRef)}" placeholder="Filename or link" style="border:none;background:transparent;padding:0;width:150px"></td>
+                    <td>
+                      <select data-response="${r.id}" data-key="status" class="del-select">
+                        <option value="">Select...</option>
+                        ${RESPONSE_STATUSES.map(function(s) { return `<option ${r.status===s?'selected':''}>${s}</option>`; }).join("")}
+                      </select>
+                    </td>
+                    <td><input data-response="${r.id}" data-key="notes" value="${escapeAttr(r.notes)}" placeholder="Context" style="border:none;background:transparent;padding:0;width:200px"></td>
+                    <td><button class="btn ghost sm" data-action="delete-response" data-id="${r.id}">&#128465;</button></td>
+                  </tr>
+                `;}).join("")}
+              </tbody>
+            </table>
+          `}
+        </div>
+      </div>
+  `;
+}
+
 function reportKey(clientName, monthLabel) { return clientName + "__" + monthLabel; }
 
 function renderReportingView() {
   if (!state.revenueActuals) state.revenueActuals = {};
+  if (!state.responses) state.responses = [];
   var names = Object.keys(REVENUE_CONTRACTS);
   var today = new Date();
   var ACCOUNT_STATUSES = ["Onboarding", "Active", "At Risk", "Paused", "Renewed", "Churned"];
@@ -1802,6 +1874,7 @@ function renderReportingView() {
       </div>
       <div class="small" style="margin-bottom:16px;color:var(--text-secondary)">MRR sums the current calendar month's contracted base (or actual, if entered) across accounts with status Onboarding, Active, At Risk, or Renewed. MRR max assumes full performance/bonus attainment on those same accounts this month. Potential MRR from prospects is manually entered per prospect (in the Prospects tab) since no package is signed yet - nothing here is assumed. Paused and Churned accounts are excluded from MRR. Set each account's status in its card below - status is only auto-set once; after that it's yours to manage.</div>
       ${renderGoalsAchievedBlock()}
+      ${renderResponseRollupBlock()}
       ${clientBlocks}
   `;
 }
@@ -1891,6 +1964,41 @@ function renderGoalsAchievedBlock() {
     '<table><thead><tr><th>Client</th><th>Line</th><th>Month</th><th>Metric</th><th>Target</th><th>Achieved</th><th>% Achieved</th></tr></thead>' +
     '<tbody>' + tableRows + '</tbody></table>' +
     note +
+    '</div></div>';
+}
+
+function renderResponseRollupBlock() {
+  var responses = state.responses || [];
+  if (responses.length === 0) {
+    return '<div class="card" style="margin-bottom:16px"><div class="card-head"><h2>Response Tracker Summary</h2></div>' +
+      '<div class="card-body"><div class="small" style="color:var(--text-muted)">No responses logged yet. Log them from the Responses tab, or ask Claude to check the response screenshots Drive folder.</div></div></div>';
+  }
+
+  var byClient = {};
+  responses.forEach(function(r) {
+    var key = r.client || "(Unassigned)";
+    if (!byClient[key]) byClient[key] = { "Positive Reply": 0, "Meeting Booked": 0, "No Fit": 0, "Not Interested": 0, total: 0 };
+    if (byClient[key][r.status] !== undefined) byClient[key][r.status]++;
+    byClient[key].total++;
+  });
+
+  var rows = Object.keys(byClient).sort().map(function(client) {
+    var c = byClient[client];
+    return '<tr>' +
+      '<td><strong>' + escapeHTML(client) + '</strong></td>' +
+      '<td>' + c["Positive Reply"] + '</td>' +
+      '<td>' + c["Meeting Booked"] + '</td>' +
+      '<td>' + c["No Fit"] + '</td>' +
+      '<td>' + c["Not Interested"] + '</td>' +
+      '<td><strong>' + c.total + '</strong></td>' +
+      '</tr>';
+  }).join("");
+
+  return '<div class="card" style="margin-bottom:16px">' +
+    '<div class="card-head"><div><h2>Response Tracker Summary</h2><div class="sub">Rolled up from the Responses tab, by client</div></div></div>' +
+    '<div class="card-body" style="padding:0">' +
+    '<table><thead><tr><th>Client</th><th>Positive Reply</th><th>Meeting Booked</th><th>No Fit</th><th>Not Interested</th><th>Total</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table>' +
     '</div></div>';
 }
 
@@ -3151,6 +3259,24 @@ function attachHandlers() {
         });
         saveState(); render();
       }
+      else if (action === "add-response") {
+        if (!state.responses) state.responses = [];
+        state.responses.push({
+          id: "r_" + Math.random().toString(36).slice(2,10),
+          date: new Date().toISOString().slice(0,10), client: "", contact: "",
+          screenshotRef: "", status: "", notes: ""
+        });
+        saveState("responses"); render();
+      }
+      else if (action === "delete-response") {
+        if (confirm("Remove this response? This cannot be undone.")) {
+          state.responses = (state.responses || []).filter(function(r) { return r.id !== el.dataset.id; });
+          saveState("responses"); render();
+        }
+      }
+      else if (action === "check-response-drive") {
+        alert("Ask Claude in chat to check the response screenshots Drive folder. It will read any new screenshots, add a row per reply with date/client/contact/notes filled in, and leave Status blank for you to classify manually.");
+      }
       else if (action === "convert-prospect") {
         var prospect = state.prospects.find(function(x) { return x.id === el.dataset.id; });
         if (!prospect) return;
@@ -3396,6 +3522,17 @@ function attachHandlers() {
       if (!p) return;
       p[el.dataset.key] = el.value;
       if (el.dataset.key === "status") { saveState(); render(); } else { save(); }
+    };
+    el.addEventListener("input", handler);
+    el.addEventListener("change", handler);
+  });
+
+  document.querySelectorAll("[data-response]").forEach(el => {
+    var handler = function() {
+      var r = (state.responses || []).find(function(x) { return x.id === el.dataset.response; });
+      if (!r) return;
+      r[el.dataset.key] = el.value;
+      if (el.dataset.key === "status" || el.dataset.key === "client") { saveState("responses"); render(); } else { save("responses"); }
     };
     el.addEventListener("input", handler);
     el.addEventListener("change", handler);
