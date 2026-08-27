@@ -889,6 +889,7 @@ function migrateClient(c) {
     if (c.goals[m].achievedReplies === undefined) c.goals[m].achievedReplies = "";
     if (c.goals[m].achievedMeetings === undefined) c.goals[m].achievedMeetings = "";
   });
+  if (!Array.isArray(c.goalLines)) c.goalLines = [];
 
   // Patch ICP
   if (!c.icp) c.icp = { geography: "", industry: "", companySize: "", revenue: "", roles: "", exclusions: "", currentAccounts: "", competitors: "" };
@@ -1162,6 +1163,21 @@ function enrichKnownAccounts() {
         billingAddress: "Office #325, Aqariah 2 Commercial Complex, Musa bin Nusair Street, Olaya, Riyadh 11351, KSA" },
       icp: { roles: "CISO, Network Security Manager, Security Architect (Tufin); IAM Manager, CIO, CISO, Digital Transformation Lead (1Kosmos)" },
       sow: { value: "$1,500 Month 1; up to $1,599/mo from Month 2 (base $1,000 + up to $599 performance)" },
+      // Two independent product lines, each with its own KPI thresholds per the signed contract.
+      // No monthly meetings figure is defined separately - a "qualifying response" itself is the
+      // reply expressing intent for a meeting, so only Positive Replies is filled per line.
+      goalLines: [
+        { name: "Tufin", goals: {
+          m1: { replies: "0", meetings: "", achievedReplies: "", achievedMeetings: "" },
+          m2: { replies: "4", meetings: "", achievedReplies: "", achievedMeetings: "" },
+          m3: { replies: "4", meetings: "", achievedReplies: "", achievedMeetings: "" },
+        }},
+        { name: "1Kosmos", goals: {
+          m1: { replies: "0", meetings: "", achievedReplies: "", achievedMeetings: "" },
+          m2: { replies: "4", meetings: "", achievedReplies: "", achievedMeetings: "" },
+          m3: { replies: "4", meetings: "", achievedReplies: "", achievedMeetings: "" },
+        }},
+      ],
     },
     "CloudLeap": {
       intake: { termType: "Month-to-month from signing", contractRef: "Final CloudLeap GTM Services Agreement 18072026.pdf",
@@ -1170,6 +1186,13 @@ function enrichKnownAccounts() {
         billingAddress: "100 Summit Dr, Burlington, MA 01803, USA" },
       icp: { roles: "VP/Director Supply Chain & Logistics, Director Transportation/Distribution, VP/Director IT ERP & Systems, VP Operations & Fulfillment, Warehouse/DC Systems Managers" },
       sow: { value: "$750 Month 1; from Month 2, $500 base + up to $1,000 tranches (max $1,500 fixed) + uncapped bonuses" },
+      // Tranche 2 (the full/max threshold) used as the target - Tranche 1 (2 meetings/2 replies) is a
+      // lower partial threshold along the way, noted in packageNotes. No KPI in Month 1 (fixed fee only).
+      goals: {
+        m1: { replies: "0", meetings: "0" },
+        m2: { replies: "8", meetings: "5" },
+        m3: { replies: "8", meetings: "5" },
+      },
     },
     "EduInfra": {
       intake: { termType: "3 months fixed (Jul 27 - Oct 31), renewable", termEndDate: "2026-10-31",
@@ -1179,6 +1202,12 @@ function enrichKnownAccounts() {
         billingAddress: "WeWork, Krishe Emerald, Kondapur Main Road, Gachibowli, Hyderabad, Telangana 500084, India" },
       icp: { geography: "India" },
       sow: { value: "$800/mo base + $799 per 100 qualifying replies + TBD success bonus at 300 replies across term" },
+      // 100 qualifying replies/month, every month - no separate meetings figure in this contract.
+      goals: {
+        m1: { replies: "100", meetings: "" },
+        m2: { replies: "100", meetings: "" },
+        m3: { replies: "100", meetings: "" },
+      },
     },
     "SPRY": {
       intake: { termType: "2-month pilot (Aug 5 - Oct 4)", termEndDate: "2026-10-04",
@@ -1188,6 +1217,14 @@ function enrichKnownAccounts() {
         billingAddress: "1207 Del Ave #481, Wilmington, DE 19806, USA" },
       icp: { industry: "Healthcare practice management (physical therapy)" },
       sow: { value: "$1,250 Month 1; $750 base + up to $750 performance incentive Month 2 (max $1,500)" },
+      // 3+ qualified meetings is a CUMULATIVE target across the full 2-month pilot, assessed at the
+      // end of Month 2 - not a per-month figure. Placed on M2 to match when it's actually evaluated.
+      // No monthly replies figure defined in this contract.
+      goals: {
+        m1: { replies: "", meetings: "0" },
+        m2: { replies: "", meetings: "3" },
+        m3: { replies: "", meetings: "" },
+      },
     },
   };
 
@@ -1199,6 +1236,18 @@ function enrichKnownAccounts() {
     if (f.people) Object.keys(f.people).forEach(function(k) { if (!c.people[k]) c.people[k] = f.people[k]; });
     if (f.icp) Object.keys(f.icp).forEach(function(k) { if (!c.icp[k]) c.icp[k] = f.icp[k]; });
     if (f.sow) Object.keys(f.sow).forEach(function(k) { if (!c.sow[k]) c.sow[k] = f.sow[k]; });
+    // Fill goal targets only where currently blank - never overwrite a manually entered number.
+    if (f.goals) {
+      ["m1","m2","m3"].forEach(function(m) {
+        if (!c.goals[m].replies && f.goals[m].replies) c.goals[m].replies = f.goals[m].replies;
+        if (!c.goals[m].meetings && f.goals[m].meetings) c.goals[m].meetings = f.goals[m].meetings;
+      });
+    }
+    // Multi-line KPI structure (e.g. Securotix's Tufin + 1Kosmos) - only set up once, never overwrites
+    // existing lines or their entered values on subsequent enrichment passes.
+    if (f.goalLines && (!c.goalLines || c.goalLines.length === 0)) {
+      c.goalLines = JSON.parse(JSON.stringify(f.goalLines));
+    }
   });
 }
 
@@ -1759,18 +1808,50 @@ function renderReportingView() {
 
 function renderGoalsAchievedBlock() {
   var rows = [];
+  var multiLineClients = [];
   Object.values(state.clients).forEach(function(c) {
     if (!c.proposal || c.proposal.stage !== "approved") return;
-    if (!c.goals) return;
-    ["m1","m2","m3"].forEach(function(m) {
-      var gm = c.goals[m];
-      if (!gm) return;
-      [["Positive replies", gm.replies, gm.achievedReplies], ["Meetings booked", gm.meetings, gm.achievedMeetings]].forEach(function(pair) {
-        var metric = pair[0], target = pair[1], achieved = pair[2];
-        if (!target && !achieved) return; // skip rows with nothing set
-        rows.push({ client: c.name, month: m.toUpperCase(), metric: metric, target: target, achieved: achieved });
+
+    if (c.goalLines && c.goalLines.length > 0) {
+      multiLineClients.push(c.name);
+      // Per-line rows
+      c.goalLines.forEach(function(line) {
+        ["m1","m2","m3"].forEach(function(m) {
+          var gm = line.goals[m];
+          if (!gm) return;
+          [["Positive replies", gm.replies, gm.achievedReplies], ["Meetings booked", gm.meetings, gm.achievedMeetings]].forEach(function(pair) {
+            var metric = pair[0], target = pair[1], achieved = pair[2];
+            if (!target && !achieved) return;
+            rows.push({ client: c.name, line: line.name, month: m.toUpperCase(), metric: metric, target: target, achieved: achieved });
+          });
+        });
       });
-    });
+      // Combined rollup row per month/metric, summed across all lines
+      ["m1","m2","m3"].forEach(function(m) {
+        [["Positive replies", "replies", "achievedReplies"], ["Meetings booked", "meetings", "achievedMeetings"]].forEach(function(pair) {
+          var metric = pair[0], tKey = pair[1], aKey = pair[2];
+          var tSum = 0, aSum = 0, anyT = false, anyA = false;
+          c.goalLines.forEach(function(line) {
+            var t = parseFloat(line.goals[m][tKey]), a = parseFloat(line.goals[m][aKey]);
+            if (!isNaN(t)) { tSum += t; anyT = true; }
+            if (!isNaN(a)) { aSum += a; anyA = true; }
+          });
+          if (!anyT && !anyA) return;
+          rows.push({ client: c.name, line: "Combined", month: m.toUpperCase(), metric: metric,
+            target: anyT ? String(tSum) : "", achieved: anyA ? String(aSum) : "", isRollup: true });
+        });
+      });
+    } else if (c.goals) {
+      ["m1","m2","m3"].forEach(function(m) {
+        var gm = c.goals[m];
+        if (!gm) return;
+        [["Positive replies", gm.replies, gm.achievedReplies], ["Meetings booked", gm.meetings, gm.achievedMeetings]].forEach(function(pair) {
+          var metric = pair[0], target = pair[1], achieved = pair[2];
+          if (!target && !achieved) return;
+          rows.push({ client: c.name, line: "-", month: m.toUpperCase(), metric: metric, target: target, achieved: achieved });
+        });
+      });
+    }
   });
 
   if (rows.length === 0) {
@@ -1786,8 +1867,9 @@ function renderGoalsAchievedBlock() {
       var color = pct >= 100 ? "var(--success)" : pct >= 60 ? "var(--brand)" : "var(--danger)";
       pctHtml = '<strong style="color:' + color + '">' + pct + '%</strong>';
     }
-    return '<tr>' +
+    return '<tr' + (r.isRollup ? ' style="background:var(--surface-1);font-weight:600"' : '') + '>' +
       '<td><strong>' + escapeHTML(r.client) + '</strong></td>' +
+      '<td>' + escapeHTML(r.line || "-") + '</td>' +
       '<td>' + escapeHTML(r.month) + '</td>' +
       '<td>' + escapeHTML(r.metric) + '</td>' +
       '<td>' + escapeHTML(r.target || "-") + '</td>' +
@@ -1796,11 +1878,19 @@ function renderGoalsAchievedBlock() {
       '</tr>';
   }).join("");
 
+  var note = multiLineClients.length > 0
+    ? '<div class="small" style="padding:10px 16px;border-top:0.5px solid var(--border);color:var(--text-muted)">' +
+      '<strong>' + multiLineClients.map(escapeHTML).join(", ") + '</strong> ' + (multiLineClients.length === 1 ? "has" : "have") +
+      ' independent KPI lines per their signed contract (separate product lines, each assessed independently). ' +
+      'Each line is shown individually, with a <strong>Combined</strong> row summing both for a portfolio-level view.</div>'
+    : '';
+
   return '<div class="card" style="margin-bottom:16px">' +
     '<div class="card-head"><div><h2>Goals vs. Achieved</h2><div class="sub">Every client with monthly targets set, across M1/M2/M3</div></div></div>' +
     '<div class="card-body" style="padding:0">' +
-    '<table><thead><tr><th>Client</th><th>Month</th><th>Metric</th><th>Target</th><th>Achieved</th><th>% Achieved</th></tr></thead>' +
+    '<table><thead><tr><th>Client</th><th>Line</th><th>Month</th><th>Metric</th><th>Target</th><th>Achieved</th><th>% Achieved</th></tr></thead>' +
     '<tbody>' + tableRows + '</tbody></table>' +
+    note +
     '</div></div>';
 }
 
@@ -2156,6 +2246,39 @@ function renderIntakeTab(c) {
   `;
 }
 
+function goalsPctCell(target, achieved) {
+  var tNum = parseFloat(target), aNum = parseFloat(achieved);
+  if (!tNum || isNaN(tNum) || isNaN(aNum)) return '<span class="small" style="color:var(--text-muted)">-</span>';
+  var pct = Math.round((aNum / tNum) * 100);
+  var color = pct >= 100 ? "var(--success)" : pct >= 60 ? "var(--brand)" : "var(--danger)";
+  return '<strong style="color:' + color + '">' + pct + '%</strong>';
+}
+
+function renderGoalsTable(goalsObj, lineIndex) {
+  // lineIndex: null/undefined for the single-line (default) case using data-goal="m.metric";
+  // a number for the multi-line case using data-goalline="lineIndex.m.metric"
+  var attrName = lineIndex === undefined || lineIndex === null ? "data-goal" : "data-goalline";
+  function keyFor(m, metric) { return lineIndex === undefined || lineIndex === null ? (m + "." + metric) : (lineIndex + "." + m + "." + metric); }
+  var rows = ["m1","m2","m3"].map(function(m) {
+    var gm = goalsObj[m];
+    var mLabel = m.toUpperCase();
+    return '<tr>' +
+      '<td style="font-weight:600" rowspan="2">' + mLabel + '</td>' +
+      '<td>Positive replies</td>' +
+      '<td><input ' + attrName + '="' + keyFor(m, "replies") + '" value="' + escapeAttr(gm.replies) + '" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>' +
+      '<td><input ' + attrName + '="' + keyFor(m, "achievedReplies") + '" value="' + escapeAttr(gm.achievedReplies) + '" placeholder="Actual" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>' +
+      '<td>' + goalsPctCell(gm.replies, gm.achievedReplies) + '</td>' +
+      '</tr>' +
+      '<tr style="border-bottom:1px solid var(--border)">' +
+      '<td>Meetings booked</td>' +
+      '<td><input ' + attrName + '="' + keyFor(m, "meetings") + '" value="' + escapeAttr(gm.meetings) + '" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>' +
+      '<td><input ' + attrName + '="' + keyFor(m, "achievedMeetings") + '" value="' + escapeAttr(gm.achievedMeetings) + '" placeholder="Actual" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>' +
+      '<td>' + goalsPctCell(gm.meetings, gm.achievedMeetings) + '</td>' +
+      '</tr>';
+  }).join("");
+  return '<table style="margin-bottom:4px"><thead><tr><th>Month</th><th>Metric</th><th>Target</th><th>Achieved</th><th>% Achieved</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
 function renderOverviewTab(c) {
   const p = c.people, g = c.goals, icp = c.icp, ch = c.channel, dr = c.drive, ig = c.integration;
 
@@ -2224,37 +2347,15 @@ function renderOverviewTab(c) {
         <div class="small">Create two folders: <code style="background:var(--surface-1);padding:2px 6px;border-radius:3px">${escapeHTML(c.name)}</code> and inside it <code style="background:var(--surface-1);padding:2px 6px;border-radius:3px">${escapeHTML(c.name)} + Assets</code>, then paste the links.</div>
 
         <h3 style="margin:20px 0 12px;font-size:13px;font-weight:600">Goals (by month)</h3>
-        <table style="margin-bottom:4px">
-          <thead><tr><th>Month</th><th>Metric</th><th>Target</th><th>Achieved</th><th>% Achieved</th></tr></thead>
-          <tbody>
-            ${["m1","m2","m3"].map(function(m) {
-              var gm = g[m];
-              var mLabel = m.toUpperCase();
-              function pctCell(target, achieved) {
-                var tNum = parseFloat(target), aNum = parseFloat(achieved);
-                if (!tNum || isNaN(tNum) || isNaN(aNum)) return '<span class="small" style="color:var(--text-muted)">-</span>';
-                var pct = Math.round((aNum / tNum) * 100);
-                var color = pct >= 100 ? "var(--success)" : pct >= 60 ? "var(--brand)" : "var(--danger)";
-                return '<strong style="color:' + color + '">' + pct + '%</strong>';
-              }
-              return `
-              <tr>
-                <td style="font-weight:600" rowspan="2">${mLabel}</td>
-                <td>Positive replies</td>
-                <td><input data-goal="${m}.replies" value="${escapeAttr(gm.replies)}" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
-                <td><input data-goal="${m}.achievedReplies" value="${escapeAttr(gm.achievedReplies)}" placeholder="Actual" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
-                <td>${pctCell(gm.replies, gm.achievedReplies)}</td>
-              </tr>
-              <tr style="border-bottom:1px solid var(--border)">
-                <td>Meetings booked</td>
-                <td><input data-goal="${m}.meetings" value="${escapeAttr(gm.meetings)}" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
-                <td><input data-goal="${m}.achievedMeetings" value="${escapeAttr(gm.achievedMeetings)}" placeholder="Actual" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
-                <td>${pctCell(gm.meetings, gm.achievedMeetings)}</td>
-              </tr>
-              `;
-            }).join("")}
-          </tbody>
-        </table>
+        ${(c.goalLines && c.goalLines.length > 0) ? `
+          <div class="small" style="margin-bottom:10px;color:var(--text-muted)">This account has ${c.goalLines.length} independent KPI lines per the signed contract - tracked separately below.</div>
+          ${c.goalLines.map(function(line, li) {
+            return '<div style="margin-bottom:16px">' +
+              '<div style="font-size:12px;font-weight:700;color:var(--brand);margin-bottom:6px">' + escapeHTML(line.name) + '</div>' +
+              renderGoalsTable(line.goals, li)
+            + '</div>';
+          }).join("")}
+        ` : renderGoalsTable(g)}
 
         <h3 style="margin:20px 0 12px;font-size:13px;font-weight:600">ICP</h3>
         <div class="grid-2">
@@ -3322,6 +3423,13 @@ function attachHandlers() {
     el.addEventListener("input", () => {
       const [month, metric] = el.dataset.goal.split(".");
       state.clients[ui.clientId].goals[month][metric] = el.value;
+      save();
+    });
+  });
+  document.querySelectorAll("[data-goalline]").forEach(el => {
+    el.addEventListener("input", () => {
+      const [lineIdx, month, metric] = el.dataset.goalline.split(".");
+      state.clients[ui.clientId].goalLines[+lineIdx].goals[month][metric] = el.value;
       save();
     });
   });
