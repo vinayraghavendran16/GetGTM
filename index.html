@@ -885,6 +885,10 @@ function migrateClient(c) {
   if (!c.goals.m1) c.goals.m1 = { replies: "", meetings: "" };
   if (!c.goals.m2) c.goals.m2 = { replies: "", meetings: "" };
   if (!c.goals.m3) c.goals.m3 = { replies: "", meetings: "" };
+  ["m1","m2","m3"].forEach(function(m) {
+    if (c.goals[m].achievedReplies === undefined) c.goals[m].achievedReplies = "";
+    if (c.goals[m].achievedMeetings === undefined) c.goals[m].achievedMeetings = "";
+  });
 
   // Patch ICP
   if (!c.icp) c.icp = { geography: "", industry: "", companySize: "", revenue: "", roles: "", exclusions: "", currentAccounts: "", competitors: "" };
@@ -1217,9 +1221,9 @@ function newClient(name, path) {
     channel: { type: "Slack", link: "" },
     drive: { folderLink: "", assetsLink: "" },
     goals: {
-      m1: { replies: "", meetings: "" },
-      m2: { replies: "", meetings: "" },
-      m3: { replies: "", meetings: "" },
+      m1: { replies: "", meetings: "", achievedReplies: "", achievedMeetings: "" },
+      m2: { replies: "", meetings: "", achievedReplies: "", achievedMeetings: "" },
+      m3: { replies: "", meetings: "", achievedReplies: "", achievedMeetings: "" },
     },
     icp: {
       geography: "", industry: "", companySize: "", revenue: "",
@@ -1748,8 +1752,56 @@ function renderReportingView() {
         <div class="kpi"><div class="label">MRR lost to churn</div><div class="value" style="color:${churnedMRR?'var(--danger)':'inherit'}">$${churnedMRR.toLocaleString()}</div></div>
       </div>
       <div class="small" style="margin-bottom:16px;color:var(--text-secondary)">MRR sums the current calendar month's contracted base (or actual, if entered) across accounts with status Onboarding, Active, At Risk, or Renewed. MRR max assumes full performance/bonus attainment on those same accounts this month. Potential MRR from prospects is manually entered per prospect (in the Prospects tab) since no package is signed yet - nothing here is assumed. Paused and Churned accounts are excluded from MRR. Set each account's status in its card below - status is only auto-set once; after that it's yours to manage.</div>
+      ${renderGoalsAchievedBlock()}
       ${clientBlocks}
   `;
+}
+
+function renderGoalsAchievedBlock() {
+  var rows = [];
+  Object.values(state.clients).forEach(function(c) {
+    if (!c.proposal || c.proposal.stage !== "approved") return;
+    if (!c.goals) return;
+    ["m1","m2","m3"].forEach(function(m) {
+      var gm = c.goals[m];
+      if (!gm) return;
+      [["Positive replies", gm.replies, gm.achievedReplies], ["Meetings booked", gm.meetings, gm.achievedMeetings]].forEach(function(pair) {
+        var metric = pair[0], target = pair[1], achieved = pair[2];
+        if (!target && !achieved) return; // skip rows with nothing set
+        rows.push({ client: c.name, month: m.toUpperCase(), metric: metric, target: target, achieved: achieved });
+      });
+    });
+  });
+
+  if (rows.length === 0) {
+    return '<div class="card" style="margin-bottom:16px"><div class="card-head"><h2>Goals vs. Achieved</h2></div>' +
+      '<div class="card-body"><div class="small" style="color:var(--text-muted)">No monthly goals set yet across any client. Add targets in each client Overview tab and they will show up here.</div></div></div>';
+  }
+
+  var tableRows = rows.map(function(r) {
+    var tNum = parseFloat(r.target), aNum = parseFloat(r.achieved);
+    var pctHtml = '<span class="small" style="color:var(--text-muted)">-</span>';
+    if (tNum && !isNaN(tNum) && !isNaN(aNum)) {
+      var pct = Math.round((aNum / tNum) * 100);
+      var color = pct >= 100 ? "var(--success)" : pct >= 60 ? "var(--brand)" : "var(--danger)";
+      pctHtml = '<strong style="color:' + color + '">' + pct + '%</strong>';
+    }
+    return '<tr>' +
+      '<td><strong>' + escapeHTML(r.client) + '</strong></td>' +
+      '<td>' + escapeHTML(r.month) + '</td>' +
+      '<td>' + escapeHTML(r.metric) + '</td>' +
+      '<td>' + escapeHTML(r.target || "-") + '</td>' +
+      '<td>' + escapeHTML(r.achieved || "-") + '</td>' +
+      '<td>' + pctHtml + '</td>' +
+      '</tr>';
+  }).join("");
+
+  return '<div class="card" style="margin-bottom:16px">' +
+    '<div class="card-head"><div><h2>Goals vs. Achieved</h2><div class="sub">Every client with monthly targets set, across M1/M2/M3</div></div></div>' +
+    '<div class="card-body" style="padding:0">' +
+    '<table><thead><tr><th>Client</th><th>Month</th><th>Metric</th><th>Target</th><th>Achieved</th><th>% Achieved</th></tr></thead>' +
+    '<tbody>' + tableRows + '</tbody></table>' +
+    '</div></div>';
 }
 
 
@@ -2173,23 +2225,34 @@ function renderOverviewTab(c) {
 
         <h3 style="margin:20px 0 12px;font-size:13px;font-weight:600">Goals (by month)</h3>
         <table style="margin-bottom:4px">
-          <thead><tr><th>Month</th><th>Positive replies</th><th>Meetings booked</th></tr></thead>
+          <thead><tr><th>Month</th><th>Metric</th><th>Target</th><th>Achieved</th><th>% Achieved</th></tr></thead>
           <tbody>
-            <tr>
-              <td style="font-weight:500">M1</td>
-              <td><input data-goal="m1.replies" value="${escapeAttr(g.m1.replies)}" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
-              <td><input data-goal="m1.meetings" value="${escapeAttr(g.m1.meetings)}" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
-            </tr>
-            <tr>
-              <td style="font-weight:500">M2</td>
-              <td><input data-goal="m2.replies" value="${escapeAttr(g.m2.replies)}" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
-              <td><input data-goal="m2.meetings" value="${escapeAttr(g.m2.meetings)}" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
-            </tr>
-            <tr>
-              <td style="font-weight:500">M3</td>
-              <td><input data-goal="m3.replies" value="${escapeAttr(g.m3.replies)}" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
-              <td><input data-goal="m3.meetings" value="${escapeAttr(g.m3.meetings)}" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
-            </tr>
+            ${["m1","m2","m3"].map(function(m) {
+              var gm = g[m];
+              var mLabel = m.toUpperCase();
+              function pctCell(target, achieved) {
+                var tNum = parseFloat(target), aNum = parseFloat(achieved);
+                if (!tNum || isNaN(tNum) || isNaN(aNum)) return '<span class="small" style="color:var(--text-muted)">-</span>';
+                var pct = Math.round((aNum / tNum) * 100);
+                var color = pct >= 100 ? "var(--success)" : pct >= 60 ? "var(--brand)" : "var(--danger)";
+                return '<strong style="color:' + color + '">' + pct + '%</strong>';
+              }
+              return `
+              <tr>
+                <td style="font-weight:600" rowspan="2">${mLabel}</td>
+                <td>Positive replies</td>
+                <td><input data-goal="${m}.replies" value="${escapeAttr(gm.replies)}" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
+                <td><input data-goal="${m}.achievedReplies" value="${escapeAttr(gm.achievedReplies)}" placeholder="Actual" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
+                <td>${pctCell(gm.replies, gm.achievedReplies)}</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border)">
+                <td>Meetings booked</td>
+                <td><input data-goal="${m}.meetings" value="${escapeAttr(gm.meetings)}" placeholder="Target" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
+                <td><input data-goal="${m}.achievedMeetings" value="${escapeAttr(gm.achievedMeetings)}" placeholder="Actual" style="padding:5px 8px;border:0.5px solid var(--border);border-radius:4px;width:100%;background:var(--surface-1)"></td>
+                <td>${pctCell(gm.meetings, gm.achievedMeetings)}</td>
+              </tr>
+              `;
+            }).join("")}
           </tbody>
         </table>
 
