@@ -619,6 +619,50 @@ function refreshProspectsFromGmail() {
   return { added: added, updated: updated };
 }
 
+
+// Manually-triggered pull from the response screenshots Drive folder (via Claude). Idempotent by
+// screenshotRef - safe to re-run, never duplicates. Heddl Status is set automatically from what the
+// screenshot shows; Client Status and Confirmed are always left for manual entry.
+function refreshResponsesFromDrive() {
+  if (!state.responses) state.responses = [];
+  var existingRefs = state.responses.map(function(r) { return r.screenshotRef; });
+
+  function addIfMissing(r) {
+    if (existingRefs.indexOf(r.screenshotRef) !== -1) return false;
+    state.responses.push(Object.assign({
+      id: "r_" + Math.random().toString(36).slice(2,10),
+      clientStatus: "", confirmed: false
+    }, r));
+    return true;
+  }
+
+  var added = 0;
+  var securotixReplies = [
+    { date: "2026-08-25", contact: "Yara Basager (Bupa Arabia)", screenshotRef: "Screenshot 2026-08-27 at 12.09.32 PM.png", heddlStatus: "Positive Reply", notes: "1Kosmos campaign. Explained her GRC team owns governance/policy, actual IAM implementation sits with IAM/IT teams - useful redirect toward the right contact." },
+    { date: "2026-03-26", contact: "Yara A. Al Qahtani (alrajhi bank)", screenshotRef: "Screenshot 2026-08-27 at 12.09.21 PM.png", heddlStatus: "Positive Reply", notes: "1Kosmos campaign. Reply is minimal (\"Hi, Adhnaan\") - real engagement but thin content, worth a follow-up to develop." },
+    { date: "2026-08-25", contact: "Muhammad Yahya (Riyad Bank)", screenshotRef: "Screenshot 2026-08-27 at 12.09.10 PM.png", heddlStatus: "No Fit", notes: "1Kosmos campaign. \"We don't work on that\" then \"not sure if I'm the right person\" - declined, no referral given." },
+    { date: "2026-08-26", contact: "Raad Algaead (Al Rajhi Takaful)", screenshotRef: "Screenshot 2026-08-27 at 12.09.01 PM.png", heddlStatus: "Positive Reply", notes: "1Kosmos campaign. Confirmed \"Yes, part of my work is to implement this controls\" - directly relevant owner." },
+    { date: "2026-08-21", contact: "Mohamed Abd El-Wahab (Cisco)", screenshotRef: "Screenshot 2026-08-27 at 12.08.52 PM.png", heddlStatus: "Positive Reply", notes: "Tufin campaign. Detailed answer on their hybrid automation approach to security policy changes - substantive engagement." },
+    { date: "2026-08-21", contact: "Chunyu Qu (ICBC)", screenshotRef: "Screenshot 2026-08-27 at 12.08.43 PM.png", heddlStatus: "Positive Reply", notes: "Tufin campaign. Multi-turn technical exchange, rep sent a meeting ask (\"brief knowledge-sharing session\") - awaiting confirmation, not yet booked." },
+    { date: "2026-08-18", contact: "Dr. Anil Tiwari (Ooredoo Qatar)", screenshotRef: "Screenshot 2026-08-27 at 12.08.31 PM.png", heddlStatus: "Positive Reply", notes: "Tufin campaign. Long, detailed expert answer on firewall rule cleanup best practices - highly engaged." },
+    { date: "2026-08-15", contact: "Abdullah Alzahrani (Bupa Arabia)", screenshotRef: "Screenshot 2026-08-27 at 12.08.17 PM.png", heddlStatus: "Positive Reply", notes: "Tufin campaign. Reciprocal engagement (\"Where are you from?\") - minimal but genuine back-and-forth." },
+    { date: "2026-08-12", contact: "Mohanned Mudathir (Huawei)", screenshotRef: "Screenshot 2026-08-27 at 12.08.06 PM.png", heddlStatus: "Positive Reply", notes: "Tufin campaign. Asked rep to \"describe more details\" about the query - engaged, inviting more info." },
+    { date: "2026-08-11", contact: "Mahammad Imran Shiledar (DXC Technology)", screenshotRef: "Screenshot 2026-08-27 at 12.07.55 PM.png", heddlStatus: "Positive Reply", notes: "Tufin campaign. \"Fully automated, using several tools\" - substantive, relevant answer." },
+    { date: "2026-08-09", contact: "Abhinav Kumar Shrivastava (NMC Healthcare)", screenshotRef: "Screenshot 2026-08-27 at 12.07.46 PM.png", heddlStatus: "Positive Reply", notes: "Tufin senior profile campaign. \"With a different team, but may I ask the reason for this question?\" - not the owner but curious, engaged." },
+    { date: "2026-08-14", contact: "Surohith Surendran (First Abu Dhabi Bank)", screenshotRef: "Screenshot 2026-08-27 at 12.07.36 PM.png", heddlStatus: "No Fit", notes: "Tufin/AlgoSec campaign. \"Not working with the Firewall team anymore\" - no longer the right contact." },
+    { date: "2026-08-07", contact: "Shakeer Ahmed Mohammad (Saudi Investment Bank)", screenshotRef: "Screenshot 2026-08-27 at 12.07.23 PM.png", heddlStatus: "Positive Reply", notes: "Tufin/AlgoSec campaign. Detailed answer on firewall change pain points (NAT/routing complexity) - engaged, relevant." },
+    { date: "2026-08-18", contact: "Khalinder Attar (Emirates NBD)", screenshotRef: "Screenshot 2026-08-27 at 12.07.12 PM.png", heddlStatus: "Not Interested", notes: "AlgoSec Displacement (Tufin) campaign. Flat \"No\" to the outreach." },
+    { date: "2026-08-15", contact: "Maryam Alshehyari (First Abu Dhabi Bank)", screenshotRef: "Screenshot 2026-08-27 at 12.07.05 PM.png", heddlStatus: "Not Interested", notes: "AlgoSec Displacement (Tufin) campaign. \"Not currently looking for solutions\" - polite decline." },
+    { date: "2026-08-11", contact: "Fadel Salmi (Al Rajhi Bank)", screenshotRef: "Screenshot 2026-08-27 at 12.06.55 PM.png", heddlStatus: "Positive Reply", notes: "AlgoSec Displacement (Tufin) campaign. \"Not directly within my scope\" but asked for a referral to the right team - real redirect value." },
+    { date: "2026-08-10", contact: "Ganesha Sannap (Emirates)", screenshotRef: "Screenshot 2026-08-27 at 12.06.48 PM.png", heddlStatus: "Not Interested", notes: "AlgoSec Displacement (Tufin) campaign. \"No thanks, we have our own solution.\"" },
+  ];
+  securotixReplies.forEach(function(r) {
+    if (addIfMissing(Object.assign({ client: "Securotix" }, r))) added++;
+  });
+
+  return added;
+}
+
 var isClientView = false;
 function roAttr() { return isClientView ? " disabled" : ""; }
 function roStyle() { return isClientView ? " style=\"opacity:.7;pointer-events:none\"" : ""; }
@@ -737,6 +781,17 @@ function initFirebase() {
           }, function(err) { console.log("revenueActuals read error:", err.message); });
           responsesRef.on("value", function(snapshot) {
             state.responses = snapshot.val() || [];
+            state.responses.forEach(function(r) {
+              if (r.heddlStatus === undefined) r.heddlStatus = r.status || "";
+              if (r.clientStatus === undefined) r.clientStatus = "";
+              if (r.confirmed === undefined) r.confirmed = false;
+              delete r.status;
+            });
+            if (!window._responseSeedDone) {
+              window._responseSeedDone = true;
+              var addedResponses = refreshResponsesFromDrive();
+              if (addedResponses > 0) { saveState("responses"); }
+            }
             if (!window._fbSaveInProgress) render();
           }, function(err) { console.log("responses read error:", err.message); });
         } else {
@@ -785,6 +840,8 @@ async function loadState() {
     if (state.prospects.length === 0) { seedProspects(); await saveState(); }
     var _resultOnInit = refreshProspectsFromGmail();
     if (_resultOnInit.added > 0 || _resultOnInit.updated > 0) { state.lastGmailRefresh = new Date().toLocaleDateString("en-US", {year:"numeric",month:"short",day:"numeric"}); await saveState(); }
+    var _responsesAddedOnInit = refreshResponsesFromDrive();
+    if (_responsesAddedOnInit > 0) { await saveState(); }
     var beforeClientCount = Object.keys(state.clients).length;
     seedKnownAccounts();
     enrichKnownAccounts();
@@ -1716,16 +1773,17 @@ function renderProspectsView() {
 
 function renderResponsesView() {
   var responses = (state.responses || []).slice().sort((a,b) => (b.date||"").localeCompare(a.date||""));
-  var counts = { "Positive Reply": 0, "Meeting Booked": 0, "No Fit": 0, "Not Interested": 0 };
-  responses.forEach(function(r) { if (counts[r.status] !== undefined) counts[r.status]++; });
+  var heddlCounts = { "Positive Reply": 0, "Meeting Booked": 0, "No Fit": 0, "Not Interested": 0 };
+  responses.forEach(function(r) { if (heddlCounts[r.heddlStatus] !== undefined) heddlCounts[r.heddlStatus]++; });
+  var confirmedCount = responses.filter(function(r) { return r.confirmed; }).length;
   var clientNames = Object.values(state.clients).map(function(c) { return c.name; }).sort();
 
   return `
       <div class="kpis">
         <div class="kpi"><div class="label">Total responses logged</div><div class="value">${responses.length}</div></div>
-        <div class="kpi"><div class="label">Positive replies</div><div class="value" style="color:var(--success)">${counts["Positive Reply"]}</div></div>
-        <div class="kpi"><div class="label">Meetings booked</div><div class="value" style="color:var(--brand)">${counts["Meeting Booked"]}</div></div>
-        <div class="kpi"><div class="label">No fit / Not interested</div><div class="value" style="color:var(--text-secondary)">${counts["No Fit"] + counts["Not Interested"]}</div></div>
+        <div class="kpi"><div class="label">Positive replies (Heddl)</div><div class="value" style="color:var(--success)">${heddlCounts["Positive Reply"]}</div></div>
+        <div class="kpi"><div class="label">Meetings booked (Heddl)</div><div class="value" style="color:var(--brand)">${heddlCounts["Meeting Booked"]}</div></div>
+        <div class="kpi"><div class="label">Client confirmed</div><div class="value" style="color:var(--text-secondary)">${confirmedCount} / ${responses.length}</div></div>
       </div>
 
       <div class="card">
@@ -1738,11 +1796,11 @@ function renderResponsesView() {
         </div>
         <div class="card-body" style="padding:0">
           <div class="small" style="padding:12px 16px;border-bottom:0.5px solid var(--border)">
-            Upload reply screenshots to a shared Drive folder - ask Claude to check it and it will read each screenshot, add a row with date/client/contact/notes filled in, and leave Status blank for you to classify. Status is always a manual call, never auto-set.
+            Screenshots live in per-client folders in Drive - ask Claude to check them and it reads each one, adds a row with date/client/contact/notes filled in, and sets <strong>Heddl Status</strong> automatically from what the reply shows. <strong>Client Status</strong> and <strong>Confirmed</strong> are always set manually, once you've worked with the client to agree on classification.
           </div>
           ${responses.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">No responses logged yet.</div>` : `
             <table>
-              <thead><tr><th>Date</th><th>Client</th><th>Contact</th><th>Screenshot ref</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+              <thead><tr><th>Date</th><th>Client</th><th>Contact</th><th>Screenshot ref</th><th>Heddl Status</th><th>Client Status</th><th>Confirmed</th><th>Notes</th><th></th></tr></thead>
               <tbody>
                 ${responses.map(function(r, i) { return `
                   <tr>
@@ -1753,15 +1811,22 @@ function renderResponsesView() {
                         ${clientNames.map(function(n) { return `<option ${r.client===n?'selected':''}>${escapeHTML(n)}</option>`; }).join("")}
                       </select>
                     </td>
-                    <td><input data-response="${r.id}" data-key="contact" value="${escapeAttr(r.contact)}" placeholder="Name" style="border:none;background:transparent;padding:0;width:130px"></td>
-                    <td><input data-response="${r.id}" data-key="screenshotRef" value="${escapeAttr(r.screenshotRef)}" placeholder="Filename or link" style="border:none;background:transparent;padding:0;width:150px"></td>
+                    <td><input data-response="${r.id}" data-key="contact" value="${escapeAttr(r.contact)}" placeholder="Name" style="border:none;background:transparent;padding:0;width:120px"></td>
+                    <td><input data-response="${r.id}" data-key="screenshotRef" value="${escapeAttr(r.screenshotRef)}" placeholder="Filename or link" style="border:none;background:transparent;padding:0;width:140px"></td>
                     <td>
-                      <select data-response="${r.id}" data-key="status" class="del-select">
-                        <option value="">Select...</option>
-                        ${RESPONSE_STATUSES.map(function(s) { return `<option ${r.status===s?'selected':''}>${s}</option>`; }).join("")}
+                      <select data-response="${r.id}" data-key="heddlStatus" class="del-select" style="background:var(--brand-light)">
+                        <option value="">-</option>
+                        ${RESPONSE_STATUSES.map(function(s) { return `<option ${r.heddlStatus===s?'selected':''}>${s}</option>`; }).join("")}
                       </select>
                     </td>
-                    <td><input data-response="${r.id}" data-key="notes" value="${escapeAttr(r.notes)}" placeholder="Context" style="border:none;background:transparent;padding:0;width:200px"></td>
+                    <td>
+                      <select data-response="${r.id}" data-key="clientStatus" class="del-select">
+                        <option value="">Not set</option>
+                        ${RESPONSE_STATUSES.map(function(s) { return `<option ${r.clientStatus===s?'selected':''}>${s}</option>`; }).join("")}
+                      </select>
+                    </td>
+                    <td style="text-align:center"><input type="checkbox" data-response="${r.id}" data-key="confirmed" data-type="checkbox" ${r.confirmed ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer"></td>
+                    <td><input data-response="${r.id}" data-key="notes" value="${escapeAttr(r.notes)}" placeholder="Context" style="border:none;background:transparent;padding:0;width:180px"></td>
                     <td><button class="btn ghost sm" data-action="delete-response" data-id="${r.id}">&#128465;</button></td>
                   </tr>
                 `;}).join("")}
@@ -1977,8 +2042,9 @@ function renderResponseRollupBlock() {
   var byClient = {};
   responses.forEach(function(r) {
     var key = r.client || "(Unassigned)";
-    if (!byClient[key]) byClient[key] = { "Positive Reply": 0, "Meeting Booked": 0, "No Fit": 0, "Not Interested": 0, total: 0 };
-    if (byClient[key][r.status] !== undefined) byClient[key][r.status]++;
+    if (!byClient[key]) byClient[key] = { "Positive Reply": 0, "Meeting Booked": 0, "No Fit": 0, "Not Interested": 0, total: 0, confirmed: 0 };
+    if (byClient[key][r.heddlStatus] !== undefined) byClient[key][r.heddlStatus]++;
+    if (r.confirmed) byClient[key].confirmed++;
     byClient[key].total++;
   });
 
@@ -1990,14 +2056,15 @@ function renderResponseRollupBlock() {
       '<td>' + c["Meeting Booked"] + '</td>' +
       '<td>' + c["No Fit"] + '</td>' +
       '<td>' + c["Not Interested"] + '</td>' +
+      '<td>' + c.confirmed + ' / ' + c.total + '</td>' +
       '<td><strong>' + c.total + '</strong></td>' +
       '</tr>';
   }).join("");
 
   return '<div class="card" style="margin-bottom:16px">' +
-    '<div class="card-head"><div><h2>Response Tracker Summary</h2><div class="sub">Rolled up from the Responses tab, by client</div></div></div>' +
+    '<div class="card-head"><div><h2>Response Tracker Summary</h2><div class="sub">Heddl Status, rolled up by client - Confirmed shows how many have been agreed with the client</div></div></div>' +
     '<div class="card-body" style="padding:0">' +
-    '<table><thead><tr><th>Client</th><th>Positive Reply</th><th>Meeting Booked</th><th>No Fit</th><th>Not Interested</th><th>Total</th></tr></thead>' +
+    '<table><thead><tr><th>Client</th><th>Positive Reply</th><th>Meeting Booked</th><th>No Fit</th><th>Not Interested</th><th>Confirmed</th><th>Total</th></tr></thead>' +
     '<tbody>' + rows + '</tbody></table>' +
     '</div></div>';
 }
@@ -3264,7 +3331,7 @@ function attachHandlers() {
         state.responses.push({
           id: "r_" + Math.random().toString(36).slice(2,10),
           date: new Date().toISOString().slice(0,10), client: "", contact: "",
-          screenshotRef: "", status: "", notes: ""
+          screenshotRef: "", heddlStatus: "", clientStatus: "", confirmed: false, notes: ""
         });
         saveState("responses"); render();
       }
@@ -3275,7 +3342,13 @@ function attachHandlers() {
         }
       }
       else if (action === "check-response-drive") {
-        alert("Ask Claude in chat to check the response screenshots Drive folder. It will read any new screenshots, add a row per reply with date/client/contact/notes filled in, and leave Status blank for you to classify manually.");
+        var result = refreshResponsesFromDrive();
+        if (result > 0) {
+          saveState("responses").then(function() { render(); });
+          alert(result + " new response" + (result > 1 ? "s" : "") + " added from Drive screenshots.");
+        } else {
+          alert("No new responses found. This checks against screenshots I already know about - ask Claude in chat to check the Drive folder fresh for anything newly uploaded.");
+        }
       }
       else if (action === "convert-prospect") {
         var prospect = state.prospects.find(function(x) { return x.id === el.dataset.id; });
@@ -3531,8 +3604,8 @@ function attachHandlers() {
     var handler = function() {
       var r = (state.responses || []).find(function(x) { return x.id === el.dataset.response; });
       if (!r) return;
-      r[el.dataset.key] = el.value;
-      if (el.dataset.key === "status" || el.dataset.key === "client") { saveState("responses"); render(); } else { save("responses"); }
+      r[el.dataset.key] = el.dataset.type === "checkbox" ? el.checked : el.value;
+      if (el.dataset.type === "checkbox" || el.dataset.key === "heddlStatus" || el.dataset.key === "clientStatus" || el.dataset.key === "client") { saveState("responses"); render(); } else { save("responses"); }
     };
     el.addEventListener("input", handler);
     el.addEventListener("change", handler);
