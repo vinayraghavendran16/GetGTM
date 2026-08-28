@@ -1890,6 +1890,7 @@ function renderResponsesView() {
           <h2>Response Tracker</h2>
           <div style="display:flex;gap:8px">
             <button class="btn ghost sm" data-action="check-response-drive">📷 Check for new replies</button>
+            <button class="btn ghost sm" data-action="export-responses-pdf">⬇ Export PDF</button>
             <button class="btn" data-action="add-response">+ Add response</button>
           </div>
         </div>
@@ -2914,6 +2915,76 @@ function buildProposalHTML(c, isForPDF) {
   return html;
 }
 
+function generateResponsesPDF() {
+  var allResponses = (state.responses || []).slice().sort((a,b) => (b.date||"").localeCompare(a.date||""));
+  var f = ui.responseFilters || { client: "", heddlStatus: "", clientStatus: "", confirmed: "" };
+  var responses = allResponses.filter(function(r) {
+    if (f.client && r.client !== f.client) return false;
+    if (f.heddlStatus && r.heddlStatus !== f.heddlStatus) return false;
+    if (f.clientStatus && r.clientStatus !== f.clientStatus) return false;
+    if (f.confirmed === "yes" && !r.confirmed) return false;
+    if (f.confirmed === "no" && r.confirmed) return false;
+    return true;
+  });
+
+  var filterParts = [];
+  if (f.client) filterParts.push("Account: " + f.client);
+  if (f.heddlStatus) filterParts.push("Heddl Status: " + f.heddlStatus);
+  if (f.clientStatus) filterParts.push("Client Status: " + f.clientStatus);
+  if (f.confirmed) filterParts.push("Confirmed: " + (f.confirmed === "yes" ? "Confirmed only" : "Not confirmed only"));
+  var filterLabel = filterParts.length > 0 ? filterParts.join(" | ") : "All responses";
+
+  function badge(status) {
+    if (!status) return '<span style="color:#94a3b8">-</span>';
+    var c = responseStatusColor(status);
+    return '<span style="background:' + c.bg + ';color:' + c.color + ';font-weight:600;padding:2px 8px;border-radius:4px;font-size:10px;display:inline-block">' + escapeHTML(status) + '</span>';
+  }
+
+  var rows = responses.map(function(r) {
+    return '<tr>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px;white-space:nowrap">' + escapeHTML(r.date || "-") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px"><strong>' + escapeHTML(r.client || "-") + '</strong><br><span style="color:#64748b">' + escapeHTML(r.contact || "") + '</span></td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + badge(r.heddlStatus) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + badge(r.clientStatus) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px;text-align:center">' + (r.confirmed ? '✓' : '') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px;max-width:220px">' + escapeHTML(r.notes || "") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;color:#64748b">' + escapeHTML(r.screenshotRef || "") + '</td>' +
+      '</tr>';
+  }).join("");
+
+  var html = '<div style="font-family:Helvetica,Arial,sans-serif;padding:24px;color:#111">' +
+    '<h1 style="font-size:18px;margin:0 0 4px">Response Tracker</h1>' +
+    '<div style="font-size:11px;color:#64748b;margin-bottom:2px">' + escapeHTML(filterLabel) + '</div>' +
+    '<div style="font-size:10px;color:#94a3b8;margin-bottom:16px">Exported ' + new Date().toLocaleDateString("en-US", {year:"numeric",month:"long",day:"numeric"}) + ' - ' + responses.length + ' response' + (responses.length !== 1 ? 's' : '') + '</div>' +
+    '<table style="width:100%;border-collapse:collapse">' +
+    '<thead><tr>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Date</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Account / Contact</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Heddl Status</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Client Status</th>' +
+    '<th style="text-align:center;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Confirmed</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Notes</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Screenshot ref</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>' +
+    '</div>';
+
+  var container = document.createElement('div');
+  container.innerHTML = html;
+  document.body.appendChild(container);
+  var filenameSuffix = f.client ? f.client.replace(/[^a-zA-Z0-9]+/g, '_') : 'All';
+  var opt = {
+    margin: 10,
+    filename: 'Response_Tracker_' + filenameSuffix + '_' + new Date().toISOString().slice(0,10) + '.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+    pagebreak: { mode: ['css', 'legacy'] }
+  };
+  html2pdf().set(opt).from(container).save().then(function() {
+    document.body.removeChild(container);
+  });
+}
+
 function generateProposalPDF(c) {
   var html = buildProposalHTML(c, true);
   var filename = c.name.replace(/[^a-zA-Z0-9]+/g, '_') + '_x_GetGTM_Initial_Proposal.pdf';
@@ -3472,6 +3543,9 @@ function attachHandlers() {
         } else {
           alert("No new responses found. This checks against screenshots I already know about - ask Claude in chat to check the Drive folder fresh for anything newly uploaded.");
         }
+      }
+      else if (action === "export-responses-pdf") {
+        generateResponsesPDF();
       }
       else if (action === "clear-response-filters") {
         ui.responseFilters = { client: "", heddlStatus: "", clientStatus: "", confirmed: "" };
