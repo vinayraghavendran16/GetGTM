@@ -517,7 +517,7 @@ var REVENUE_CONTRACTS = {
   },
 };
 
-let state = { clients: {}, prospects: [], responses: [], responseSavedViews: [], revenueActuals: {} };
+let state = { clients: {}, prospects: [], responses: [], responseSavedViews: [], responseBilling: {}, revenueActuals: {} };
 let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: null, dashboardTab: "clients", responseFilters: { client: "", heddlStatus: "", clientStatus: "", confirmed: "" } };
 
 function seedProspects() {
@@ -728,7 +728,7 @@ var dbRef = null;
 var useFirebase = false;
 var auth = null;
 var authUser = null;
-var clientsRef = null, prospectsRef = null, revenueActualsRef = null, responsesRef = null, responseViewsRef = null;
+var clientsRef = null, prospectsRef = null, revenueActualsRef = null, responsesRef = null, responseViewsRef = null, responseBillingRef = null;
 
 function initFirebase() {
   try {
@@ -741,6 +741,7 @@ function initFirebase() {
       revenueActualsRef = db.ref("getgtm_tracker/revenueActuals");
       responsesRef = db.ref("getgtm_tracker/responses");
       responseViewsRef = db.ref("getgtm_tracker/responseViews");
+      responseBillingRef = db.ref("getgtm_tracker/responseBilling");
       auth = firebase.auth();
       useFirebase = true;
 
@@ -799,11 +800,16 @@ function initFirebase() {
             state.responseSavedViews = snapshot.val() || [];
             if (!window._fbSaveInProgress) render();
           }, function(err) { console.log("responseViews read error:", err.message); });
+          responseBillingRef.on("value", function(snapshot) {
+            state.responseBilling = snapshot.val() || {};
+            if (!window._fbSaveInProgress) render();
+          }, function(err) { console.log("responseBilling read error:", err.message); });
         } else {
           prospectsRef.off();
           revenueActualsRef.off();
           responseViewsRef.off();
           responsesRef.off();
+          responseBillingRef.off();
         }
         render();
       });
@@ -841,6 +847,7 @@ async function loadState() {
   if (!state.prospects) state.prospects = [];
   if (!state.responses) state.responses = [];
   if (!state.responseSavedViews) state.responseSavedViews = [];
+  if (!state.responseBilling) state.responseBilling = {};
   // Firebase path seeds via the reactive listeners in initFirebase() instead - this block only
   // runs for the localStorage fallback (useFirebase === false).
   if (!useFirebase) {
@@ -867,6 +874,7 @@ async function saveState(scope) {
       if (authUser && (!scope || scope === "revenueActuals")) writes.push(revenueActualsRef.set(state.revenueActuals || {}));
       if (authUser && (!scope || scope === "responses")) writes.push(responsesRef.set(state.responses || []));
       if (authUser && (!scope || scope === "responseViews")) writes.push(responseViewsRef.set(state.responseSavedViews || []));
+      if (authUser && (!scope || scope === "responseBilling")) writes.push(responseBillingRef.set(state.responseBilling || {}));
       await Promise.all(writes);
       setTimeout(function() { window._fbSaveInProgress = false; }, 500);
     }
@@ -2105,48 +2113,70 @@ function renderGoalsAchievedBlock() {
     : '';
 
   return '<div class="card" style="margin-bottom:16px">' +
-    '<div class="card-head"><div><h2>Goals vs. Achieved</h2><div class="sub">Every client with monthly targets set, across M1/M2/M3</div></div></div>' +
+    '<div class="card-head"><div><h2>Goals vs. Achieved</h2><div class="sub">Every client with monthly targets set, across M1/M2/M3 - Achieved here is entered manually per month</div></div></div>' +
     '<div class="card-body" style="padding:0">' +
     '<table><thead><tr><th>Client</th><th>Line</th><th>Month</th><th>Metric</th><th>Target</th><th>Achieved</th><th>% Achieved</th></tr></thead>' +
     '<tbody>' + tableRows + '</tbody></table>' +
     note +
+    '<div class="small" style="padding:10px 16px;border-top:0.5px solid var(--border);color:var(--text-muted)">For achievement based only on client-confirmed replies (not monthly targets), see <strong>Confirmed Achievement &amp; Billing</strong> below - it counts only responses marked Confirmed in the Responses tab.</div>' +
     '</div></div>';
 }
 
 function renderResponseRollupBlock() {
   var responses = state.responses || [];
+  if (!state.responseBilling) state.responseBilling = {};
   if (responses.length === 0) {
-    return '<div class="card" style="margin-bottom:16px"><div class="card-head"><h2>Response Tracker Summary</h2></div>' +
+    return '<div class="card" style="margin-bottom:16px"><div class="card-head"><h2>Confirmed Achievement &amp; Billing</h2></div>' +
       '<div class="card-body"><div class="small" style="color:var(--text-muted)">No responses logged yet. Log them from the Responses tab, or ask Claude to check the response screenshots Drive folder.</div></div></div>';
   }
 
   var byClient = {};
   responses.forEach(function(r) {
     var key = r.client || "(Unassigned)";
-    if (!byClient[key]) byClient[key] = { "Positive Reply": 0, "Meeting Booked": 0, "No Fit": 0, "Not Interested": 0, total: 0, confirmed: 0 };
-    if (byClient[key][r.heddlStatus] !== undefined) byClient[key][r.heddlStatus]++;
-    if (r.confirmed) byClient[key].confirmed++;
+    if (!byClient[key]) byClient[key] = { confirmedPositive: 0, confirmedMeetings: 0, totalConfirmed: 0, total: 0 };
     byClient[key].total++;
+    if (!r.confirmed) return; // only confirmed responses count toward achievement/billing
+    // Client Status is the agreed-upon final classification once confirmed; fall back to Heddl Status if not set.
+    var finalStatus = r.clientStatus || r.heddlStatus;
+    if (finalStatus === "Positive Reply") byClient[key].confirmedPositive++;
+    if (finalStatus === "Meeting Booked") byClient[key].confirmedMeetings++;
+    byClient[key].totalConfirmed++;
   });
 
-  var rows = Object.keys(byClient).sort().map(function(client) {
+  var clientKeys = Object.keys(byClient).sort();
+  var totalBillAmount = 0, totalConfirmed = 0, totalBilled = 0, totalPaid = 0;
+
+  var rows = clientKeys.map(function(client) {
     var c = byClient[client];
+    var billing = state.responseBilling[client] || { amount: "", billed: false, paid: false };
+    var amt = parseFloat(billing.amount);
+    if (!isNaN(amt)) totalBillAmount += amt;
+    totalConfirmed += c.totalConfirmed;
+    if (billing.billed) totalBilled++;
+    if (billing.paid) totalPaid++;
     return '<tr>' +
       '<td><strong>' + escapeHTML(client) + '</strong></td>' +
-      '<td>' + c["Positive Reply"] + '</td>' +
-      '<td>' + c["Meeting Booked"] + '</td>' +
-      '<td>' + c["No Fit"] + '</td>' +
-      '<td>' + c["Not Interested"] + '</td>' +
-      '<td>' + c.confirmed + ' / ' + c.total + '</td>' +
-      '<td><strong>' + c.total + '</strong></td>' +
+      '<td>' + c.confirmedPositive + '</td>' +
+      '<td>' + c.confirmedMeetings + '</td>' +
+      '<td>' + c.totalConfirmed + ' / ' + c.total + '</td>' +
+      '<td><input type="number" placeholder="0" data-billing="' + escapeAttr(client) + '" data-key="amount" value="' + escapeAttr(billing.amount || "") + '" style="width:100px;border:0.5px solid var(--border);border-radius:4px;padding:4px 6px;background:var(--surface-1)"></td>' +
+      '<td style="text-align:center"><input type="checkbox" data-billing="' + escapeAttr(client) + '" data-key="billed" data-type="checkbox" ' + (billing.billed ? 'checked' : '') + ' style="width:16px;height:16px;cursor:pointer"></td>' +
+      '<td style="text-align:center"><input type="checkbox" data-billing="' + escapeAttr(client) + '" data-key="paid" data-type="checkbox" ' + (billing.paid ? 'checked' : '') + ' style="width:16px;height:16px;cursor:pointer"></td>' +
       '</tr>';
   }).join("");
 
+  var totalRow = '<tr style="border-top:1px solid var(--border);background:var(--surface-1);font-weight:600">' +
+    '<td>Total</td><td></td><td></td><td>' + totalConfirmed + '</td>' +
+    '<td>$' + totalBillAmount.toLocaleString() + '</td>' +
+    '<td style="text-align:center">' + totalBilled + ' / ' + clientKeys.length + '</td>' +
+    '<td style="text-align:center">' + totalPaid + ' / ' + clientKeys.length + '</td>' +
+    '</tr>';
+
   return '<div class="card" style="margin-bottom:16px">' +
-    '<div class="card-head"><div><h2>Response Tracker Summary</h2><div class="sub">Heddl Status, rolled up by client - Confirmed shows how many have been agreed with the client</div></div></div>' +
+    '<div class="card-head"><div><h2>Confirmed Achievement &amp; Billing</h2><div class="sub">Only Confirmed responses count here - grouped by account, with billing status and totals</div></div></div>' +
     '<div class="card-body" style="padding:0">' +
-    '<table><thead><tr><th>Client</th><th>Positive Reply</th><th>Meeting Booked</th><th>No Fit</th><th>Not Interested</th><th>Confirmed</th><th>Total</th></tr></thead>' +
-    '<tbody>' + rows + '</tbody></table>' +
+    '<table><thead><tr><th>Client</th><th>Confirmed Positive Reply</th><th>Confirmed Meeting Booked</th><th>Confirmed / Total</th><th>Bill Amount</th><th>Billed</th><th>Paid</th></tr></thead>' +
+    '<tbody>' + rows + totalRow + '</tbody></table>' +
     '</div></div>';
 }
 
@@ -3711,6 +3741,18 @@ function attachHandlers() {
       if (!r) return;
       r[el.dataset.key] = el.dataset.type === "checkbox" ? el.checked : el.value;
       if (el.dataset.type === "checkbox" || el.dataset.key === "heddlStatus" || el.dataset.key === "clientStatus" || el.dataset.key === "client") { saveState("responses"); render(); } else { save("responses"); }
+    };
+    el.addEventListener("input", handler);
+    el.addEventListener("change", handler);
+  });
+
+  document.querySelectorAll("[data-billing]").forEach(el => {
+    var handler = function() {
+      if (!state.responseBilling) state.responseBilling = {};
+      var client = el.dataset.billing;
+      if (!state.responseBilling[client]) state.responseBilling[client] = { amount: "", billed: false, paid: false };
+      state.responseBilling[client][el.dataset.key] = el.dataset.type === "checkbox" ? el.checked : el.value;
+      if (el.dataset.type === "checkbox") { saveState("responseBilling"); render(); } else { save("responseBilling"); }
     };
     el.addEventListener("input", handler);
     el.addEventListener("change", handler);
