@@ -1899,24 +1899,31 @@ function renderResponsesView() {
           </div>
           ${responses.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">${anyFilterActive ? 'No responses match the current filters.' : 'No responses logged yet.'}</div>` : `
             <table>
-              <thead><tr><th>Date</th><th>Client</th><th>Contact</th><th>Screenshot ref</th><th>Heddl Status</th><th>Client Status</th><th>Confirmed</th><th>Notes</th><th></th></tr></thead>
+              <thead><tr><th>Date</th><th>Account / Contact</th><th>Heddl Status</th><th>Client Status</th><th>Confirmed</th><th>Notes</th><th>Screenshot ref</th><th></th></tr></thead>
               <tbody>
-                ${responses.map(function(r, i) { return `
-                  <tr>
-                    <td><input type="date" data-response="${r.id}" data-key="date" value="${escapeAttr(r.date)}" style="border:none;background:transparent;padding:0;width:120px"></td>
+                ${responses.map(function(r, i) {
+                  var locked = !!r.confirmed;
+                  var lockAttr = locked ? 'disabled' : '';
+                  var lockStyle = locked ? 'opacity:0.65;cursor:not-allowed' : '';
+                  return `
+                  <tr${locked ? ' style="background:var(--surface-1)"' : ''}>
+                    <td><input type="date" ${lockAttr} data-response="${r.id}" data-key="date" value="${escapeAttr(r.date)}" style="border:none;background:transparent;padding:0;width:120px;${lockStyle}"></td>
                     <td>
-                      <select data-response="${r.id}" data-key="client" class="del-select">
+                      <select ${lockAttr} data-response="${r.id}" data-key="client" class="del-select" style="${lockStyle}">
                         <option value="">-</option>
                         ${clientNames.map(function(n) { return `<option ${r.client===n?'selected':''}>${escapeHTML(n)}</option>`; }).join("")}
                       </select>
+                      <input ${lockAttr} data-response="${r.id}" data-key="contact" value="${escapeAttr(r.contact)}" placeholder="Contact name" style="border:none;background:transparent;padding:2px 0 0;width:100%;font-size:12px;color:var(--text-secondary);${lockStyle}">
                     </td>
-                    <td><input data-response="${r.id}" data-key="contact" value="${escapeAttr(r.contact)}" placeholder="Name" style="border:none;background:transparent;padding:0;width:120px"></td>
-                    <td><input data-response="${r.id}" data-key="screenshotRef" value="${escapeAttr(r.screenshotRef)}" placeholder="Filename or link" style="border:none;background:transparent;padding:0;width:140px"></td>
-                    <td>${statusSelectHtml(r, "heddlStatus", RESPONSE_STATUSES, "-")}</td>
-                    <td>${statusSelectHtml(r, "clientStatus", RESPONSE_STATUSES, "Not set")}</td>
-                    <td style="text-align:center"><input type="checkbox" data-response="${r.id}" data-key="confirmed" data-type="checkbox" ${r.confirmed ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer"></td>
-                    <td><input data-response="${r.id}" data-key="notes" value="${escapeAttr(r.notes)}" placeholder="Context" style="border:none;background:transparent;padding:0;width:180px"></td>
-                    <td><button class="btn ghost sm" data-action="delete-response" data-id="${r.id}">&#128465;</button></td>
+                    <td>${locked ? '<span style="' + (function(){var c=responseStatusColor(r.heddlStatus);return 'background:'+c.bg+';color:'+c.color;})() + ';font-weight:600;padding:3px 8px;border-radius:4px;font-size:12px;display:inline-block">' + escapeHTML(r.heddlStatus||'-') + '</span>' : statusSelectHtml(r, "heddlStatus", RESPONSE_STATUSES, "-")}</td>
+                    <td>${locked ? '<span style="' + (function(){var c=responseStatusColor(r.clientStatus);return 'background:'+c.bg+';color:'+c.color;})() + ';font-weight:600;padding:3px 8px;border-radius:4px;font-size:12px;display:inline-block">' + escapeHTML(r.clientStatus||'Not set') + '</span>' : statusSelectHtml(r, "clientStatus", RESPONSE_STATUSES, "Not set")}</td>
+                    <td style="text-align:center">
+                      <input type="checkbox" data-response="${r.id}" data-key="confirmed" data-type="checkbox" ${r.confirmed ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer">
+                      ${locked ? '<div class="small" style="color:var(--text-muted);margin-top:2px">🔒 locked</div>' : ''}
+                    </td>
+                    <td><input ${lockAttr} data-response="${r.id}" data-key="notes" value="${escapeAttr(r.notes)}" placeholder="Context" style="border:none;background:transparent;padding:0;width:180px;${lockStyle}"></td>
+                    <td><input ${lockAttr} data-response="${r.id}" data-key="screenshotRef" value="${escapeAttr(r.screenshotRef)}" placeholder="Filename or link" style="border:none;background:transparent;padding:0;width:140px;${lockStyle}"></td>
+                    <td><button class="btn ghost sm" data-action="delete-response" data-id="${r.id}" ${lockAttr}>&#128465;</button></td>
                   </tr>
                 `;}).join("")}
               </tbody>
@@ -3447,6 +3454,11 @@ function attachHandlers() {
         saveState("responses"); render();
       }
       else if (action === "delete-response") {
+        var respToDelete = (state.responses || []).find(function(r) { return r.id === el.dataset.id; });
+        if (respToDelete && respToDelete.confirmed) {
+          var delPin = prompt("This response is confirmed and locked. Enter the 4-digit PIN to delete it anyway:");
+          if (delPin !== "0707") { if (delPin !== null) alert("Incorrect PIN."); return; }
+        }
         if (confirm("Remove this response? This cannot be undone.")) {
           state.responses = (state.responses || []).filter(function(r) { return r.id !== el.dataset.id; });
           saveState("responses"); render();
@@ -3735,12 +3747,28 @@ function attachHandlers() {
     el.addEventListener("change", handler);
   });
 
+  var RESPONSE_UNLOCK_PIN = "0707";
   document.querySelectorAll("[data-response]").forEach(el => {
     var handler = function() {
       var r = (state.responses || []).find(function(x) { return x.id === el.dataset.response; });
       if (!r) return;
+      if (el.dataset.key === "confirmed") {
+        if (r.confirmed && !el.checked) {
+          // Attempting to unlock a confirmed response - require the PIN.
+          var pin = prompt("Enter the 4-digit PIN to unlock this response:");
+          if (pin !== RESPONSE_UNLOCK_PIN) {
+            el.checked = true; // revert - wrong or cancelled PIN
+            if (pin !== null) alert("Incorrect PIN.");
+            return;
+          }
+        }
+        r.confirmed = el.checked;
+        saveState("responses"); render();
+        return;
+      }
+      if (r.confirmed) return; // locked - all other fields are read-only while confirmed
       r[el.dataset.key] = el.dataset.type === "checkbox" ? el.checked : el.value;
-      if (el.dataset.type === "checkbox" || el.dataset.key === "heddlStatus" || el.dataset.key === "clientStatus" || el.dataset.key === "client") { saveState("responses"); render(); } else { save("responses"); }
+      if (el.dataset.key === "heddlStatus" || el.dataset.key === "clientStatus" || el.dataset.key === "client") { saveState("responses"); render(); } else { save("responses"); }
     };
     el.addEventListener("input", handler);
     el.addEventListener("change", handler);
