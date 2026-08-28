@@ -638,16 +638,16 @@ function refreshResponsesFromDrive() {
 
   var added = 0;
   var securotixReplies = [
-    { date: "2026-08-25", contact: "Yara Basager (Bupa Arabia)", screenshotRef: "Screenshot 2026-08-27 at 12.09.32 PM.png", heddlStatus: "Positive Reply", notes: "1Kosmos campaign. Explained her GRC team owns governance/policy, actual IAM implementation sits with IAM/IT teams - useful redirect toward the right contact." },
-    { date: "2026-03-26", contact: "Yara A. Al Qahtani (alrajhi bank)", screenshotRef: "Screenshot 2026-08-27 at 12.09.21 PM.png", heddlStatus: "Positive Reply", notes: "1Kosmos campaign. Reply is minimal (\"Hi, Adhnaan\") - real engagement but thin content, worth a follow-up to develop." },
-    { date: "2026-08-25", contact: "Muhammad Yahya (Riyad Bank)", screenshotRef: "Screenshot 2026-08-27 at 12.09.10 PM.png", heddlStatus: "No Fit", notes: "1Kosmos campaign. \"We don't work on that\" then \"not sure if I'm the right person\" - declined, no referral given." },
-    { date: "2026-08-26", contact: "Raad Algaead (Al Rajhi Takaful)", screenshotRef: "Screenshot 2026-08-27 at 12.09.01 PM.png", heddlStatus: "Positive Reply", notes: "1Kosmos campaign. Confirmed \"Yes, part of my work is to implement this controls\" - directly relevant owner." },
-    { date: "2026-08-21", contact: "Mohamed Abd El-Wahab (Cisco)", screenshotRef: "Screenshot 2026-08-27 at 12.08.52 PM.png", heddlStatus: "Positive Reply", notes: "Tufin campaign. Detailed answer on their hybrid automation approach to security policy changes - substantive engagement." },
-    { date: "2026-08-21", contact: "Chunyu Qu (ICBC)", screenshotRef: "Screenshot 2026-08-27 at 12.08.43 PM.png", heddlStatus: "Positive Reply", notes: "Tufin campaign. Multi-turn technical exchange, rep sent a meeting ask (\"brief knowledge-sharing session\") - awaiting confirmation, not yet booked." },
-    { date: "2026-08-18", contact: "Dr. Anil Tiwari (Ooredoo Qatar)", screenshotRef: "Screenshot 2026-08-27 at 12.08.31 PM.png", heddlStatus: "Positive Reply", notes: "Tufin campaign. Long, detailed expert answer on firewall rule cleanup best practices - highly engaged." },
-    { date: "2026-08-15", contact: "Abdullah Alzahrani (Bupa Arabia)", screenshotRef: "Screenshot 2026-08-27 at 12.08.17 PM.png", heddlStatus: "Positive Reply", notes: "Tufin campaign. Reciprocal engagement (\"Where are you from?\") - minimal but genuine back-and-forth." },
-    { date: "2026-08-12", contact: "Mohanned Mudathir (Huawei)", screenshotRef: "Screenshot 2026-08-27 at 12.08.06 PM.png", heddlStatus: "Positive Reply", notes: "Tufin campaign. Asked rep to \"describe more details\" about the query - engaged, inviting more info." },
-    { date: "2026-08-11", contact: "Mahammad Imran Shiledar (DXC Technology)", screenshotRef: "Screenshot 2026-08-27 at 12.07.55 PM.png", heddlStatus: "Positive Reply", notes: "Tufin campaign. \"Fully automated, using several tools\" - substantive, relevant answer." },
+    { date: "2026-08-25", contact: "Yara Basager (Bupa Arabia)", screenshotRef: "Screenshot 2026-08-27 at 12.09.32 PM.png", screenshotUrl: "https://drive.google.com/file/d/1OC8gktwY3AkhYfZzfx2hkgdGE3utEXBB/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "1Kosmos campaign. Explained her GRC team owns governance/policy, actual IAM implementation sits with IAM/IT teams - useful redirect toward the right contact." },
+    { date: "2026-03-26", contact: "Yara A. Al Qahtani (alrajhi bank)", screenshotRef: "Screenshot 2026-08-27 at 12.09.21 PM.png", screenshotUrl: "https://drive.google.com/file/d/1tIvyq93iO4yBippPBKV2ts8mqqx2_9eK/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "1Kosmos campaign. Reply is minimal (\"Hi, Adhnaan\") - real engagement but thin content, worth a follow-up to develop." },
+    { date: "2026-08-25", contact: "Muhammad Yahya (Riyad Bank)", screenshotRef: "Screenshot 2026-08-27 at 12.09.10 PM.png", screenshotUrl: "https://drive.google.com/file/d/1swbnJTrlZd_e_AjysHMoSsR68K1vvFtE/view?usp=drivesdk", heddlStatus: "No Fit", notes: "1Kosmos campaign. \"We don't work on that\" then \"not sure if I'm the right person\" - declined, no referral given." },
+    { date: "2026-08-26", contact: "Raad Algaead (Al Rajhi Takaful)", screenshotRef: "Screenshot 2026-08-27 at 12.09.01 PM.png", screenshotUrl: "https://drive.google.com/file/d/14pcMd5wiOPb5leMAuX-YAva91U2X_tdR/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "1Kosmos campaign. Confirmed \"Yes, part of my work is to implement this controls\" - directly relevant owner." },
+    { date: "2026-08-21", contact: "Mohamed Abd El-Wahab (Cisco)", screenshotRef: "Screenshot 2026-08-27 at 12.08.52 PM.png", screenshotUrl: "https://drive.google.com/file/d/1AC0rdLN_fDdKGe2nCI9AstaGaOSBdZjo/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "Tufin campaign. Detailed answer on their hybrid automation approach to security policy changes - substantive engagement." },
+    { date: "2026-08-21", contact: "Chunyu Qu (ICBC)", screenshotRef: "Screenshot 2026-08-27 at 12.08.43 PM.png", screenshotUrl: "https://drive.google.com/file/d/1QFyoCkH5lf-DWHxy79uFRIyLEovRVvap/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "Tufin campaign. Multi-turn technical exchange, rep sent a meeting ask (\"brief knowledge-sharing session\") - awaiting confirmation, not yet booked." },
+    { date: "2026-08-18", contact: "Dr. Anil Tiwari (Ooredoo Qatar)", screenshotRef: "Screenshot 2026-08-27 at 12.08.31 PM.png", screenshotUrl: "https://drive.google.com/file/d/1TKrpxBMkKgkIHZ5OIYdqFgbnSthHuOfY/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "Tufin campaign. Long, detailed expert answer on firewall rule cleanup best practices - highly engaged." },
+    { date: "2026-08-15", contact: "Abdullah Alzahrani (Bupa Arabia)", screenshotRef: "Screenshot 2026-08-27 at 12.08.17 PM.png", screenshotUrl: "https://drive.google.com/file/d/1C-i8cfMU2FPBpd5ANKfdWdzQ8aMicnCc/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "Tufin campaign. Reciprocal engagement (\"Where are you from?\") - minimal but genuine back-and-forth." },
+    { date: "2026-08-12", contact: "Mohanned Mudathir (Huawei)", screenshotRef: "Screenshot 2026-08-27 at 12.08.06 PM.png", screenshotUrl: "https://drive.google.com/file/d/1uqfLVFIE_oIIt0MUYDXIZQoOOfWATlct/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "Tufin campaign. Asked rep to \"describe more details\" about the query - engaged, inviting more info." },
+    { date: "2026-08-11", contact: "Mahammad Imran Shiledar (DXC Technology)", screenshotRef: "Screenshot 2026-08-27 at 12.07.55 PM.png", screenshotUrl: "https://drive.google.com/file/d/1pMj2egSq4gMVDG4JzQRCxC2iLaAU_0t1/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "Tufin campaign. \"Fully automated, using several tools\" - substantive, relevant answer." },
     { date: "2026-08-09", contact: "Abhinav Kumar Shrivastava (NMC Healthcare)", screenshotRef: "Screenshot 2026-08-27 at 12.07.46 PM.png", heddlStatus: "Positive Reply", notes: "Tufin senior profile campaign. \"With a different team, but may I ask the reason for this question?\" - not the owner but curious, engaged." },
     { date: "2026-08-14", contact: "Surohith Surendran (First Abu Dhabi Bank)", screenshotRef: "Screenshot 2026-08-27 at 12.07.36 PM.png", heddlStatus: "No Fit", notes: "Tufin/AlgoSec campaign. \"Not working with the Firewall team anymore\" - no longer the right contact." },
     { date: "2026-08-07", contact: "Shakeer Ahmed Mohammad (Saudi Investment Bank)", screenshotRef: "Screenshot 2026-08-27 at 12.07.23 PM.png", heddlStatus: "Positive Reply", notes: "Tufin/AlgoSec campaign. Detailed answer on firewall change pain points (NAT/routing complexity) - engaged, relevant." },
@@ -657,7 +657,12 @@ function refreshResponsesFromDrive() {
     { date: "2026-08-10", contact: "Ganesha Sannap (Emirates)", screenshotRef: "Screenshot 2026-08-27 at 12.06.48 PM.png", heddlStatus: "Not Interested", notes: "AlgoSec Displacement (Tufin) campaign. \"No thanks, we have our own solution.\"" },
   ];
   securotixReplies.forEach(function(r) {
-    if (addIfMissing(Object.assign({ client: "Securotix" }, r))) added++;
+    if (addIfMissing(Object.assign({ client: "Securotix" }, r))) { added++; return; }
+    // Already exists (matched by screenshotRef) - backfill screenshotUrl if we now have one and it's missing.
+    if (r.screenshotUrl) {
+      var existing = state.responses.find(function(x) { return x.screenshotRef === r.screenshotRef; });
+      if (existing && !existing.screenshotUrl) { existing.screenshotUrl = r.screenshotUrl; added++; }
+    }
   });
 
   return added;
@@ -693,6 +698,16 @@ var NOTIFY_CONFIG = {
 if (NOTIFY_CONFIG.emailjsPublicKey && typeof emailjs !== "undefined") {
   try { emailjs.init(NOTIFY_CONFIG.emailjsPublicKey); } catch (e) { console.log("EmailJS init failed:", e.message); }
 }
+
+// ===== TEAM EMAILS FOR CLIENT REPORTS =====
+// Used to CC internal stakeholders on the "Send report to prospect" email. CS email comes from each
+// client's own Overview record (people.csEmail). Founder/RevOps below are NOT confirmed from any
+// source - founder is inferred from the getgtm.ai domain pattern used elsewhere, RevOps is blank
+// since there's no dedicated RevOps contact field yet. Update these directly if wrong.
+var TEAM_EMAILS = {
+  founder: "rajiv@getgtm.ai",   // assumed - not explicitly confirmed anywhere in Gmail/Drive
+  revops: "",                    // no RevOps contact identified yet - leave blank to omit from CC
+};
 
 async function notifyTeam(title, message) {
   // Slack
@@ -1867,6 +1882,7 @@ function renderResponsesView() {
             </div>
             ${anyFilterActive ? '<button class="btn ghost sm" data-action="clear-response-filters">Clear filters</button>' : ''}
             <div style="margin-left:auto;display:flex;gap:8px;align-items:flex-end">
+              ${f.client ? '<button class="btn sm" data-action="send-response-report" style="background:var(--brand)">✉ Send report to prospect</button>' : ''}
               ${savedViews.length > 0 ? `
               <div>
                 <label class="small" style="display:block;margin-bottom:4px">Saved views</label>
@@ -1889,6 +1905,7 @@ function renderResponsesView() {
         <div class="card-head">
           <h2>Response Tracker</h2>
           <div style="display:flex;gap:8px">
+            <a href="https://drive.google.com/drive/folders/1Hr3GWko3ixmEJZTl6DHgNiJauG502gL8" target="_blank" class="btn ghost sm">📁 Open Drive folder</a>
             <button class="btn ghost sm" data-action="check-response-drive">📷 Check for new replies</button>
             <button class="btn ghost sm" data-action="export-responses-pdf">⬇ Export PDF</button>
             <button class="btn" data-action="add-response">+ Add response</button>
@@ -1900,7 +1917,7 @@ function renderResponsesView() {
           </div>
           ${responses.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">${anyFilterActive ? 'No responses match the current filters.' : 'No responses logged yet.'}</div>` : `
             <table>
-              <thead><tr><th>Date</th><th>Account / Contact</th><th>Heddl Status</th><th>Client Status</th><th>Confirmed</th><th>Notes</th><th>Screenshot ref</th><th></th></tr></thead>
+              <thead><tr><th>Date</th><th>Account</th><th>Contact</th><th>Heddl Status</th><th>Client Status</th><th>Confirmed</th><th>Notes</th><th>Screenshot</th><th></th></tr></thead>
               <tbody>
                 ${responses.map(function(r, i) {
                   var locked = !!r.confirmed;
@@ -1914,8 +1931,8 @@ function renderResponsesView() {
                         <option value="">-</option>
                         ${clientNames.map(function(n) { return `<option ${r.client===n?'selected':''}>${escapeHTML(n)}</option>`; }).join("")}
                       </select>
-                      <input ${lockAttr} data-response="${r.id}" data-key="contact" value="${escapeAttr(r.contact)}" placeholder="Contact name" style="border:none;background:transparent;padding:2px 0 0;width:100%;font-size:12px;color:var(--text-secondary);${lockStyle}">
                     </td>
+                    <td><input ${lockAttr} data-response="${r.id}" data-key="contact" value="${escapeAttr(r.contact)}" placeholder="Contact name" style="border:none;background:transparent;padding:0;width:140px;${lockStyle}"></td>
                     <td>${locked ? '<span style="' + (function(){var c=responseStatusColor(r.heddlStatus);return 'background:'+c.bg+';color:'+c.color;})() + ';font-weight:600;padding:3px 8px;border-radius:4px;font-size:12px;display:inline-block">' + escapeHTML(r.heddlStatus||'-') + '</span>' : statusSelectHtml(r, "heddlStatus", RESPONSE_STATUSES, "-")}</td>
                     <td>${locked ? '<span style="' + (function(){var c=responseStatusColor(r.clientStatus);return 'background:'+c.bg+';color:'+c.color;})() + ';font-weight:600;padding:3px 8px;border-radius:4px;font-size:12px;display:inline-block">' + escapeHTML(r.clientStatus||'Not set') + '</span>' : statusSelectHtml(r, "clientStatus", RESPONSE_STATUSES, "Not set")}</td>
                     <td style="text-align:center">
@@ -1923,7 +1940,7 @@ function renderResponsesView() {
                       ${locked ? '<div class="small" style="color:var(--text-muted);margin-top:2px">🔒 locked</div>' : ''}
                     </td>
                     <td><input ${lockAttr} data-response="${r.id}" data-key="notes" value="${escapeAttr(r.notes)}" placeholder="Context" style="border:none;background:transparent;padding:0;width:180px;${lockStyle}"></td>
-                    <td><input ${lockAttr} data-response="${r.id}" data-key="screenshotRef" value="${escapeAttr(r.screenshotRef)}" placeholder="Filename or link" style="border:none;background:transparent;padding:0;width:140px;${lockStyle}"></td>
+                    <td>${r.screenshotUrl ? '<a href="' + escapeAttr(r.screenshotUrl) + '" target="_blank" class="small" style="color:var(--brand)">📎 ' + escapeHTML((r.screenshotRef||'view').slice(0,18)) + '…</a>' : '<span class="small" style="color:var(--text-muted)">' + escapeHTML((r.screenshotRef||'-').slice(0,18)) + '</span>'}</td>
                     <td><button class="btn ghost sm" data-action="delete-response" data-id="${r.id}" ${lockAttr}>&#128465;</button></td>
                   </tr>
                 `;}).join("")}
@@ -2706,6 +2723,82 @@ function buildGmailLink(to, subject, bodyLines) {
   var body = bodyLines.join("\n");
   return "https://mail.google.com/mail/?view=cm&to=" + encodeURIComponent(to) +
     "&su=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+}
+
+function buildGmailLinkWithCC(to, cc, subject, bodyLines) {
+  var body = bodyLines.join("\n");
+  var url = "https://mail.google.com/mail/?view=cm&to=" + encodeURIComponent(to);
+  if (cc && cc.length > 0) url += "&cc=" + encodeURIComponent(cc.join(","));
+  url += "&su=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+  return url;
+}
+
+function sendResponseReportToProspect() {
+  var clientName = (ui.responseFilters && ui.responseFilters.client) || "";
+  if (!clientName) {
+    alert("Filter the Responses tab to one specific account first (use the Account filter above), then click Send report to prospect.");
+    return;
+  }
+  var c = Object.values(state.clients).find(function(cl) { return cl.name === clientName; });
+  if (!c) { alert("Could not find a client record for " + clientName + "."); return; }
+  var toEmail = c.people.clientPocEmail || c.intake.pocEmail || "";
+  if (!toEmail) { alert("No client contact email on file for " + clientName + " yet. Add one in that client's Overview tab first."); return; }
+
+  var ccList = [];
+  if (c.people.csEmail) ccList.push(c.people.csEmail);
+  if (TEAM_EMAILS.revops) ccList.push(TEAM_EMAILS.revops);
+  if (TEAM_EMAILS.founder) ccList.push(TEAM_EMAILS.founder);
+
+  // Outcomes by Confirmed Client Status, by month - only responses marked Confirmed count here.
+  var confirmedResponses = (state.responses || []).filter(function(r) { return r.client === clientName && r.confirmed; });
+  var byMonth = {};
+  confirmedResponses.forEach(function(r) {
+    if (!r.date) return;
+    var d = new Date(r.date + "T00:00:00");
+    var monthKey = d.toLocaleDateString("en-US", { year: "numeric", month: "short" });
+    if (!byMonth[monthKey]) byMonth[monthKey] = { "Positive Reply": 0, "Meeting Booked": 0, "No Fit": 0, "Not Interested": 0 };
+    var status = r.clientStatus || r.heddlStatus;
+    if (byMonth[monthKey][status] !== undefined) byMonth[monthKey][status]++;
+  });
+  var monthKeys = Object.keys(byMonth).sort(function(a,b) { return new Date(a + " 1") - new Date(b + " 1"); });
+
+  function pad(s, n) { s = String(s); while (s.length < n) s += " "; return s; }
+  var tableLines = [];
+  if (monthKeys.length === 0) {
+    tableLines.push("No confirmed responses logged yet for " + clientName + ".");
+  } else {
+    tableLines.push(pad("Month", 14) + pad("Positive Reply", 17) + pad("Meeting Booked", 17) + pad("No Fit", 9) + "Not Interested");
+    tableLines.push(pad("-----", 14) + pad("--------------", 17) + pad("--------------", 17) + pad("------", 9) + "--------------");
+    monthKeys.forEach(function(m) {
+      var row = byMonth[m];
+      tableLines.push(pad(m, 14) + pad(row["Positive Reply"], 17) + pad(row["Meeting Booked"], 17) + pad(row["No Fit"], 9) + row["Not Interested"]);
+    });
+  }
+
+  var bodyLines = [
+    "Hi,",
+    "",
+    "Please find below a summary of confirmed outcomes for " + clientName + ", broken down by month:",
+    "",
+  ].concat(tableLines).concat([
+    "",
+    "A detailed response-by-response report (PDF) is attached.",
+    "",
+    "Best,",
+    "GetGTM Team"
+  ]);
+
+  var subject = clientName + " x GetGTM - Response & Outcomes Report";
+  var gmailUrl = buildGmailLinkWithCC(toEmail, ccList, subject, bodyLines);
+
+  // Generate the PDF scoped to just this client (ignoring any other active status/confirmed filters),
+  // so the attachment always covers the client's full response history.
+  var savedFilters = Object.assign({}, ui.responseFilters);
+  ui.responseFilters = { client: clientName, heddlStatus: "", clientStatus: "", confirmed: "" };
+  generateResponsesPDF();
+  ui.responseFilters = savedFilters;
+
+  window.open(gmailUrl, "_blank");
 }
 
 function buildProposalHTML(c, isForPDF) {
@@ -3539,13 +3632,16 @@ function attachHandlers() {
         var result = refreshResponsesFromDrive();
         if (result > 0) {
           saveState("responses").then(function() { render(); });
-          alert(result + " new response" + (result > 1 ? "s" : "") + " added from Drive screenshots.");
+          alert(result + " response" + (result > 1 ? "s" : "") + " added or updated from Drive screenshots.");
         } else {
           alert("No new responses found. This checks against screenshots I already know about - ask Claude in chat to check the Drive folder fresh for anything newly uploaded.");
         }
       }
       else if (action === "export-responses-pdf") {
         generateResponsesPDF();
+      }
+      else if (action === "send-response-report") {
+        sendResponseReportToProspect();
       }
       else if (action === "clear-response-filters") {
         ui.responseFilters = { client: "", heddlStatus: "", clientStatus: "", confirmed: "" };
