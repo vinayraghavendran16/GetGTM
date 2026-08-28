@@ -517,8 +517,8 @@ var REVENUE_CONTRACTS = {
   },
 };
 
-let state = { clients: {}, prospects: [], responses: [], revenueActuals: {} };
-let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: null, dashboardTab: "clients" };
+let state = { clients: {}, prospects: [], responses: [], responseSavedViews: [], revenueActuals: {} };
+let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: null, dashboardTab: "clients", responseFilters: { client: "", heddlStatus: "", clientStatus: "", confirmed: "" } };
 
 function seedProspects() {
   state.prospects = [
@@ -728,7 +728,7 @@ var dbRef = null;
 var useFirebase = false;
 var auth = null;
 var authUser = null;
-var clientsRef = null, prospectsRef = null, revenueActualsRef = null, responsesRef = null;
+var clientsRef = null, prospectsRef = null, revenueActualsRef = null, responsesRef = null, responseViewsRef = null;
 
 function initFirebase() {
   try {
@@ -740,6 +740,7 @@ function initFirebase() {
       prospectsRef = db.ref("getgtm_tracker/prospects");
       revenueActualsRef = db.ref("getgtm_tracker/revenueActuals");
       responsesRef = db.ref("getgtm_tracker/responses");
+      responseViewsRef = db.ref("getgtm_tracker/responseViews");
       auth = firebase.auth();
       useFirebase = true;
 
@@ -794,9 +795,14 @@ function initFirebase() {
             }
             if (!window._fbSaveInProgress) render();
           }, function(err) { console.log("responses read error:", err.message); });
+          responseViewsRef.on("value", function(snapshot) {
+            state.responseSavedViews = snapshot.val() || [];
+            if (!window._fbSaveInProgress) render();
+          }, function(err) { console.log("responseViews read error:", err.message); });
         } else {
           prospectsRef.off();
           revenueActualsRef.off();
+          responseViewsRef.off();
           responsesRef.off();
         }
         render();
@@ -834,6 +840,7 @@ async function loadState() {
   if (!state.revenueActuals) state.revenueActuals = {};
   if (!state.prospects) state.prospects = [];
   if (!state.responses) state.responses = [];
+  if (!state.responseSavedViews) state.responseSavedViews = [];
   // Firebase path seeds via the reactive listeners in initFirebase() instead - this block only
   // runs for the localStorage fallback (useFirebase === false).
   if (!useFirebase) {
@@ -859,6 +866,7 @@ async function saveState(scope) {
       if (authUser && (!scope || scope === "prospects")) writes.push(prospectsRef.set(state.prospects || []));
       if (authUser && (!scope || scope === "revenueActuals")) writes.push(revenueActualsRef.set(state.revenueActuals || {}));
       if (authUser && (!scope || scope === "responses")) writes.push(responsesRef.set(state.responses || []));
+      if (authUser && (!scope || scope === "responseViews")) writes.push(responseViewsRef.set(state.responseSavedViews || []));
       await Promise.all(writes);
       setTimeout(function() { window._fbSaveInProgress = false; }, 500);
     }
@@ -1699,6 +1707,14 @@ function renderNewEngagementsView(clients) {
 
 var RESPONSE_STATUSES = ["Positive Reply", "Meeting Booked", "No Fit", "Not Interested"];
 
+function responseStatusColor(status) {
+  if (status === "Positive Reply") return { bg: "#dcfce7", color: "#15803d" };
+  if (status === "Meeting Booked") return { bg: "#dbeafe", color: "#1d4ed8" };
+  if (status === "No Fit") return { bg: "#fef3c7", color: "#b45309" };
+  if (status === "Not Interested") return { bg: "#fee2e2", color: "#b91c1c" };
+  return { bg: "var(--surface-1)", color: "var(--text-secondary)" };
+}
+
 var PROSPECT_STATUSES = ["New", "Contacted", "Follow-up Sent", "In Conversation", "Objection Handling",
   "Proposal Requested", "Kickoff Scheduled", "Stalled", "Closed Lost", "Not a Fit", "Converted"];
 
@@ -1772,18 +1788,93 @@ function renderProspectsView() {
 }
 
 function renderResponsesView() {
-  var responses = (state.responses || []).slice().sort((a,b) => (b.date||"").localeCompare(a.date||""));
+  var allResponses = (state.responses || []).slice().sort((a,b) => (b.date||"").localeCompare(a.date||""));
+  var clientNames = Object.values(state.clients).map(function(c) { return c.name; }).sort();
+  var savedViews = state.responseSavedViews || [];
+  var f = ui.responseFilters || { client: "", heddlStatus: "", clientStatus: "", confirmed: "" };
+
+  var responses = allResponses.filter(function(r) {
+    if (f.client && r.client !== f.client) return false;
+    if (f.heddlStatus && r.heddlStatus !== f.heddlStatus) return false;
+    if (f.clientStatus && r.clientStatus !== f.clientStatus) return false;
+    if (f.confirmed === "yes" && !r.confirmed) return false;
+    if (f.confirmed === "no" && r.confirmed) return false;
+    return true;
+  });
+
   var heddlCounts = { "Positive Reply": 0, "Meeting Booked": 0, "No Fit": 0, "Not Interested": 0 };
   responses.forEach(function(r) { if (heddlCounts[r.heddlStatus] !== undefined) heddlCounts[r.heddlStatus]++; });
   var confirmedCount = responses.filter(function(r) { return r.confirmed; }).length;
-  var clientNames = Object.values(state.clients).map(function(c) { return c.name; }).sort();
+  var anyFilterActive = f.client || f.heddlStatus || f.clientStatus || f.confirmed;
+
+  function statusSelectHtml(r, key, options, placeholder) {
+    var val = r[key];
+    var c = responseStatusColor(val);
+    return '<select data-response="' + r.id + '" data-key="' + key + '" class="del-select" style="background:' + c.bg + ';color:' + c.color + ';font-weight:600;border-color:transparent">' +
+      '<option value="">' + placeholder + '</option>' +
+      options.map(function(s) { return '<option ' + (val===s?'selected':'') + '>' + s + '</option>'; }).join("") +
+      '</select>';
+  }
 
   return `
       <div class="kpis">
-        <div class="kpi"><div class="label">Total responses logged</div><div class="value">${responses.length}</div></div>
+        <div class="kpi"><div class="label">${anyFilterActive ? 'Responses (filtered)' : 'Total responses logged'}</div><div class="value">${responses.length}${anyFilterActive ? ' / ' + allResponses.length : ''}</div></div>
         <div class="kpi"><div class="label">Positive replies (Heddl)</div><div class="value" style="color:var(--success)">${heddlCounts["Positive Reply"]}</div></div>
         <div class="kpi"><div class="label">Meetings booked (Heddl)</div><div class="value" style="color:var(--brand)">${heddlCounts["Meeting Booked"]}</div></div>
         <div class="kpi"><div class="label">Client confirmed</div><div class="value" style="color:var(--text-secondary)">${confirmedCount} / ${responses.length}</div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-body" style="padding:14px 18px">
+          <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end">
+            <div>
+              <label class="small" style="display:block;margin-bottom:4px;font-weight:600">Account</label>
+              <select data-action="filter-response" data-filter="client" style="padding:6px 10px;border:1px solid var(--brand);border-radius:5px;background:var(--surface-1);min-width:160px;font-weight:600">
+                <option value="">All accounts</option>
+                ${clientNames.map(function(n) { return `<option value="${escapeAttr(n)}" ${f.client===n?'selected':''}>${escapeHTML(n)}</option>`; }).join("")}
+              </select>
+            </div>
+            <div style="width:1px;align-self:stretch;background:var(--border);margin:0 2px"></div>
+            <div>
+              <label class="small" style="display:block;margin-bottom:4px">Heddl Status</label>
+              <select data-action="filter-response" data-filter="heddlStatus" style="padding:6px 10px;border:0.5px solid var(--border);border-radius:5px;background:var(--surface-1);min-width:140px">
+                <option value="">All</option>
+                ${RESPONSE_STATUSES.map(function(s) { return `<option ${f.heddlStatus===s?'selected':''}>${s}</option>`; }).join("")}
+              </select>
+            </div>
+            <div>
+              <label class="small" style="display:block;margin-bottom:4px">Client Status</label>
+              <select data-action="filter-response" data-filter="clientStatus" style="padding:6px 10px;border:0.5px solid var(--border);border-radius:5px;background:var(--surface-1);min-width:140px">
+                <option value="">All</option>
+                ${RESPONSE_STATUSES.map(function(s) { return `<option ${f.clientStatus===s?'selected':''}>${s}</option>`; }).join("")}
+              </select>
+            </div>
+            <div>
+              <label class="small" style="display:block;margin-bottom:4px">Confirmed</label>
+              <select data-action="filter-response" data-filter="confirmed" style="padding:6px 10px;border:0.5px solid var(--border);border-radius:5px;background:var(--surface-1);min-width:120px">
+                <option value="">All</option>
+                <option value="yes" ${f.confirmed==='yes'?'selected':''}>Confirmed</option>
+                <option value="no" ${f.confirmed==='no'?'selected':''}>Not confirmed</option>
+              </select>
+            </div>
+            ${anyFilterActive ? '<button class="btn ghost sm" data-action="clear-response-filters">Clear filters</button>' : ''}
+            <div style="margin-left:auto;display:flex;gap:8px;align-items:flex-end">
+              ${savedViews.length > 0 ? `
+              <div>
+                <label class="small" style="display:block;margin-bottom:4px">Saved views</label>
+                <select data-action="load-response-view" style="padding:6px 10px;border:0.5px solid var(--border);border-radius:5px;background:var(--surface-1);min-width:140px">
+                  <option value="">Load a view...</option>
+                  ${savedViews.map(function(v, vi) { return `<option value="${vi}">${escapeHTML(v.name)}</option>`; }).join("")}
+                </select>
+              </div>` : ''}
+              <button class="btn ghost sm" data-action="save-response-view">💾 Save view</button>
+            </div>
+          </div>
+          ${savedViews.length > 0 ? `
+          <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+            ${savedViews.map(function(v, vi) { return `<span class="badge pending" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer" data-action="load-response-view-chip" data-view-index="${vi}">${escapeHTML(v.name)} <span data-action="delete-response-view" data-view-index="${vi}" style="opacity:0.6">&times;</span></span>`; }).join("")}
+          </div>` : ''}
+        </div>
       </div>
 
       <div class="card">
@@ -1798,7 +1889,7 @@ function renderResponsesView() {
           <div class="small" style="padding:12px 16px;border-bottom:0.5px solid var(--border)">
             Screenshots live in per-client folders in Drive - ask Claude to check them and it reads each one, adds a row with date/client/contact/notes filled in, and sets <strong>Heddl Status</strong> automatically from what the reply shows. <strong>Client Status</strong> and <strong>Confirmed</strong> are always set manually, once you've worked with the client to agree on classification.
           </div>
-          ${responses.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">No responses logged yet.</div>` : `
+          ${responses.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">${anyFilterActive ? 'No responses match the current filters.' : 'No responses logged yet.'}</div>` : `
             <table>
               <thead><tr><th>Date</th><th>Client</th><th>Contact</th><th>Screenshot ref</th><th>Heddl Status</th><th>Client Status</th><th>Confirmed</th><th>Notes</th><th></th></tr></thead>
               <tbody>
@@ -1813,18 +1904,8 @@ function renderResponsesView() {
                     </td>
                     <td><input data-response="${r.id}" data-key="contact" value="${escapeAttr(r.contact)}" placeholder="Name" style="border:none;background:transparent;padding:0;width:120px"></td>
                     <td><input data-response="${r.id}" data-key="screenshotRef" value="${escapeAttr(r.screenshotRef)}" placeholder="Filename or link" style="border:none;background:transparent;padding:0;width:140px"></td>
-                    <td>
-                      <select data-response="${r.id}" data-key="heddlStatus" class="del-select" style="background:var(--brand-light)">
-                        <option value="">-</option>
-                        ${RESPONSE_STATUSES.map(function(s) { return `<option ${r.heddlStatus===s?'selected':''}>${s}</option>`; }).join("")}
-                      </select>
-                    </td>
-                    <td>
-                      <select data-response="${r.id}" data-key="clientStatus" class="del-select">
-                        <option value="">Not set</option>
-                        ${RESPONSE_STATUSES.map(function(s) { return `<option ${r.clientStatus===s?'selected':''}>${s}</option>`; }).join("")}
-                      </select>
-                    </td>
+                    <td>${statusSelectHtml(r, "heddlStatus", RESPONSE_STATUSES, "-")}</td>
+                    <td>${statusSelectHtml(r, "clientStatus", RESPONSE_STATUSES, "Not set")}</td>
                     <td style="text-align:center"><input type="checkbox" data-response="${r.id}" data-key="confirmed" data-type="checkbox" ${r.confirmed ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer"></td>
                     <td><input data-response="${r.id}" data-key="notes" value="${escapeAttr(r.notes)}" placeholder="Context" style="border:none;background:transparent;padding:0;width:180px"></td>
                     <td><button class="btn ghost sm" data-action="delete-response" data-id="${r.id}">&#128465;</button></td>
@@ -3350,6 +3431,30 @@ function attachHandlers() {
           alert("No new responses found. This checks against screenshots I already know about - ask Claude in chat to check the Drive folder fresh for anything newly uploaded.");
         }
       }
+      else if (action === "clear-response-filters") {
+        ui.responseFilters = { client: "", heddlStatus: "", clientStatus: "", confirmed: "" };
+        render();
+      }
+      else if (action === "save-response-view") {
+        var viewName = prompt("Name this view (e.g. \"Securotix unconfirmed positives\"):");
+        if (!viewName) return;
+        if (!state.responseSavedViews) state.responseSavedViews = [];
+        state.responseSavedViews.push({ name: viewName, filters: Object.assign({}, ui.responseFilters) });
+        saveState("responseViews"); render();
+      }
+      else if (action === "delete-response-view") {
+        var vIdx = +el.dataset.viewIndex;
+        var vName = (state.responseSavedViews[vIdx] || {}).name || "this view";
+        if (confirm("Delete saved view \"" + vName + "\"?")) {
+          state.responseSavedViews.splice(vIdx, 1);
+          saveState("responseViews"); render();
+        }
+      }
+      else if (action === "load-response-view-chip") {
+        var loadIdx = +el.dataset.viewIndex;
+        var view = state.responseSavedViews[loadIdx];
+        if (view) { ui.responseFilters = Object.assign({ client: "", heddlStatus: "", clientStatus: "", confirmed: "" }, view.filters); render(); }
+      }
       else if (action === "convert-prospect") {
         var prospect = state.prospects.find(function(x) { return x.id === el.dataset.id; });
         if (!prospect) return;
@@ -3609,6 +3714,21 @@ function attachHandlers() {
     };
     el.addEventListener("input", handler);
     el.addEventListener("change", handler);
+  });
+
+  document.querySelectorAll('[data-action="filter-response"]').forEach(el => {
+    el.addEventListener("change", () => {
+      if (!ui.responseFilters) ui.responseFilters = { client: "", heddlStatus: "", clientStatus: "", confirmed: "" };
+      ui.responseFilters[el.dataset.filter] = el.value;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-action="load-response-view"]').forEach(el => {
+    el.addEventListener("change", () => {
+      if (el.value === "") return;
+      var view = (state.responseSavedViews || [])[+el.value];
+      if (view) { ui.responseFilters = Object.assign({ client: "", heddlStatus: "", clientStatus: "", confirmed: "" }, view.filters); render(); }
+    });
   });
 
   document.querySelectorAll("[data-proposal]").forEach(el => {
