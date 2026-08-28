@@ -1889,13 +1889,13 @@ function renderResponsesView() {
         <div class="card-head">
           <h2>Response Tracker</h2>
           <div style="display:flex;gap:8px">
-            <button class="btn ghost sm" data-action="check-response-drive">📷 Check Drive for screenshots</button>
+            <button class="btn ghost sm" data-action="check-response-drive">📷 Check for new replies</button>
             <button class="btn" data-action="add-response">+ Add response</button>
           </div>
         </div>
         <div class="card-body" style="padding:0">
           <div class="small" style="padding:12px 16px;border-bottom:0.5px solid var(--border)">
-            Screenshots live in per-client folders in Drive - ask Claude to check them and it reads each one, adds a row with date/client/contact/notes filled in, and sets <strong>Heddl Status</strong> automatically from what the reply shows. <strong>Client Status</strong> and <strong>Confirmed</strong> are always set manually, once you've worked with the client to agree on classification.
+            Existing records here sync live - no need to refresh to see them or anyone's edits. Screenshots live in per-client folders in Drive; ask Claude to check them and it reads each new one, adds a row with date/client/contact/notes filled in, and sets <strong>Heddl Status</strong> automatically from what the reply shows. <strong>Client Status</strong> and <strong>Confirmed</strong> are always set manually, once you've worked with the client to agree on classification.
           </div>
           ${responses.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">${anyFilterActive ? 'No responses match the current filters.' : 'No responses logged yet.'}</div>` : `
             <table>
