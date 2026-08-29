@@ -629,7 +629,10 @@ function refreshProspectsFromGmail() {
 // whichever entry is best: confirmed first, then longest notes (most complete), then earliest
 // logged. Returns { kept, removed } - never mutates the input array.
 function normalizeContact(s) {
-  return (s || "").trim().toLowerCase().replace(/\s+/g, " ");
+  // Strip a trailing "(Company Name)" suffix before comparing - the same person's company text
+  // sometimes gets truncated or spelled slightly differently between screenshots (e.g. "Al Rajhi
+  // Takaful" vs "Al Rajhi"), which would otherwise defeat exact-match dedup for the same person.
+  return (s || "").trim().toLowerCase().replace(/\s*\([^)]*\)\s*$/, "").replace(/\s+/g, " ").trim();
 }
 
 function dedupeResponses(responses) {
