@@ -1890,6 +1890,12 @@ function renderResponsesView() {
         <div class="kpi"><div class="label">Meetings booked (Heddl)</div><div class="value" style="color:var(--brand)">${heddlCounts["Meeting Booked"]}</div></div>
         <div class="kpi"><div class="label">Client confirmed</div><div class="value" style="color:var(--text-secondary)">${confirmedCount} / ${responses.length}</div></div>
       </div>
+      <div class="kpis">
+        <div class="kpi"><div class="label">Positive response %</div><div class="value" style="color:var(--success)">${responses.length ? Math.round(heddlCounts["Positive Reply"] / responses.length * 100) : 0}%</div></div>
+        <div class="kpi"><div class="label">Meetings booked %</div><div class="value" style="color:var(--brand)">${responses.length ? Math.round(heddlCounts["Meeting Booked"] / responses.length * 100) : 0}%</div></div>
+        <div class="kpi"><div class="label">Not interested %</div><div class="value" style="color:var(--danger)">${responses.length ? Math.round(heddlCounts["Not Interested"] / responses.length * 100) : 0}%</div></div>
+        <div class="kpi"><div class="label">Client confirmed %</div><div class="value" style="color:var(--text-secondary)">${responses.length ? Math.round(confirmedCount / responses.length * 100) : 0}%</div></div>
+      </div>
 
       <div class="card" style="margin-bottom:16px">
         <div class="card-body" style="padding:14px 18px">
