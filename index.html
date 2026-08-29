@@ -668,6 +668,25 @@ function dedupeResponses(responses) {
   return { kept: kept, removed: removedCount };
 }
 
+// Normalizes a responses array in place: ensures newer fields exist on older records, and splits a
+// legacy combined "Name (Company)" contact string into separate contact/company fields. Returns true
+// if anything was actually changed (so callers know whether a save-back is needed).
+function migrateResponseFields(responses) {
+  var changed = false;
+  (responses || []).forEach(function(r) {
+    if (r.heddlStatus === undefined) { r.heddlStatus = r.status || ""; changed = true; }
+    if (r.clientStatus === undefined) { r.clientStatus = ""; changed = true; }
+    if (r.confirmed === undefined) { r.confirmed = false; changed = true; }
+    if (r.status !== undefined) { delete r.status; changed = true; }
+    if (r.company === undefined) {
+      var m = /^(.*?)\s*\(([^)]+)\)\s*$/.exec(r.contact || "");
+      if (m) { r.contact = m[1]; r.company = m[2]; } else { r.company = ""; }
+      changed = true;
+    }
+  });
+  return changed;
+}
+
 function refreshResponsesFromDrive() {
   if (!state.responses) state.responses = [];
   var existingRefs = state.responses.map(function(r) { return r.screenshotRef; });
@@ -849,12 +868,8 @@ function initFirebase() {
           }, function(err) { console.log("revenueActuals read error:", err.message); });
           responsesRef.on("value", function(snapshot) {
             state.responses = snapshot.val() || [];
-            state.responses.forEach(function(r) {
-              if (r.heddlStatus === undefined) r.heddlStatus = r.status || "";
-              if (r.clientStatus === undefined) r.clientStatus = "";
-              if (r.confirmed === undefined) r.confirmed = false;
-              delete r.status;
-            });
+            var migratedAny = migrateResponseFields(state.responses);
+            if (migratedAny && !window._fbSaveInProgress) { saveState("responses"); }
             // Note: the old hardcoded-list auto-seed used to run here. Removed - the backend
             // (GitHub Actions, scripts/refresh-responses.mjs) now handles new screenshots for real,
             // and re-running the old hardcoded list would fight with the Dedupe button by re-adding
@@ -916,6 +931,7 @@ async function loadState() {
   // Firebase path seeds via the reactive listeners in initFirebase() instead - this block only
   // runs for the localStorage fallback (useFirebase === false).
   if (!useFirebase) {
+    if (migrateResponseFields(state.responses)) { await saveState("responses"); }
     if (state.prospects.length === 0) { seedProspects(); await saveState(); }
     var _resultOnInit = refreshProspectsFromGmail();
     if (_resultOnInit.added > 0 || _resultOnInit.updated > 0) { state.lastGmailRefresh = new Date().toLocaleDateString("en-US", {year:"numeric",month:"short",day:"numeric"}); await saveState(); }
@@ -1973,7 +1989,7 @@ function renderResponsesView() {
           </div>
           ${responses.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">${anyFilterActive ? 'No responses match the current filters.' : 'No responses logged yet.'}</div>` : `
             <table>
-              <thead><tr><th>Date</th><th>Account</th><th>Contact</th><th>Heddl Status</th><th>Client Status</th><th>Confirmed</th><th>Notes</th><th>Screenshot</th><th></th></tr></thead>
+              <thead><tr><th>Date</th><th>Account</th><th>Contact</th><th>Company</th><th>Heddl Status</th><th>Client Status</th><th>Confirmed</th><th>Notes</th><th>Screenshot</th><th></th></tr></thead>
               <tbody>
                 ${responses.map(function(r, i) {
                   var locked = !!r.confirmed;
@@ -1989,6 +2005,7 @@ function renderResponsesView() {
                       </select>
                     </td>
                     <td><input ${lockAttr} data-response="${r.id}" data-key="contact" value="${escapeAttr(r.contact)}" placeholder="Contact name" style="border:none;background:transparent;padding:0;width:140px;${lockStyle}"></td>
+                    <td><input ${lockAttr} data-response="${r.id}" data-key="company" value="${escapeAttr(r.company || '')}" placeholder="Their company" style="border:none;background:transparent;padding:0;width:130px;${lockStyle}"></td>
                     <td>${locked ? '<span style="' + (function(){var c=responseStatusColor(r.heddlStatus);return 'background:'+c.bg+';color:'+c.color;})() + ';font-weight:600;padding:3px 8px;border-radius:4px;font-size:12px;display:inline-block">' + escapeHTML(r.heddlStatus||'-') + '</span>' : statusSelectHtml(r, "heddlStatus", RESPONSE_STATUSES, "-")}</td>
                     <td>${locked ? '<span style="' + (function(){var c=responseStatusColor(r.clientStatus);return 'background:'+c.bg+';color:'+c.color;})() + ';font-weight:600;padding:3px 8px;border-radius:4px;font-size:12px;display:inline-block">' + escapeHTML(r.clientStatus||'Not set') + '</span>' : statusSelectHtml(r, "clientStatus", RESPONSE_STATUSES, "Not set")}</td>
                     <td style="text-align:center">
@@ -3092,7 +3109,7 @@ function generateResponsesPDF() {
   var rows = responses.map(function(r) {
     return '<tr>' +
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px;white-space:nowrap">' + escapeHTML(r.date || "-") + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px"><strong>' + escapeHTML(r.client || "-") + '</strong><br><span style="color:#64748b">' + escapeHTML(r.contact || "") + '</span></td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px"><strong>' + escapeHTML(r.client || "-") + '</strong><br><span style="color:#64748b">' + escapeHTML(r.contact || "") + (r.company ? ' (' + escapeHTML(r.company) + ')' : '') + '</span></td>' +
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + badge(r.heddlStatus) + '</td>' +
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + badge(r.clientStatus) + '</td>' +
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px;text-align:center">' + (r.confirmed ? '✓' : '') + '</td>' +
@@ -3668,7 +3685,7 @@ function attachHandlers() {
         if (!state.responses) state.responses = [];
         state.responses.push({
           id: "r_" + Math.random().toString(36).slice(2,10),
-          date: new Date().toISOString().slice(0,10), client: "", contact: "",
+          date: new Date().toISOString().slice(0,10), client: "", contact: "", company: "",
           screenshotRef: "", heddlStatus: "", clientStatus: "", confirmed: false, notes: ""
         });
         saveState("responses"); render();
