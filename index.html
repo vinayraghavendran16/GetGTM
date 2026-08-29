@@ -629,10 +629,16 @@ function refreshProspectsFromGmail() {
 // whichever entry is best: confirmed first, then longest notes (most complete), then earliest
 // logged. Returns { kept, removed } - never mutates the input array.
 function normalizeContact(s) {
-  // Strip a trailing "(Company Name)" suffix before comparing - the same person's company text
-  // sometimes gets truncated or spelled slightly differently between screenshots (e.g. "Al Rajhi
-  // Takaful" vs "Al Rajhi"), which would otherwise defeat exact-match dedup for the same person.
-  return (s || "").trim().toLowerCase().replace(/\s*\([^)]*\)\s*$/, "").replace(/\s+/g, " ").trim();
+  // Take only the leading run of letters/spaces (stops at the first parenthesis, comma, dash, etc. -
+  // standard or fullwidth, since OCR-style extraction from Drive screenshots sometimes produces
+  // non-ASCII punctuation), then strip to letters only. Deliberately aggressive: Drive screenshots
+  // go through an image-to-text step that can introduce invisible characters, irregular spacing, or
+  // non-standard punctuation that look identical on screen but wouldn't match a simple trim/lowercase
+  // comparison. Tradeoff: two genuinely different people sharing an identical first+last name at the
+  // same client would incorrectly be treated as duplicates - rare in practice, but worth knowing if
+  // Dedupe ever removes something it shouldn't.
+  var leading = (s || "").match(/^[a-zA-Z\s]*/)[0];
+  return leading.toLowerCase().replace(/[^a-z]/g, "");
 }
 
 function dedupeResponses(responses) {
