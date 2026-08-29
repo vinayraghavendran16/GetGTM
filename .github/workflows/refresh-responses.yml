@@ -1,0 +1,31 @@
+name: Refresh Response Tracker from Drive
+
+# Runs on a schedule, completely independent of anyone being logged into the tracker or having
+# Gmail/Drive open in a browser. Also runnable manually from the Actions tab for testing.
+on:
+  schedule:
+    - cron: '*/30 * * * *'   # every 30 minutes. Adjust as needed - see notes in the setup guide.
+  workflow_dispatch: {}       # lets you click "Run workflow" manually in GitHub's UI
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run refresh script
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: npm run refresh

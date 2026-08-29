@@ -1,0 +1,16 @@
+{
+  "name": "getgtm-response-refresh",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Scheduled backend job that reads new Drive screenshots and logs them into the GetGTM tracker's Response Tracker via Firebase Admin SDK.",
+  "scripts": {
+    "refresh": "node scripts/refresh-responses.mjs",
+    "test": "node test/unit.mjs"
+  },
+  "dependencies": {
+    "googleapis": "^144.0.0",
+    "firebase-admin": "^12.6.0",
+    "@anthropic-ai/sdk": "^0.27.0"
+  }
+}
