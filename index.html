@@ -623,6 +623,42 @@ function refreshProspectsFromGmail() {
 // Manually-triggered pull from the response screenshots Drive folder (via Claude). Idempotent by
 // screenshotRef - safe to re-run, never duplicates. Heddl Status is set automatically from what the
 // screenshot shows; Client Status and Confirmed are always left for manual entry.
+// Groups responses by (client, normalized contact) - the same underlying reply can end up logged
+// twice if the same thread gets screenshotted more than once (each screenshot gets a unique
+// filename, so filename-based dedup alone doesn't catch this). Within each duplicate group, keeps
+// whichever entry is best: confirmed first, then longest notes (most complete), then earliest
+// logged. Returns { kept, removed } - never mutates the input array.
+function normalizeContact(s) {
+  return (s || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function dedupeResponses(responses) {
+  var groups = {};
+  responses.forEach(function(r) {
+    var key = (r.client || "").trim().toLowerCase() + "::" + normalizeContact(r.contact);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(r);
+  });
+
+  var kept = [];
+  var removedCount = 0;
+  Object.keys(groups).forEach(function(key) {
+    var group = groups[key];
+    if (group.length === 1) { kept.push(group[0]); return; }
+    var best = group.reduce(function(a, b) {
+      if (a.confirmed && !b.confirmed) return a;
+      if (b.confirmed && !a.confirmed) return b;
+      var aLen = (a.notes || "").length, bLen = (b.notes || "").length;
+      if (aLen !== bLen) return aLen > bLen ? a : b;
+      return a; // stable - keep the first one encountered
+    });
+    kept.push(best);
+    removedCount += group.length - 1;
+  });
+
+  return { kept: kept, removed: removedCount };
+}
+
 function refreshResponsesFromDrive() {
   if (!state.responses) state.responses = [];
   var existingRefs = state.responses.map(function(r) { return r.screenshotRef; });
@@ -1911,6 +1947,7 @@ function renderResponsesView() {
           <div style="display:flex;gap:8px">
             <a href="https://drive.google.com/drive/folders/1Hr3GWko3ixmEJZTl6DHgNiJauG502gL8" target="_blank" class="btn ghost sm">📁 Open Drive folder</a>
             <button class="btn ghost sm" data-action="check-response-drive">📷 Check for new replies</button>
+            <button class="btn ghost sm" data-action="dedupe-responses" style="color:var(--danger)">🧹 Dedupe</button>
             <button class="btn ghost sm" data-action="export-responses-pdf">⬇ Export PDF</button>
             <button class="btn" data-action="add-response">+ Add response</button>
           </div>
@@ -3639,6 +3676,16 @@ function attachHandlers() {
           alert(result + " response" + (result > 1 ? "s" : "") + " added or updated from Drive screenshots.");
         } else {
           alert("No new responses found. This checks against screenshots I already know about - ask Claude in chat to check the Drive folder fresh for anything newly uploaded.");
+        }
+      }
+      else if (action === "dedupe-responses") {
+        var dedupeResult = dedupeResponses(state.responses || []);
+        if (dedupeResult.removed === 0) {
+          alert("No duplicates found - every response is for a unique client + contact.");
+        } else if (confirm("Found " + dedupeResult.removed + " duplicate response(s) - same client and contact logged more than once (likely the same reply screenshotted twice). Keeping the best copy of each (confirmed ones first, then the most detailed) and removing the rest. This cannot be undone. Continue?")) {
+          state.responses = dedupeResult.kept;
+          saveState("responses").then(function() { render(); });
+          alert("Removed " + dedupeResult.removed + " duplicate(s). " + dedupeResult.kept.length + " unique responses remain.");
         }
       }
       else if (action === "export-responses-pdf") {
