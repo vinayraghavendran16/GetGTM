@@ -150,6 +150,10 @@ export function isValidClassification(extracted) {
   return HEDDL_STATUSES.includes(extracted.heddlStatus);
 }
 
+export function contactKey(client, contact) {
+  return (client || '').trim().toLowerCase() + '::' + (contact || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
 export function filterNewFiles(files, existingRefs) {
   const refsSet = existingRefs instanceof Set ? existingRefs : new Set(existingRefs);
   return files.filter((f) => !refsSet.has(f.name));
@@ -177,6 +181,10 @@ async function main() {
   const responsesSnap = await db.ref('getgtm_tracker/responses').once('value');
   const existingResponses = responsesSnap.val() || [];
   const existingRefs = new Set(existingResponses.map((r) => r.screenshotRef));
+  // Content-based dedup: the same reply thread can get screenshotted more than once, producing a
+  // new filename each time - filename dedup alone misses that. Track (client, contact) pairs too,
+  // seeded from what's already logged, so a re-screenshotted thread is skipped instead of duplicated.
+  const seenContactKeys = new Set(existingResponses.map((r) => contactKey(r.client, r.contact)));
   console.log(`${existingResponses.length} responses already logged in Firebase.`);
 
   const clientFolders = await listSubfolders(DRIVE_RESPONSES_ROOT_ID);
@@ -204,6 +212,13 @@ async function main() {
           console.log(`  - ${file.name}: skipped (${extracted.error || 'invalid heddlStatus'})`);
           continue;
         }
+
+        const key = contactKey(clientName, extracted.contact);
+        if (seenContactKeys.has(key)) {
+          console.log(`  - ${file.name}: skipped (duplicate - "${extracted.contact}" at ${clientName} already logged, likely the same thread screenshotted again)`);
+          continue;
+        }
+        seenContactKeys.add(key);
 
         const entry = buildEntry(clientName, file, extracted);
         newEntries.push(entry);
