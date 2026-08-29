@@ -844,11 +844,10 @@ function initFirebase() {
               if (r.confirmed === undefined) r.confirmed = false;
               delete r.status;
             });
-            if (!window._responseSeedDone) {
-              window._responseSeedDone = true;
-              var addedResponses = refreshResponsesFromDrive();
-              if (addedResponses > 0) { saveState("responses"); }
-            }
+            // Note: the old hardcoded-list auto-seed used to run here. Removed - the backend
+            // (GitHub Actions, scripts/refresh-responses.mjs) now handles new screenshots for real,
+            // and re-running the old hardcoded list would fight with the Dedupe button by re-adding
+            // entries that were intentionally removed as duplicates.
             if (!window._fbSaveInProgress) render();
           }, function(err) { console.log("responses read error:", err.message); });
           responseViewsRef.on("value", function(snapshot) {
@@ -909,8 +908,8 @@ async function loadState() {
     if (state.prospects.length === 0) { seedProspects(); await saveState(); }
     var _resultOnInit = refreshProspectsFromGmail();
     if (_resultOnInit.added > 0 || _resultOnInit.updated > 0) { state.lastGmailRefresh = new Date().toLocaleDateString("en-US", {year:"numeric",month:"short",day:"numeric"}); await saveState(); }
-    var _responsesAddedOnInit = refreshResponsesFromDrive();
-    if (_responsesAddedOnInit > 0) { await saveState(); }
+    // Note: legacy hardcoded-list response auto-seed removed here too - see the Firebase listener
+    // above for why (superseded by the real backend automation, conflicts with Dedupe otherwise).
     var beforeClientCount = Object.keys(state.clients).length;
     seedKnownAccounts();
     enrichKnownAccounts();
@@ -1946,7 +1945,6 @@ function renderResponsesView() {
           <h2>Response Tracker</h2>
           <div style="display:flex;gap:8px">
             <a href="https://drive.google.com/drive/folders/1Hr3GWko3ixmEJZTl6DHgNiJauG502gL8" target="_blank" class="btn ghost sm">📁 Open Drive folder</a>
-            <button class="btn ghost sm" data-action="check-response-drive">📷 Check for new replies</button>
             <button class="btn ghost sm" data-action="dedupe-responses" style="color:var(--danger)">🧹 Dedupe</button>
             <button class="btn ghost sm" data-action="export-responses-pdf">⬇ Export PDF</button>
             <button class="btn" data-action="add-response">+ Add response</button>
@@ -1954,7 +1952,7 @@ function renderResponsesView() {
         </div>
         <div class="card-body" style="padding:0">
           <div class="small" style="padding:12px 16px;border-bottom:0.5px solid var(--border)">
-            Existing records here sync live - no need to refresh to see them or anyone's edits. Screenshots live in per-client folders in Drive; ask Claude to check them and it reads each new one, adds a row with date/client/contact/notes filled in, and sets <strong>Heddl Status</strong> automatically from what the reply shows. <strong>Client Status</strong> and <strong>Confirmed</strong> are always set manually, once you've worked with the client to agree on classification.
+            Existing records here sync live - no need to refresh to see them or anyone's edits. New screenshots uploaded to Drive are picked up automatically by a backend job every 30 minutes - no button needed. It sets <strong>Heddl Status</strong> from what the reply shows. <strong>Client Status</strong> and <strong>Confirmed</strong> are always set manually, once you've worked with the client to agree on classification.
           </div>
           ${responses.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">${anyFilterActive ? 'No responses match the current filters.' : 'No responses logged yet.'}</div>` : `
             <table>
@@ -3667,15 +3665,6 @@ function attachHandlers() {
         if (confirm("Remove this response? This cannot be undone.")) {
           state.responses = (state.responses || []).filter(function(r) { return r.id !== el.dataset.id; });
           saveState("responses"); render();
-        }
-      }
-      else if (action === "check-response-drive") {
-        var result = refreshResponsesFromDrive();
-        if (result > 0) {
-          saveState("responses").then(function() { render(); });
-          alert(result + " response" + (result > 1 ? "s" : "") + " added or updated from Drive screenshots.");
-        } else {
-          alert("No new responses found. This checks against screenshots I already know about - ask Claude in chat to check the Drive folder fresh for anything newly uploaded.");
         }
       }
       else if (action === "dedupe-responses") {
