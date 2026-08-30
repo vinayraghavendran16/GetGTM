@@ -421,11 +421,6 @@
     border-radius: 3px; margin-bottom: 8px; }
   .rel-entry h3 { font-size: 14px; font-weight: 600; margin: 0 0 6px; }
   .rel-entry p { font-size: 13px; line-height: 1.6; color: var(--text-secondary); margin: 0; }
-
-  .col-resize-handle { position: absolute; right: -3px; top: 0; bottom: 0; width: 6px;
-    cursor: col-resize; z-index: 2; }
-  .col-resize-handle:hover, .col-resize-handle.resizing { background: var(--brand); opacity: 0.5; }
-  #response-table th { position: relative; }
 </style>
 </head>
 <body>
@@ -523,7 +518,7 @@ var REVENUE_CONTRACTS = {
 };
 
 let state = { clients: {}, prospects: [], responses: [], responseSavedViews: [], responseBilling: {}, revenueActuals: {} };
-let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: null, dashboardTab: "clients", responseFilters: { client: "", heddlStatus: "", clientStatus: "", confirmed: "" }, responseSort: { column: null, direction: "asc" } };
+let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: null, dashboardTab: "clients", responseFilters: { client: "", heddlStatus: "", clientStatus: "", confirmed: "" } };
 
 function seedProspects() {
   state.prospects = [
@@ -673,21 +668,6 @@ function dedupeResponses(responses) {
   return { kept: kept, removed: removedCount };
 }
 
-// Response table column widths - a pure local display preference (not shared team data), so it's
-// kept in localStorage directly rather than Firebase. Falls back to sensible defaults.
-var RESPONSE_COL_DEFAULTS = { date: 110, account: 120, contact: 150, company: 130, campaign: 150, heddlStatus: 130, clientStatus: 130, confirmed: 90, notes: 200, screenshot: 140 };
-function getResponseColWidths() {
-  try {
-    var saved = JSON.parse(window.localStorage.getItem("getgtm_response_col_widths") || "{}");
-    return Object.assign({}, RESPONSE_COL_DEFAULTS, saved);
-  } catch (e) { return Object.assign({}, RESPONSE_COL_DEFAULTS); }
-}
-function saveResponseColWidth(colId, width) {
-  var widths = getResponseColWidths();
-  widths[colId] = Math.max(60, Math.round(width));
-  try { window.localStorage.setItem("getgtm_response_col_widths", JSON.stringify(widths)); } catch (e) {}
-}
-
 // Normalizes a responses array in place: ensures newer fields exist on older records, and splits a
 // legacy combined "Name (Company)" contact string into separate contact/company fields. Returns true
 // if anything was actually changed (so callers know whether a save-back is needed).
@@ -701,14 +681,6 @@ function migrateResponseFields(responses) {
     if (r.company === undefined) {
       var m = /^(.*?)\s*\(([^)]+)\)\s*$/.exec(r.contact || "");
       if (m) { r.contact = m[1]; r.company = m[2]; } else { r.company = ""; }
-      changed = true;
-    }
-    if (r.campaign === undefined) {
-      // Best-effort extraction from notes text, e.g. "1Kosmos campaign. Confirmed..." or
-      // "AlgoSec Displacement (Tufin) campaign. ..." - matches "<name> campaign" at the start of
-      // notes. Inferred, not authoritative - the campaign column is editable so this can be corrected.
-      var cm = /^([\w\s/&()\-]+?)\s+campaign\b/i.exec(r.notes || "");
-      r.campaign = (cm && cm[1].trim().length >= 3) ? cm[1].trim() : "";
       changed = true;
     }
   });
@@ -1904,55 +1876,6 @@ function renderProspectsView() {
   `;
 }
 
-// Groups responses by Campaign then Month, with Total and Confirmed counts per group. Shared by both
-// the on-screen Reporting Snapshot table and the "Copy Snapshot" clipboard text, so they always match.
-function computeReportingSnapshotGroups(responses) {
-  var groups = {};
-  (responses || []).forEach(function(r) {
-    var campaign = r.campaign || "(No campaign set)";
-    var month = r.date ? new Date(r.date + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "short" }) : "(No date)";
-    var key = campaign + "||" + month;
-    if (!groups[key]) groups[key] = { campaign: campaign, month: month, monthSort: r.date ? r.date.slice(0,7) : "", total: 0, confirmed: 0 };
-    groups[key].total++;
-    if (r.confirmed) groups[key].confirmed++;
-  });
-  return Object.values(groups).sort(function(a, b) {
-    if (a.campaign !== b.campaign) return a.campaign.localeCompare(b.campaign);
-    return a.monthSort.localeCompare(b.monthSort);
-  });
-}
-
-// Groups the currently-visible responses by Campaign, then Month, showing Total and Confirmed counts
-// for each - the exact numbers worth putting in a report someone can copy into an email. Only ever
-// operates on whatever's currently filtered/visible, so it matches what the person is looking at.
-function renderReportingSnapshot(responses) {
-  if (!responses || responses.length === 0) {
-    return '<div class="card" style="margin-bottom:16px"><div class="card-head"><h2>Reporting Snapshot</h2></div>' +
-      '<div class="card-body"><div class="small" style="color:var(--text-muted)">No responses to summarize yet.</div></div></div>';
-  }
-
-  var rows = computeReportingSnapshotGroups(responses);
-
-  var tableRows = rows.map(function(g) {
-    var pct = g.total ? Math.round(g.confirmed / g.total * 100) : 0;
-    return '<tr>' +
-      '<td>' + escapeHTML(g.campaign) + '</td>' +
-      '<td>' + escapeHTML(g.month) + '</td>' +
-      '<td>' + g.total + '</td>' +
-      '<td>' + g.confirmed + '</td>' +
-      '<td>' + pct + '%</td>' +
-      '</tr>';
-  }).join("");
-
-  return '<div class="card" style="margin-bottom:16px">' +
-    '<div class="card-head"><div><h2>Reporting Snapshot</h2><div class="sub">By campaign and month, with confirmed counts - copy for a Gmail report</div></div>' +
-    '<button class="btn ghost sm" data-action="copy-reporting-snapshot">📋 Copy Snapshot</button></div>' +
-    '<div class="card-body" style="padding:0">' +
-    '<table><thead><tr><th>Campaign</th><th>Month</th><th>Total</th><th>Confirmed</th><th>Confirmed %</th></tr></thead>' +
-    '<tbody>' + tableRows + '</tbody></table>' +
-    '</div></div>';
-}
-
 function renderResponsesView() {
   var allResponses = (state.responses || []).slice().sort((a,b) => (b.date||"").localeCompare(a.date||""));
   var clientNames = Object.values(state.clients).map(function(c) { return c.name; }).sort();
@@ -1968,34 +1891,10 @@ function renderResponsesView() {
     return true;
   });
 
-  var sortState = ui.responseSort || { column: null, direction: "asc" };
-  if (sortState.column) {
-    var sortKey = sortState.column;
-    var dir = sortState.direction === "desc" ? -1 : 1;
-    responses.sort(function(a, b) {
-      var av = (a[sortKey] || "").toString().toLowerCase();
-      var bv = (b[sortKey] || "").toString().toLowerCase();
-      if (av < bv) return -1 * dir;
-      if (av > bv) return 1 * dir;
-      return 0;
-    });
-  }
-
   var heddlCounts = { "Positive Reply": 0, "Meeting Booked": 0, "No Fit": 0, "Not Interested": 0 };
   responses.forEach(function(r) { if (heddlCounts[r.heddlStatus] !== undefined) heddlCounts[r.heddlStatus]++; });
   var confirmedCount = responses.filter(function(r) { return r.confirmed; }).length;
   var anyFilterActive = f.client || f.heddlStatus || f.clientStatus || f.confirmed;
-
-  var colWidths = getResponseColWidths();
-  function sortableHeader(label, sortKey, colId) {
-    var arrow = "";
-    if (sortKey && sortState.column === sortKey) {
-      arrow = ' <span style="opacity:0.7">' + (sortState.direction === "desc" ? "▼" : "▲") + '</span>';
-    }
-    var clickAttr = sortKey ? ' data-action="sort-responses" data-sort-key="' + sortKey + '" style="cursor:pointer;user-select:none;position:relative"' : ' style="position:relative"';
-    var handle = colId ? '<span class="col-resize-handle" data-resize-col="col-' + colId + '"></span>' : '';
-    return '<th' + clickAttr + '>' + escapeHTML(label) + arrow + handle + '</th>';
-  }
 
   function statusSelectHtml(r, key, options, placeholder) {
     var val = r[key];
@@ -2019,8 +1918,6 @@ function renderResponsesView() {
         <div class="kpi"><div class="label">Not interested %</div><div class="value" style="color:var(--danger)">${responses.length ? Math.round(heddlCounts["Not Interested"] / responses.length * 100) : 0}%</div></div>
         <div class="kpi"><div class="label">Client confirmed %</div><div class="value" style="color:var(--text-secondary)">${responses.length ? Math.round(confirmedCount / responses.length * 100) : 0}%</div></div>
       </div>
-
-      ${renderReportingSnapshot(responses)}
 
       <div class="card" style="margin-bottom:16px">
         <div class="card-body" style="padding:14px 18px">
@@ -2091,25 +1988,8 @@ function renderResponsesView() {
             Existing records here sync live - no need to refresh to see them or anyone's edits. New screenshots uploaded to Drive are picked up automatically by a backend job every 30 minutes - no button needed. It sets <strong>Heddl Status</strong> from what the reply shows. <strong>Client Status</strong> and <strong>Confirmed</strong> are always set manually, once you've worked with the client to agree on classification.
           </div>
           ${responses.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">${anyFilterActive ? 'No responses match the current filters.' : 'No responses logged yet.'}</div>` : `
-            <div style="overflow-x:auto">
-            <table id="response-table" style="table-layout:fixed">
-              <colgroup>
-                ${Object.keys(colWidths).map(function(k) { return '<col id="col-' + k + '" style="width:' + colWidths[k] + 'px">'; }).join("")}
-                <col style="width:44px">
-              </colgroup>
-              <thead><tr>
-                ${sortableHeader("Date", null, "date")}
-                ${sortableHeader("Account", null, "account")}
-                ${sortableHeader("Contact", "contact", "contact")}
-                ${sortableHeader("Company", "company", "company")}
-                ${sortableHeader("Campaign", "campaign", "campaign")}
-                ${sortableHeader("Heddl Status", "heddlStatus", "heddlStatus")}
-                ${sortableHeader("Client Status", "clientStatus", "clientStatus")}
-                ${sortableHeader("Confirmed", null, "confirmed")}
-                ${sortableHeader("Notes", null, "notes")}
-                ${sortableHeader("Screenshot", null, "screenshot")}
-                <th></th>
-              </tr></thead>
+            <table>
+              <thead><tr><th>Date</th><th>Account</th><th>Contact</th><th>Company</th><th>Heddl Status</th><th>Client Status</th><th>Confirmed</th><th>Notes</th><th>Screenshot</th><th></th></tr></thead>
               <tbody>
                 ${responses.map(function(r, i) {
                   var locked = !!r.confirmed;
@@ -2117,30 +1997,28 @@ function renderResponsesView() {
                   var lockStyle = locked ? 'opacity:0.65;cursor:not-allowed' : '';
                   return `
                   <tr${locked ? ' style="background:var(--surface-1)"' : ''}>
-                    <td><input type="date" ${lockAttr} data-response="${r.id}" data-key="date" value="${escapeAttr(r.date)}" style="border:none;background:transparent;padding:0;width:100%;${lockStyle}"></td>
+                    <td><input type="date" ${lockAttr} data-response="${r.id}" data-key="date" value="${escapeAttr(r.date)}" style="border:none;background:transparent;padding:0;width:120px;${lockStyle}"></td>
                     <td>
-                      <select ${lockAttr} data-response="${r.id}" data-key="client" class="del-select" style="width:100%;${lockStyle}">
+                      <select ${lockAttr} data-response="${r.id}" data-key="client" class="del-select" style="${lockStyle}">
                         <option value="">-</option>
                         ${clientNames.map(function(n) { return `<option ${r.client===n?'selected':''}>${escapeHTML(n)}</option>`; }).join("")}
                       </select>
                     </td>
-                    <td><input ${lockAttr} data-response="${r.id}" data-key="contact" value="${escapeAttr(r.contact)}" placeholder="Contact name" style="border:none;background:transparent;padding:0;width:100%;${lockStyle}"></td>
-                    <td><input ${lockAttr} data-response="${r.id}" data-key="company" value="${escapeAttr(r.company || '')}" placeholder="Their company" style="border:none;background:transparent;padding:0;width:100%;${lockStyle}"></td>
-                    <td><input ${lockAttr} data-response="${r.id}" data-key="campaign" value="${escapeAttr(r.campaign || '')}" placeholder="Campaign" style="border:none;background:transparent;padding:0;width:100%;${lockStyle}"></td>
+                    <td><input ${lockAttr} data-response="${r.id}" data-key="contact" value="${escapeAttr(r.contact)}" placeholder="Contact name" style="border:none;background:transparent;padding:0;width:140px;${lockStyle}"></td>
+                    <td><input ${lockAttr} data-response="${r.id}" data-key="company" value="${escapeAttr(r.company || '')}" placeholder="Their company" style="border:none;background:transparent;padding:0;width:130px;${lockStyle}"></td>
                     <td>${locked ? '<span style="' + (function(){var c=responseStatusColor(r.heddlStatus);return 'background:'+c.bg+';color:'+c.color;})() + ';font-weight:600;padding:3px 8px;border-radius:4px;font-size:12px;display:inline-block">' + escapeHTML(r.heddlStatus||'-') + '</span>' : statusSelectHtml(r, "heddlStatus", RESPONSE_STATUSES, "-")}</td>
                     <td>${locked ? '<span style="' + (function(){var c=responseStatusColor(r.clientStatus);return 'background:'+c.bg+';color:'+c.color;})() + ';font-weight:600;padding:3px 8px;border-radius:4px;font-size:12px;display:inline-block">' + escapeHTML(r.clientStatus||'Not set') + '</span>' : statusSelectHtml(r, "clientStatus", RESPONSE_STATUSES, "Not set")}</td>
                     <td style="text-align:center">
                       <input type="checkbox" data-response="${r.id}" data-key="confirmed" data-type="checkbox" ${r.confirmed ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer">
                       ${locked ? '<div class="small" style="color:var(--text-muted);margin-top:2px">🔒 locked</div>' : ''}
                     </td>
-                    <td><input ${lockAttr} data-response="${r.id}" data-key="notes" value="${escapeAttr(r.notes)}" placeholder="Context" style="border:none;background:transparent;padding:0;width:100%;${lockStyle}"></td>
+                    <td><input ${lockAttr} data-response="${r.id}" data-key="notes" value="${escapeAttr(r.notes)}" placeholder="Context" style="border:none;background:transparent;padding:0;width:180px;${lockStyle}"></td>
                     <td>${r.screenshotUrl ? '<a href="' + escapeAttr(r.screenshotUrl) + '" target="_blank" class="small" style="color:var(--brand)">📎 ' + escapeHTML((r.screenshotRef||'view').slice(0,18)) + '…</a>' : '<span class="small" style="color:var(--text-muted)">' + escapeHTML((r.screenshotRef||'-').slice(0,18)) + '</span>'}</td>
                     <td><button class="btn ghost sm" data-action="delete-response" data-id="${r.id}" ${lockAttr}>&#128465;</button></td>
                   </tr>
                 `;}).join("")}
               </tbody>
             </table>
-            </div>
           `}
         </div>
       </div>
@@ -3222,25 +3100,6 @@ function generateResponsesPDF() {
   if (f.confirmed) filterParts.push("Confirmed: " + (f.confirmed === "yes" ? "Confirmed only" : "Not confirmed only"));
   var filterLabel = filterParts.length > 0 ? filterParts.join(" | ") : "All responses";
 
-  var pdfHeddlCounts = { "Positive Reply": 0, "Meeting Booked": 0, "No Fit": 0, "Not Interested": 0 };
-  responses.forEach(function(r) { if (pdfHeddlCounts[r.heddlStatus] !== undefined) pdfHeddlCounts[r.heddlStatus]++; });
-  var pdfConfirmedCount = responses.filter(function(r) { return r.confirmed; }).length;
-  var totalN = responses.length || 1;
-
-  function metricCard(label, value, color) {
-    return '<div style="flex:1;border:0.5px solid #e5e7eb;border-radius:6px;padding:10px 12px">' +
-      '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.3px;color:#94a3b8;margin-bottom:4px">' + escapeHTML(label) + '</div>' +
-      '<div style="font-size:18px;font-weight:700;color:' + color + '">' + value + '</div>' +
-      '</div>';
-  }
-  var metricsHtml = '<div style="display:flex;gap:10px;margin-bottom:18px">' +
-    metricCard("Total responses", responses.length, "#111") +
-    metricCard("Positive %", Math.round(pdfHeddlCounts["Positive Reply"] / totalN * 100) + "%", "#15803d") +
-    metricCard("Meetings booked %", Math.round(pdfHeddlCounts["Meeting Booked"] / totalN * 100) + "%", "#7c3aed") +
-    metricCard("Not interested %", Math.round(pdfHeddlCounts["Not Interested"] / totalN * 100) + "%", "#b91c1c") +
-    metricCard("Confirmed %", Math.round(pdfConfirmedCount / totalN * 100) + "%", "#475569") +
-    '</div>';
-
   function badge(status) {
     if (!status) return '<span style="color:#94a3b8">-</span>';
     var c = responseStatusColor(status);
@@ -3251,7 +3110,6 @@ function generateResponsesPDF() {
     return '<tr>' +
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px;white-space:nowrap">' + escapeHTML(r.date || "-") + '</td>' +
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px"><strong>' + escapeHTML(r.client || "-") + '</strong><br><span style="color:#64748b">' + escapeHTML(r.contact || "") + (r.company ? ' (' + escapeHTML(r.company) + ')' : '') + '</span></td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + escapeHTML(r.campaign || "-") + '</td>' +
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + badge(r.heddlStatus) + '</td>' +
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + badge(r.clientStatus) + '</td>' +
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px;text-align:center">' + (r.confirmed ? '✓' : '') + '</td>' +
@@ -3264,12 +3122,10 @@ function generateResponsesPDF() {
     '<h1 style="font-size:18px;margin:0 0 4px">Response Tracker</h1>' +
     '<div style="font-size:11px;color:#64748b;margin-bottom:2px">' + escapeHTML(filterLabel) + '</div>' +
     '<div style="font-size:10px;color:#94a3b8;margin-bottom:16px">Exported ' + new Date().toLocaleDateString("en-US", {year:"numeric",month:"long",day:"numeric"}) + ' - ' + responses.length + ' response' + (responses.length !== 1 ? 's' : '') + '</div>' +
-    metricsHtml +
     '<table style="width:100%;border-collapse:collapse">' +
     '<thead><tr>' +
     '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Date</th>' +
     '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Account / Contact</th>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Campaign</th>' +
     '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Heddl Status</th>' +
     '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Client Status</th>' +
     '<th style="text-align:center;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Confirmed</th>' +
@@ -3845,42 +3701,6 @@ function attachHandlers() {
           saveState("responses"); render();
         }
       }
-      else if (action === "copy-reporting-snapshot") {
-        var snapAllResponses = (state.responses || []);
-        var snapF = ui.responseFilters || { client: "", heddlStatus: "", clientStatus: "", confirmed: "" };
-        var snapResponses = snapAllResponses.filter(function(r) {
-          if (snapF.client && r.client !== snapF.client) return false;
-          if (snapF.heddlStatus && r.heddlStatus !== snapF.heddlStatus) return false;
-          if (snapF.clientStatus && r.clientStatus !== snapF.clientStatus) return false;
-          if (snapF.confirmed === "yes" && !r.confirmed) return false;
-          if (snapF.confirmed === "no" && r.confirmed) return false;
-          return true;
-        });
-        var snapGroups = computeReportingSnapshotGroups(snapResponses);
-        function pad(s, n) { s = String(s); while (s.length < n) s += " "; return s; }
-        var lines = ["Campaign".padEnd ? "Campaign".padEnd(28) + "Month".padEnd(12) + "Total".padEnd(8) + "Confirmed".padEnd(12) + "Confirmed %" : pad("Campaign",28) + pad("Month",12) + pad("Total",8) + pad("Confirmed",12) + "Confirmed %"];
-        lines.push("-".repeat(28) + "-".repeat(12) + "-".repeat(8) + "-".repeat(12) + "-".repeat(11));
-        snapGroups.forEach(function(g) {
-          var pct = g.total ? Math.round(g.confirmed / g.total * 100) : 0;
-          lines.push(pad(g.campaign, 28) + pad(g.month, 12) + pad(g.total, 8) + pad(g.confirmed, 12) + pct + "%");
-        });
-        var snapText = lines.join("\n");
-        navigator.clipboard.writeText(snapText).then(function() {
-          alert("Reporting Snapshot copied - paste it into a Gmail draft or anywhere else.");
-        }).catch(function() {
-          alert("Couldn't copy automatically. Here's the snapshot to copy manually:\n\n" + snapText);
-        });
-      }
-      else if (action === "sort-responses") {
-        var sortKey = el.dataset.sortKey;
-        if (!ui.responseSort) ui.responseSort = { column: null, direction: "asc" };
-        if (ui.responseSort.column === sortKey) {
-          ui.responseSort.direction = ui.responseSort.direction === "asc" ? "desc" : "asc";
-        } else {
-          ui.responseSort = { column: sortKey, direction: "asc" };
-        }
-        render();
-      }
       else if (action === "dedupe-responses") {
         var dedupeResult = dedupeResponses(state.responses || []);
         if (dedupeResult.removed === 0) {
@@ -4222,32 +4042,6 @@ function attachHandlers() {
       if (el.value === "") return;
       var view = (state.responseSavedViews || [])[+el.value];
       if (view) { ui.responseFilters = Object.assign({ client: "", heddlStatus: "", clientStatus: "", confirmed: "" }, view.filters); render(); }
-    });
-  });
-
-  // Column resize: drag handles update the matching <col> width directly (no re-render needed while
-  // dragging, for smoothness), then persist to localStorage once the drag ends.
-  document.querySelectorAll(".col-resize-handle").forEach(handle => {
-    handle.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      var colId = handle.dataset.resizeCol;
-      var colEl = document.getElementById(colId);
-      if (!colEl) return;
-      var startX = e.clientX;
-      var startWidth = colEl.offsetWidth;
-      handle.classList.add("resizing");
-      function onMove(ev) {
-        var newWidth = Math.max(60, startWidth + (ev.clientX - startX));
-        colEl.style.width = newWidth + "px";
-      }
-      function onUp() {
-        handle.classList.remove("resizing");
-        saveResponseColWidth(colId.replace("col-", ""), colEl.offsetWidth);
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-      }
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
     });
   });
 
