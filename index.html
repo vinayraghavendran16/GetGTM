@@ -671,6 +671,52 @@ function dedupeResponses(responses) {
 // Normalizes a responses array in place: ensures newer fields exist on older records, and splits a
 // legacy combined "Name (Company)" contact string into separate contact/company fields. Returns true
 // if anything was actually changed (so callers know whether a save-back is needed).
+// Best-effort campaign extraction from a response's notes text. Tries the REAL campaign names from
+// the Campaigns tab first (authoritative - matches a distinctive keyword unique to one campaign, e.g.
+// "FireMon" only appears in one campaign name, so that's a safe, specific match). Only falls back to
+// the older short-phrase pattern ("1Kosmos campaign.", "Tufin campaign.") when no real campaign
+// matches, and even then rejects anything that looks like a fragment of a sentence rather than an
+// actual name (starts with a filler/lead-in word, or is implausibly long for a campaign name).
+function extractCampaignFromNotes(notes) {
+  notes = notes || "";
+  var lower = notes.toLowerCase();
+
+  // Distinctive single-keyword-per-campaign matches, checked in order from most to least specific so
+  // a note mentioning "FireMon" doesn't accidentally match a generic "Tufin" campaign instead.
+  var knownCampaigns = (state.campaigns || []).map(function(c) { return c.name; });
+  var keywordMap = [
+    ["firemon", "FireMon Expansion (Tufin)"],
+    ["algosec displacement", "AlgoSec Displacement (Tufin)"],
+    ["tuffin extended", "Tuffin Extended - Oman & Qatar (Oil&Gas, BFSI, Govt)"],
+    ["tuffin - senior profile", "Tuffin - senior Profile Leads"],
+    ["tuffin junior profile", "Algosec Users - Tuffin Junior Profile"],
+    ["multichannel", "Tuffin - Junior Roles - Multichannel outreaching"],
+    ["senior roles", "Senior roles (GRC & IAM) - 1kosmos - SAMA CSF-KSA BFSI - tire 1 companies"],
+    ["junior roles (grc", "1kosmos - SAMA CSF-KSA BFSI - Junior roles (GRC & IAM) - tire 1 companies"],
+  ];
+  for (var i = 0; i < keywordMap.length; i++) {
+    if (lower.indexOf(keywordMap[i][0]) !== -1 && knownCampaigns.indexOf(keywordMap[i][1]) !== -1) {
+      return keywordMap[i][1];
+    }
+  }
+
+  // Guarded fallback for older short-phrase notes ("1Kosmos campaign.", "Tufin/AlgoSec campaign.") -
+  // requires the word "campaign" to be immediately followed by a period, matching the exact authoring
+  // convention used for these notes (a short campaign-name lead-in sentence). This is much stricter
+  // than just finding "campaign" anywhere in the text, which caused real bugs earlier (e.g. capturing
+  // "In a Tufin outreach" or an entire unrelated sentence as a "campaign name" just because the word
+  // happened to appear later in normal prose). Also rejects filler-word starts and implausible length.
+  var cm = /^([\w\s/&()\-]+?)\s+campaign\./i.exec(notes);
+  if (cm) {
+    var candidate = cm[1].trim();
+    var fillerStart = /^(in|on|for|the|a|an|outreach|following|during|after|regarding|sales|this)\b/i;
+    if (candidate.length >= 3 && candidate.length <= 40 && !fillerStart.test(candidate)) {
+      return candidate;
+    }
+  }
+  return "";
+}
+
 function migrateResponseFields(responses) {
   var changed = false;
   (responses || []).forEach(function(r) {
@@ -686,11 +732,7 @@ function migrateResponseFields(responses) {
     if (r.meetingBookedDate === undefined) { r.meetingBookedDate = ""; changed = true; }
     if (r.noFitReason === undefined) { r.noFitReason = ""; changed = true; }
     if (r.campaign === undefined) {
-      // Best-effort extraction from notes text, e.g. "1Kosmos campaign. Confirmed..." or
-      // "AlgoSec Displacement (Tufin) campaign. ..." - matches "<name> campaign" at the start of
-      // notes. Inferred, not authoritative - the campaign column is editable so this can be corrected.
-      var cm = /^([\w\s/&()\-]+?)\s+campaign\b/i.exec(r.notes || "");
-      r.campaign = (cm && cm[1].trim().length >= 3) ? cm[1].trim() : "";
+      r.campaign = extractCampaignFromNotes(r.notes);
       changed = true;
     }
     if (r.actualReply === undefined) {
@@ -2187,6 +2229,7 @@ function renderResponsesView() {
           <div style="display:flex;gap:8px">
             <a href="https://drive.google.com/drive/folders/1Hr3GWko3ixmEJZTl6DHgNiJauG502gL8" target="_blank" class="btn ghost sm">📁 Open Drive folder</a>
             <button class="btn ghost sm" data-action="dedupe-responses" style="color:var(--danger)">🧹 Dedupe</button>
+            <button class="btn ghost sm" data-action="fix-campaigns" style="color:var(--danger)">🔧 Fix Campaigns</button>
             <button class="btn ghost sm" data-action="export-responses-pdf">⬇ Export PDF</button>
             <button class="btn" data-action="add-response">+ Add response</button>
           </div>
@@ -4117,6 +4160,20 @@ function attachHandlers() {
           state.responses = dedupeResult.kept;
           saveState("responses").then(function() { render(); });
           alert("Removed " + dedupeResult.removed + " duplicate(s). " + dedupeResult.kept.length + " unique responses remain.");
+        }
+      }
+      else if (action === "fix-campaigns") {
+        var changes = [];
+        (state.responses || []).forEach(function(r) {
+          var reDerived = extractCampaignFromNotes(r.notes);
+          if (reDerived !== r.campaign) { changes.push({ r: r, newVal: reDerived }); }
+        });
+        if (changes.length === 0) {
+          alert("No changes needed - every campaign value already matches what would be re-derived from notes.");
+        } else if (confirm("This will re-derive the Campaign field for all " + (state.responses||[]).length + " responses from their notes text and the real campaign list, overwriting any current value (including ones you've manually corrected). " + changes.length + " would change. Continue?")) {
+          changes.forEach(function(c) { c.r.campaign = c.newVal; });
+          saveState("responses").then(function() { render(); });
+          alert("Updated " + changes.length + " campaign value(s).");
         }
       }
       else if (action === "export-responses-pdf") {
