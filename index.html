@@ -683,6 +683,8 @@ function migrateResponseFields(responses) {
       if (m) { r.contact = m[1]; r.company = m[2]; } else { r.company = ""; }
       changed = true;
     }
+    if (r.meetingBookedDate === undefined) { r.meetingBookedDate = ""; changed = true; }
+    if (r.noFitReason === undefined) { r.noFitReason = ""; changed = true; }
   });
   return changed;
 }
@@ -1990,7 +1992,7 @@ function renderResponsesView() {
           ${responses.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">${anyFilterActive ? 'No responses match the current filters.' : 'No responses logged yet.'}</div>` : `
             <div style="overflow-x:auto">
             <table style="min-width:1100px">
-              <thead><tr><th>Date</th><th>Account</th><th>Contact</th><th>Company</th><th>Heddl Status</th><th>Client Status</th><th>Confirmed</th><th>Notes</th><th>Screenshot</th><th></th></tr></thead>
+              <thead><tr><th>Date</th><th>Account</th><th>Contact</th><th>Company</th><th>Heddl Status</th><th>Client Status</th><th>Confirmed</th><th>Meeting Date</th><th>No Fit Reason</th><th>Notes</th><th>Screenshot</th><th></th></tr></thead>
               <tbody>
                 ${responses.map(function(r, i) {
                   var locked = !!r.confirmed;
@@ -2013,6 +2015,8 @@ function renderResponsesView() {
                       <input type="checkbox" data-response="${r.id}" data-key="confirmed" data-type="checkbox" ${r.confirmed ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer">
                       ${locked ? '<div class="small" style="color:var(--text-muted);margin-top:2px">🔒 locked</div>' : ''}
                     </td>
+                    <td>${r.clientStatus === "Meeting Booked" ? '<input type="date" ' + lockAttr + ' data-response="' + r.id + '" data-key="meetingBookedDate" value="' + escapeAttr(r.meetingBookedDate || '') + '" style="border:none;background:transparent;padding:0;width:100%;' + lockStyle + '">' : '<span class="small" style="color:var(--text-muted)">-</span>'}</td>
+                    <td>${r.clientStatus === "No Fit" ? '<input ' + lockAttr + ' data-response="' + r.id + '" data-key="noFitReason" value="' + escapeAttr(r.noFitReason || '') + '" placeholder="Why not a fit" style="border:none;background:transparent;padding:0;width:100%;' + lockStyle + '">' : '<span class="small" style="color:var(--text-muted)">-</span>'}</td>
                     <td><input ${lockAttr} data-response="${r.id}" data-key="notes" value="${escapeAttr(r.notes)}" placeholder="Context" style="border:none;background:transparent;padding:0;width:180px;${lockStyle}"></td>
                     <td>${r.screenshotUrl ? '<a href="' + escapeAttr(r.screenshotUrl) + '" target="_blank" class="small" style="color:var(--brand)">📎 ' + escapeHTML((r.screenshotRef||'view').slice(0,18)) + '…</a>' : '<span class="small" style="color:var(--text-muted)">' + escapeHTML((r.screenshotRef||'-').slice(0,18)) + '</span>'}</td>
                     <td><button class="btn ghost sm" data-action="delete-response" data-id="${r.id}" ${lockAttr}>&#128465;</button></td>
@@ -4006,6 +4010,18 @@ function attachHandlers() {
             el.checked = true; // revert - wrong or cancelled PIN
             if (pin !== null) alert("Incorrect PIN.");
             return;
+          }
+        }
+        if (!r.confirmed && el.checked) {
+          // Confirming for the first time - capture the field specific to this Client Status, if not
+          // already filled in. Cancelling the prompt still lets confirmation proceed - the field just
+          // stays blank and can be added later (after unlocking with the PIN).
+          if (r.clientStatus === "Meeting Booked" && !r.meetingBookedDate) {
+            var meetingDate = prompt("Meeting Booked - what's the meeting date? (YYYY-MM-DD)");
+            if (meetingDate) r.meetingBookedDate = meetingDate;
+          } else if (r.clientStatus === "No Fit" && !r.noFitReason) {
+            var noFitReason = prompt("No Fit - what's the reason this isn't a fit?");
+            if (noFitReason) r.noFitReason = noFitReason;
           }
         }
         r.confirmed = el.checked;
