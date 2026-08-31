@@ -3450,21 +3450,26 @@ function generateResponsesPDF() {
   if (f.confirmed) filterParts.push("Confirmed: " + (f.confirmed === "yes" ? "Confirmed only" : "Not confirmed only"));
   var filterLabel = filterParts.length > 0 ? filterParts.join(" | ") : "All responses";
 
+  // Client-specific brand accent color for a polished, client-facing report. Falls back to the
+  // standard GetGTM purple when not filtered to a specific client with a defined brand color.
+  var CLIENT_BRAND_COLORS = { "Securotix": "#A6192E" };
+  var accentColor = (f.client && CLIENT_BRAND_COLORS[f.client]) ? CLIENT_BRAND_COLORS[f.client] : "#7c3aed";
+
   var pdfHeddlCounts = { "Positive Reply": 0, "Meeting Booked": 0, "No Fit": 0, "Not Interested": 0 };
   responses.forEach(function(r) { if (pdfHeddlCounts[r.heddlStatus] !== undefined) pdfHeddlCounts[r.heddlStatus]++; });
   var pdfConfirmedCount = responses.filter(function(r) { return r.confirmed; }).length;
   var totalN = responses.length || 1;
 
   function metricCard(label, value, color) {
-    return '<div style="flex:1;border:0.5px solid #e5e7eb;border-radius:6px;padding:10px 12px">' +
-      '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.3px;color:#94a3b8;margin-bottom:4px">' + escapeHTML(label) + '</div>' +
-      '<div style="font-size:18px;font-weight:700;color:' + color + '">' + value + '</div>' +
+    return '<div style="flex:1;border:0.5px solid #e5e7eb;border-radius:6px;padding:12px 14px">' +
+      '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.3px;color:#94a3b8;margin-bottom:5px">' + escapeHTML(label) + '</div>' +
+      '<div style="font-size:20px;font-weight:700;color:' + color + '">' + value + '</div>' +
       '</div>';
   }
-  var metricsHtml = '<div style="display:flex;gap:10px;margin-bottom:18px">' +
+  var metricsHtml = '<div style="display:flex;gap:10px;margin-bottom:22px">' +
     metricCard("Total responses", responses.length, "#111") +
     metricCard("Positive %", Math.round(pdfHeddlCounts["Positive Reply"] / totalN * 100) + "%", "#15803d") +
-    metricCard("Meetings booked %", Math.round(pdfHeddlCounts["Meeting Booked"] / totalN * 100) + "%", "#7c3aed") +
+    metricCard("Meetings booked %", Math.round(pdfHeddlCounts["Meeting Booked"] / totalN * 100) + "%", accentColor) +
     metricCard("Not interested %", Math.round(pdfHeddlCounts["Not Interested"] / totalN * 100) + "%", "#b91c1c") +
     metricCard("Confirmed %", Math.round(pdfConfirmedCount / totalN * 100) + "%", "#475569") +
     '</div>';
@@ -3473,81 +3478,125 @@ function generateResponsesPDF() {
   var pivotRowsHtml = pivotGroups.map(function(g) {
     var pct = g.total ? Math.round(g.confirmed / g.total * 100) : 0;
     return '<tr>' +
-      '<td style="padding:5px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(g.campaign) + '</td>' +
-      '<td style="padding:5px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(g.month) + '</td>' +
-      '<td style="padding:5px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + g.total + '</td>' +
-      '<td style="padding:5px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + g.confirmed + '</td>' +
-      '<td style="padding:5px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + pct + '%</td>' +
+      '<td style="padding:6px 10px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + escapeHTML(g.campaign) + '</td>' +
+      '<td style="padding:6px 10px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + escapeHTML(g.month) + '</td>' +
+      '<td style="padding:6px 10px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + g.total + '</td>' +
+      '<td style="padding:6px 10px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + g.confirmed + '</td>' +
+      '<td style="padding:6px 10px;border-bottom:0.5px solid #e5e7eb;font-size:10px;font-weight:600">' + pct + '%</td>' +
       '</tr>';
   }).join("");
   var pivotHtml = pivotGroups.length === 0 ? '' :
-    '<div style="margin-bottom:18px">' +
-    '<div style="font-size:11px;font-weight:700;margin-bottom:6px">Reporting Snapshot - by Campaign and Month</div>' +
-    '<table style="width:60%;border-collapse:collapse">' +
+    '<div>' +
+    '<div style="font-size:12px;font-weight:700;margin-bottom:8px;color:' + accentColor + '">Reporting Snapshot - by Campaign and Month</div>' +
+    '<table style="width:65%;border-collapse:collapse">' +
     '<thead><tr>' +
-    '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Campaign</th>' +
-    '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Month</th>' +
-    '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Total</th>' +
-    '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Confirmed</th>' +
-    '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Confirmed %</th>' +
+    '<th style="text-align:left;padding:6px 10px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Campaign</th>' +
+    '<th style="text-align:left;padding:6px 10px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Month</th>' +
+    '<th style="text-align:left;padding:6px 10px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Total</th>' +
+    '<th style="text-align:left;padding:6px 10px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Confirmed</th>' +
+    '<th style="text-align:left;padding:6px 10px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Confirmed %</th>' +
     '</tr></thead><tbody>' + pivotRowsHtml + '</tbody></table>' +
     '</div>';
 
   function badge(status) {
     if (!status) return '<span style="color:#94a3b8">-</span>';
     var c = responseStatusColor(status);
-    return '<span style="background:' + c.bg + ';color:' + c.color + ';font-weight:600;padding:2px 8px;border-radius:4px;font-size:10px;display:inline-block">' + escapeHTML(status) + '</span>';
+    return '<span style="background:' + c.bg + ';color:' + c.color + ';font-weight:600;padding:2px 7px;border-radius:4px;font-size:9px;display:inline-block;white-space:nowrap">' + escapeHTML(status) + '</span>';
+  }
+  // Trims long free-text fields for the table so rows stay a predictable height and the layout stays
+  // clean - full untruncated text always remains available in the tracker itself.
+  function trim(s, n) {
+    s = s || "";
+    return s.length > n ? s.slice(0, n - 1) + "…" : s;
   }
 
+  // Screenshots get a short numbered reference in the main table (not the raw URL - a long URL forced
+  // to wrap across multiple lines inside a narrow cell breaks most PDF viewers' automatic link
+  // detection, since they only recognize an unbroken run of URL text). The full, unwrapped, single-
+  // line URL for each reference lives on its own dedicated page at the end, where it has the whole
+  // page width to itself and reliably gets auto-linked.
+  var refMap = [];
+  responses.forEach(function(r) {
+    if (r.screenshotUrl) refMap.push({ ref: refMap.length + 1, contact: r.contact, client: r.client, url: r.screenshotUrl });
+  });
+  var refByResponse = {};
+  refMap.forEach(function(item, i) { refByResponse[i] = item.ref; });
+  var refIndex = 0;
+
   var rows = responses.map(function(r) {
-    // Print the FULL Drive URL as plain visible text (not truncated, not an <a> tag) - PDF viewers
-    // (Chrome, Adobe, macOS Preview) auto-detect and hyperlink plain URL text on their own. This is
-    // more reliable than manually embedding link annotations, which don't survive the html2canvas
-    // rasterization step this PDF pipeline uses, and can't be verified without live rendering.
-    var screenshotCell = r.screenshotUrl
-      ? '<span style="color:#2563eb;word-break:break-all">' + escapeHTML(r.screenshotUrl) + '</span>'
-      : '<span style="color:#94a3b8">' + escapeHTML(r.screenshotRef || "-") + '</span>';
+    var screenshotCell;
+    if (r.screenshotUrl) {
+      refIndex++;
+      screenshotCell = '<span style="color:' + accentColor + ';font-weight:700">Ref #' + refIndex + '</span>';
+    } else {
+      screenshotCell = '<span style="color:#94a3b8">-</span>';
+    }
     return '<tr>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;white-space:nowrap">' + escapeHTML(r.date || "-") + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(r.client || "-") + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(r.contact || "-") + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(r.company || "-") + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(r.campaign || "-") + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + badge(r.heddlStatus) + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + badge(r.clientStatus) + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;text-align:center">' + (r.confirmed ? '✓' : '') + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(r.meetingBookedDate || "-") + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;max-width:120px">' + escapeHTML(r.noFitReason || "-") + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;max-width:170px">' + escapeHTML(r.notes || "") + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:8px;max-width:140px">' + screenshotCell + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:8.5px;white-space:nowrap;vertical-align:top">' + escapeHTML(r.date || "-") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:8.5px;vertical-align:top">' + escapeHTML(r.client || "-") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:8.5px;vertical-align:top;overflow-wrap:break-word">' + escapeHTML(trim(r.contact, 28)) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:8.5px;vertical-align:top;overflow-wrap:break-word">' + escapeHTML(trim(r.company, 22)) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:8.5px;vertical-align:top;overflow-wrap:break-word">' + escapeHTML(trim(r.campaign, 26)) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;vertical-align:top">' + badge(r.heddlStatus) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;vertical-align:top">' + badge(r.clientStatus) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:8.5px;text-align:center;vertical-align:top">' + (r.confirmed ? '✓' : '') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:8.5px;white-space:nowrap;vertical-align:top">' + escapeHTML(r.meetingBookedDate || "-") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:8.5px;vertical-align:top;overflow-wrap:break-word">' + escapeHTML(trim(r.noFitReason, 40)) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:8.5px;vertical-align:top;overflow-wrap:break-word">' + escapeHTML(trim(r.actualReply, 60)) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:8.5px;vertical-align:top;overflow-wrap:break-word">' + escapeHTML(trim(r.notes, 70)) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;vertical-align:top">' + screenshotCell + '</td>' +
       '</tr>';
   }).join("");
 
-  var logoHtml = (f.client && CLIENT_LOGOS[f.client]) ? '<img src="' + CLIENT_LOGOS[f.client] + '" style="height:40px;margin-bottom:10px">' : '';
+  var refListHtml = refMap.length === 0 ? '' :
+    '<div style="page-break-before:always;padding-top:24px">' +
+    '<h2 style="font-size:14px;margin:0 0 14px;color:' + accentColor + '">Screenshot References</h2>' +
+    refMap.map(function(item) {
+      return '<div style="font-size:10px;margin-bottom:8px;white-space:nowrap">' +
+        '<strong>Ref #' + item.ref + '</strong> - ' + escapeHTML(item.contact || "") + ' (' + escapeHTML(item.client || "") + '): ' +
+        '<span style="color:#2563eb">' + escapeHTML(item.url) + '</span>' +
+        '</div>';
+    }).join("") +
+    '</div>';
+
+  var logoHtml = (f.client && CLIENT_LOGOS[f.client]) ? '<img src="' + CLIENT_LOGOS[f.client] + '" style="height:48px;margin-bottom:14px">' : '';
   var generatedStamp = 'GetGTM Report generated on ' + new Date().toLocaleDateString("en-US", {year:"numeric",month:"long",day:"numeric"}) + ' at ' + new Date().toLocaleTimeString("en-US", {hour:"2-digit",minute:"2-digit"});
 
-  var html = '<div style="font-family:Helvetica,Arial,sans-serif;padding:24px;color:#111">' +
+  var html = '<div style="font-family:Helvetica,Arial,sans-serif;color:#111">' +
+    // Page 1: logo, title, metrics, pivot - nothing else. Forced page break after so the table always
+    // starts fresh on page 2, never splitting awkwardly across the metrics section.
+    '<div style="padding:28px 28px 0">' +
     logoHtml +
-    '<h1 style="font-size:18px;margin:0 0 4px">Response Tracker</h1>' +
+    '<h1 style="font-size:19px;margin:0 0 4px;color:' + accentColor + '">Response Tracker</h1>' +
     '<div style="font-size:11px;color:#64748b;margin-bottom:2px">' + escapeHTML(filterLabel) + '</div>' +
-    '<div style="font-size:10px;color:#94a3b8;margin-bottom:16px">' + escapeHTML(generatedStamp) + ' - ' + responses.length + ' response' + (responses.length !== 1 ? 's' : '') + '</div>' +
+    '<div style="font-size:10px;color:#94a3b8;margin-bottom:20px">' + escapeHTML(generatedStamp) + ' - ' + responses.length + ' response' + (responses.length !== 1 ? 's' : '') + '</div>' +
     metricsHtml +
     pivotHtml +
-    '<table style="width:100%;border-collapse:collapse">' +
+    '</div>' +
+    '<div style="page-break-before:always;padding:28px">' +
+    '<table style="width:100%;border-collapse:collapse;table-layout:fixed">' +
+    '<colgroup>' +
+    '<col style="width:7%"><col style="width:7%"><col style="width:9%"><col style="width:8%"><col style="width:9%">' +
+    '<col style="width:8%"><col style="width:8%"><col style="width:5%"><col style="width:6%"><col style="width:9%">' +
+    '<col style="width:12%"><col style="width:8%"><col style="width:4%">' +
+    '</colgroup>' +
     '<thead><tr>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Date</th>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Account</th>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Contact</th>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Company</th>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Campaign</th>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Heddl Status</th>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Client Status</th>' +
-    '<th style="text-align:center;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Confirmed</th>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Meeting Date</th>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">No Fit Reason</th>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Notes</th>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Screenshot link</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:2px solid ' + accentColor + ';font-size:8.5px;text-transform:uppercase;color:#64748b">Date</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:2px solid ' + accentColor + ';font-size:8.5px;text-transform:uppercase;color:#64748b">Account</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:2px solid ' + accentColor + ';font-size:8.5px;text-transform:uppercase;color:#64748b">Contact</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:2px solid ' + accentColor + ';font-size:8.5px;text-transform:uppercase;color:#64748b">Company</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:2px solid ' + accentColor + ';font-size:8.5px;text-transform:uppercase;color:#64748b">Campaign</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:2px solid ' + accentColor + ';font-size:8.5px;text-transform:uppercase;color:#64748b">Heddl Status</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:2px solid ' + accentColor + ';font-size:8.5px;text-transform:uppercase;color:#64748b">Client Status</th>' +
+    '<th style="text-align:center;padding:6px 8px;border-bottom:2px solid ' + accentColor + ';font-size:8.5px;text-transform:uppercase;color:#64748b">Conf.</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:2px solid ' + accentColor + ';font-size:8.5px;text-transform:uppercase;color:#64748b">Mtg Date</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:2px solid ' + accentColor + ';font-size:8.5px;text-transform:uppercase;color:#64748b">No Fit Reason</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:2px solid ' + accentColor + ';font-size:8.5px;text-transform:uppercase;color:#64748b">Actual Reply</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:2px solid ' + accentColor + ';font-size:8.5px;text-transform:uppercase;color:#64748b">Notes</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:2px solid ' + accentColor + ';font-size:8.5px;text-transform:uppercase;color:#64748b">SS</th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table>' +
+    '</div>' +
+    refListHtml +
     '</div>';
 
   var container = document.createElement('div');
