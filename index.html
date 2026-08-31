@@ -3367,10 +3367,12 @@ function generateCampaignsPDF() {
 
   var container = document.createElement('div');
   container.innerHTML = html;
+  // Position off-screen (not behind other content via z-index) - html2canvas can fail to capture
+  // content stacked behind opaque elements via negative z-index, rendering a blank page. Moving it
+  // physically outside the viewport keeps it isolated from document flow without that risk.
   container.style.position = 'fixed';
   container.style.top = '0';
-  container.style.left = '0';
-  container.style.zIndex = '-9999';
+  container.style.left = '-99999px';
   container.style.background = '#ffffff';
   document.body.appendChild(container);
   var filenameSuffix = f.client ? f.client.replace(/[^a-zA-Z0-9]+/g, '_') : 'All';
@@ -3512,10 +3514,12 @@ function generateResponsesPDF() {
   // inherits normal document flow and lands far down the page (below the entire app's existing
   // content), which html2canvas then captures as a large blank area before the real content. Fixed
   // positioning isolates it from that regardless of how tall the rest of the page is.
+  // Position off-screen (not behind other content via z-index) - html2canvas can fail to capture
+  // content stacked behind opaque elements via negative z-index, rendering a blank page. Moving it
+  // physically outside the viewport keeps it isolated from document flow without that risk.
   container.style.position = 'fixed';
   container.style.top = '0';
-  container.style.left = '0';
-  container.style.zIndex = '-9999';
+  container.style.left = '-99999px';
   container.style.background = '#ffffff';
   document.body.appendChild(container);
   var filenameSuffix = f.client ? f.client.replace(/[^a-zA-Z0-9]+/g, '_') : 'All';
@@ -3537,10 +3541,12 @@ function generateProposalPDF(c) {
   var filename = c.name.replace(/[^a-zA-Z0-9]+/g, '_') + '_x_GetGTM_Initial_Proposal.pdf';
   var container = document.createElement('div');
   container.innerHTML = html;
+  // Position off-screen (not behind other content via z-index) - html2canvas can fail to capture
+  // content stacked behind opaque elements via negative z-index, rendering a blank page. Moving it
+  // physically outside the viewport keeps it isolated from document flow without that risk.
   container.style.position = 'fixed';
   container.style.top = '0';
-  container.style.left = '0';
-  container.style.zIndex = '-9999';
+  container.style.left = '-99999px';
   container.style.background = '#ffffff';
   document.body.appendChild(container);
   var opt = {
