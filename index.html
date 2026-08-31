@@ -3106,6 +3106,25 @@ function generateResponsesPDF() {
   if (f.confirmed) filterParts.push("Confirmed: " + (f.confirmed === "yes" ? "Confirmed only" : "Not confirmed only"));
   var filterLabel = filterParts.length > 0 ? filterParts.join(" | ") : "All responses";
 
+  var pdfHeddlCounts = { "Positive Reply": 0, "Meeting Booked": 0, "No Fit": 0, "Not Interested": 0 };
+  responses.forEach(function(r) { if (pdfHeddlCounts[r.heddlStatus] !== undefined) pdfHeddlCounts[r.heddlStatus]++; });
+  var pdfConfirmedCount = responses.filter(function(r) { return r.confirmed; }).length;
+  var totalN = responses.length || 1;
+
+  function metricCard(label, value, color) {
+    return '<div style="flex:1;border:0.5px solid #e5e7eb;border-radius:6px;padding:10px 12px">' +
+      '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.3px;color:#94a3b8;margin-bottom:4px">' + escapeHTML(label) + '</div>' +
+      '<div style="font-size:18px;font-weight:700;color:' + color + '">' + value + '</div>' +
+      '</div>';
+  }
+  var metricsHtml = '<div style="display:flex;gap:10px;margin-bottom:18px">' +
+    metricCard("Total responses", responses.length, "#111") +
+    metricCard("Positive %", Math.round(pdfHeddlCounts["Positive Reply"] / totalN * 100) + "%", "#15803d") +
+    metricCard("Meetings booked %", Math.round(pdfHeddlCounts["Meeting Booked"] / totalN * 100) + "%", "#7c3aed") +
+    metricCard("Not interested %", Math.round(pdfHeddlCounts["Not Interested"] / totalN * 100) + "%", "#b91c1c") +
+    metricCard("Confirmed %", Math.round(pdfConfirmedCount / totalN * 100) + "%", "#475569") +
+    '</div>';
+
   function badge(status) {
     if (!status) return '<span style="color:#94a3b8">-</span>';
     var c = responseStatusColor(status);
@@ -3113,14 +3132,21 @@ function generateResponsesPDF() {
   }
 
   var rows = responses.map(function(r) {
+    // Print the FULL Drive URL as plain visible text (not truncated, not an <a> tag) - PDF viewers
+    // (Chrome, Adobe, macOS Preview) auto-detect and hyperlink plain URL text on their own. This is
+    // more reliable than manually embedding link annotations, which don't survive the html2canvas
+    // rasterization step this PDF pipeline uses, and can't be verified without live rendering.
+    var screenshotCell = r.screenshotUrl
+      ? '<span style="color:#2563eb;word-break:break-all">' + escapeHTML(r.screenshotUrl) + '</span>'
+      : '<span style="color:#94a3b8">' + escapeHTML(r.screenshotRef || "-") + '</span>';
     return '<tr>' +
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px;white-space:nowrap">' + escapeHTML(r.date || "-") + '</td>' +
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px"><strong>' + escapeHTML(r.client || "-") + '</strong><br><span style="color:#64748b">' + escapeHTML(r.contact || "") + (r.company ? ' (' + escapeHTML(r.company) + ')' : '') + '</span></td>' +
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + badge(r.heddlStatus) + '</td>' +
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + badge(r.clientStatus) + '</td>' +
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px;text-align:center">' + (r.confirmed ? '✓' : '') + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px;max-width:220px">' + escapeHTML(r.notes || "") + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;color:#64748b">' + escapeHTML(r.screenshotRef || "") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px;max-width:200px">' + escapeHTML(r.notes || "") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;max-width:160px">' + screenshotCell + '</td>' +
       '</tr>';
   }).join("");
 
@@ -3128,6 +3154,7 @@ function generateResponsesPDF() {
     '<h1 style="font-size:18px;margin:0 0 4px">Response Tracker</h1>' +
     '<div style="font-size:11px;color:#64748b;margin-bottom:2px">' + escapeHTML(filterLabel) + '</div>' +
     '<div style="font-size:10px;color:#94a3b8;margin-bottom:16px">Exported ' + new Date().toLocaleDateString("en-US", {year:"numeric",month:"long",day:"numeric"}) + ' - ' + responses.length + ' response' + (responses.length !== 1 ? 's' : '') + '</div>' +
+    metricsHtml +
     '<table style="width:100%;border-collapse:collapse">' +
     '<thead><tr>' +
     '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Date</th>' +
@@ -3136,7 +3163,7 @@ function generateResponsesPDF() {
     '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Client Status</th>' +
     '<th style="text-align:center;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Confirmed</th>' +
     '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Notes</th>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Screenshot ref</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Screenshot link</th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table>' +
     '</div>';
 
