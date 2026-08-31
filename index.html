@@ -1988,7 +1988,8 @@ function renderResponsesView() {
             Existing records here sync live - no need to refresh to see them or anyone's edits. New screenshots uploaded to Drive are picked up automatically by a backend job every 30 minutes - no button needed. It sets <strong>Heddl Status</strong> from what the reply shows. <strong>Client Status</strong> and <strong>Confirmed</strong> are always set manually, once you've worked with the client to agree on classification.
           </div>
           ${responses.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">${anyFilterActive ? 'No responses match the current filters.' : 'No responses logged yet.'}</div>` : `
-            <table>
+            <div style="overflow-x:auto">
+            <table style="min-width:1100px">
               <thead><tr><th>Date</th><th>Account</th><th>Contact</th><th>Company</th><th>Heddl Status</th><th>Client Status</th><th>Confirmed</th><th>Notes</th><th>Screenshot</th><th></th></tr></thead>
               <tbody>
                 ${responses.map(function(r, i) {
@@ -2019,6 +2020,7 @@ function renderResponsesView() {
                 `;}).join("")}
               </tbody>
             </table>
+            </div>
           `}
         </div>
       </div>
