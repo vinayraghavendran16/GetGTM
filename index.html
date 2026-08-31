@@ -3367,12 +3367,11 @@ function generateCampaignsPDF() {
 
   var container = document.createElement('div');
   container.innerHTML = html;
-  // Position off-screen (not behind other content via z-index) - html2canvas can fail to capture
-  // content stacked behind opaque elements via negative z-index, rendering a blank page. Moving it
-  // physically outside the viewport keeps it isolated from document flow without that risk.
-  container.style.position = 'fixed';
-  container.style.top = '0';
-  container.style.left = '-99999px';
+  // No CSS positioning tricks - both z-index hiding and far off-screen positioning turned out to
+  // cause html2canvas to capture a blank page. Instead, the container stays in normal document flow,
+  // and html2canvas is told explicitly to capture from scroll position (0,0) via scrollX/scrollY
+  // below, regardless of where the container actually sits on the page. This is the documented fix
+  // for capturing an element that isn't at the top of a long page.
   container.style.background = '#ffffff';
   document.body.appendChild(container);
   var filenameSuffix = f.client ? f.client.replace(/[^a-zA-Z0-9]+/g, '_') : 'All';
@@ -3380,7 +3379,7 @@ function generateCampaignsPDF() {
     margin: 10,
     filename: 'Campaigns_' + filenameSuffix + '_' + new Date().toISOString().slice(0,10) + '.pdf',
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
+    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: -window.scrollY, windowWidth: document.documentElement.scrollWidth, windowHeight: document.documentElement.scrollHeight },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
     pagebreak: { mode: ['css', 'legacy'] }
   };
@@ -3514,12 +3513,11 @@ function generateResponsesPDF() {
   // inherits normal document flow and lands far down the page (below the entire app's existing
   // content), which html2canvas then captures as a large blank area before the real content. Fixed
   // positioning isolates it from that regardless of how tall the rest of the page is.
-  // Position off-screen (not behind other content via z-index) - html2canvas can fail to capture
-  // content stacked behind opaque elements via negative z-index, rendering a blank page. Moving it
-  // physically outside the viewport keeps it isolated from document flow without that risk.
-  container.style.position = 'fixed';
-  container.style.top = '0';
-  container.style.left = '-99999px';
+  // No CSS positioning tricks - both z-index hiding and far off-screen positioning turned out to
+  // cause html2canvas to capture a blank page. Instead, the container stays in normal document flow,
+  // and html2canvas is told explicitly to capture from scroll position (0,0) via scrollX/scrollY
+  // below, regardless of where the container actually sits on the page. This is the documented fix
+  // for capturing an element that isn't at the top of a long page.
   container.style.background = '#ffffff';
   document.body.appendChild(container);
   var filenameSuffix = f.client ? f.client.replace(/[^a-zA-Z0-9]+/g, '_') : 'All';
@@ -3527,7 +3525,7 @@ function generateResponsesPDF() {
     margin: 10,
     filename: 'Response_Tracker_' + filenameSuffix + '_' + new Date().toISOString().slice(0,10) + '.pdf',
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
+    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: -window.scrollY, windowWidth: document.documentElement.scrollWidth, windowHeight: document.documentElement.scrollHeight },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
     pagebreak: { mode: ['css', 'legacy'] }
   };
@@ -3541,19 +3539,18 @@ function generateProposalPDF(c) {
   var filename = c.name.replace(/[^a-zA-Z0-9]+/g, '_') + '_x_GetGTM_Initial_Proposal.pdf';
   var container = document.createElement('div');
   container.innerHTML = html;
-  // Position off-screen (not behind other content via z-index) - html2canvas can fail to capture
-  // content stacked behind opaque elements via negative z-index, rendering a blank page. Moving it
-  // physically outside the viewport keeps it isolated from document flow without that risk.
-  container.style.position = 'fixed';
-  container.style.top = '0';
-  container.style.left = '-99999px';
+  // No CSS positioning tricks - both z-index hiding and far off-screen positioning turned out to
+  // cause html2canvas to capture a blank page. Instead, the container stays in normal document flow,
+  // and html2canvas is told explicitly to capture from scroll position (0,0) via scrollX/scrollY
+  // below, regardless of where the container actually sits on the page. This is the documented fix
+  // for capturing an element that isn't at the top of a long page.
   container.style.background = '#ffffff';
   document.body.appendChild(container);
   var opt = {
     margin: 0,
     filename: filename,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
+    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: -window.scrollY, windowWidth: document.documentElement.scrollWidth, windowHeight: document.documentElement.scrollHeight },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
     pagebreak: { mode: ['css', 'legacy'] }
   };
