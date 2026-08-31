@@ -517,8 +517,8 @@ var REVENUE_CONTRACTS = {
   },
 };
 
-let state = { clients: {}, prospects: [], responses: [], responseSavedViews: [], responseBilling: {}, revenueActuals: {} };
-let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: null, dashboardTab: "clients", responseFilters: { client: "", heddlStatus: "", clientStatus: "", confirmed: "" } };
+let state = { clients: {}, prospects: [], responses: [], responseSavedViews: [], responseBilling: {}, revenueActuals: {}, campaigns: [] };
+let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: null, dashboardTab: "clients", responseFilters: { client: "", heddlStatus: "", clientStatus: "", confirmed: "" }, campaignFilters: { client: "" } };
 
 function seedProspects() {
   state.prospects = [
@@ -685,8 +685,59 @@ function migrateResponseFields(responses) {
     }
     if (r.meetingBookedDate === undefined) { r.meetingBookedDate = ""; changed = true; }
     if (r.noFitReason === undefined) { r.noFitReason = ""; changed = true; }
+    if (r.campaign === undefined) {
+      // Best-effort extraction from notes text, e.g. "1Kosmos campaign. Confirmed..." or
+      // "AlgoSec Displacement (Tufin) campaign. ..." - matches "<name> campaign" at the start of
+      // notes. Inferred, not authoritative - the campaign column is editable so this can be corrected.
+      var cm = /^([\w\s/&()\-]+?)\s+campaign\b/i.exec(r.notes || "");
+      r.campaign = (cm && cm[1].trim().length >= 3) ? cm[1].trim() : "";
+      changed = true;
+    }
+    if (r.actualReply === undefined) {
+      // Best-effort backfill: pull any double-quoted phrases already present in notes, since notes
+      // often already quote the verbatim reply (e.g. 'replied "I see"'). Joins multiple quotes found.
+      // Blank when nothing is quoted - inferred, not authoritative, and always manually editable.
+      var quotes = (r.notes || "").match(/"([^"]{2,200})"/g);
+      r.actualReply = quotes ? quotes.join(" / ").replace(/"/g, "") : "";
+      changed = true;
+    }
   });
   return changed;
+}
+
+// Manually-triggered pull from the campaign screenshots Drive folder (via Claude). Idempotent by
+// campaign name - safe to re-run, never duplicates. All numbers below were read directly off real
+// Heddl campaign detail screenshots (contacts, accepted, messages, replies, reactions) - these are a
+// snapshot as of when the screenshot was taken, not live, so re-check periodically for updates.
+function seedCampaignsFromDrive() {
+  if (!state.campaigns) state.campaigns = [];
+  var existingNames = state.campaigns.map(function(c) { return c.name; });
+
+  function addIfMissing(c) {
+    if (existingNames.indexOf(c.name) !== -1) return false;
+    state.campaigns.push(Object.assign({
+      id: "cmp_" + Math.random().toString(36).slice(2,10),
+      notes: ""
+    }, c));
+    return true;
+  }
+
+  var added = 0;
+  var securotixCampaigns = [
+    { client: "Securotix", name: "AlgoSec Displacement (Tufin)", status: "Live", createdDate: "2026-07-13", totalContacts: 484, accepted: 99, messagesSent: 284, emailsSent: 0, inmailsSent: 0, replies: 6, reactions: 0, pending: 1, screenshotRef: "Screenshot 2026-08-31 at 10.19.11 AM.png", screenshotUrl: "https://drive.google.com/file/d/16SXF7ata2CQA3t1c_f1695qWdL9FwIu1/view?usp=drivesdk" },
+    { client: "Securotix", name: "FireMon Expansion (Tufin)", status: "Live", createdDate: "2026-07-13", totalContacts: 156, accepted: 31, messagesSent: 118, emailsSent: 0, inmailsSent: 0, replies: 3, reactions: 0, pending: 0, screenshotRef: "Screenshot 2026-08-31 at 10.19.05 AM.png", screenshotUrl: "https://drive.google.com/file/d/1MIKjzLB34O9O8iv66Ytc3huQB1N4ue6N/view?usp=drivesdk" },
+    { client: "Securotix", name: "Tuffin - senior Profile Leads", status: "Live", createdDate: "2026-08-04", totalContacts: 97, accepted: 18, messagesSent: 52, emailsSent: 0, inmailsSent: 0, replies: 1, reactions: 18, pending: 0, screenshotRef: "Screenshot 2026-08-31 at 10.18.57 AM.png", screenshotUrl: "https://drive.google.com/file/d/1owkm-5atnnTs8XYmo0R3VtzxuLujhu7X/view?usp=drivesdk" },
+    { client: "Securotix", name: "Algosec Users - Tuffin Junior Profile", status: "Live", createdDate: "2026-07-30", totalContacts: 42, accepted: 13, messagesSent: 36, emailsSent: 0, inmailsSent: 0, replies: 2, reactions: 13, pending: 2, screenshotRef: "Screenshot 2026-08-31 at 10.18.51 AM.png", screenshotUrl: "https://drive.google.com/file/d/1eZnGbD6CnFPoQlD5MdJ5EwIPOrPyU-D6/view?usp=drivesdk" },
+    { client: "Securotix", name: "Tuffin - Junior Roles - Multichannel outreaching", status: "Live", createdDate: "2026-08-10", totalContacts: 103, accepted: 32, messagesSent: 79, emailsSent: 44, inmailsSent: 0, replies: 6, reactions: 51, pending: 0, screenshotRef: "Screenshot 2026-08-31 at 10.18.44 AM.png", screenshotUrl: "https://drive.google.com/file/d/1d1EhO5QXqhjjIKflwcxWIhH8gb2tk3VF/view?usp=drivesdk" },
+    { client: "Securotix", name: "Senior roles (GRC & IAM) - 1kosmos - SAMA CSF-KSA BFSI - tire 1 companies", status: "Live", createdDate: "2026-08-28", totalContacts: 167, accepted: 23, messagesSent: 24, emailsSent: 0, inmailsSent: 0, replies: 0, reactions: 0, pending: 0, screenshotRef: "Screenshot 2026-08-31 at 10.18.22 AM.png", screenshotUrl: "https://drive.google.com/file/d/1UfDKkA78C8k3w61T9XQ922bJ5HXRJ1k-/view?usp=drivesdk" },
+    { client: "Securotix", name: "1kosmos - SAMA CSF-KSA BFSI - Junior roles (GRC & IAM) - tire 1 companies", status: "Live", createdDate: "2026-08-24", totalContacts: 52, accepted: 20, messagesSent: 38, emailsSent: 0, inmailsSent: 0, replies: 6, reactions: 13, pending: 0, screenshotRef: "Screenshot 2026-08-31 at 10.18.02 AM.png", screenshotUrl: "https://drive.google.com/file/d/1qc5ESxlsUSw6yj7kIdkoPiGk1zLN6LEZ/view?usp=drivesdk" },
+    { client: "Securotix", name: "Tuffin Extended - Oman & Qatar (Oil&Gas, BFSI, Govt)", status: "Live", createdDate: "2026-08-28", totalContacts: 61, accepted: 8, messagesSent: 8, emailsSent: 0, inmailsSent: 0, replies: 0, reactions: 0, pending: 0, screenshotRef: "Screenshot 2026-08-31 at 10.17.54 AM.png", screenshotUrl: "https://drive.google.com/file/d/1OipdaoikgQyduxDL2m5rwNsfZE1BZiUS/view?usp=drivesdk" },
+  ];
+  securotixCampaigns.forEach(function(c) {
+    if (addIfMissing(c)) added++;
+  });
+
+  return added;
 }
 
 function refreshResponsesFromDrive() {
@@ -781,6 +832,13 @@ var TEAM_EMAILS = {
   revops: "",                    // no RevOps contact identified yet - leave blank to omit from CC
 };
 
+// Per-client logos for branded PDF exports. Only include a client's logo in a report when that
+// specific client is the one being reported on (e.g. Account filter = "Securotix") - never show one
+// client's branding on another client's report.
+var CLIENT_LOGOS = {
+  "Securotix": "data:image/png;base64,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",
+};
+
 async function notifyTeam(title, message) {
   // Slack
   if (NOTIFY_CONFIG.slackWebhookUrl) {
@@ -815,7 +873,7 @@ var dbRef = null;
 var useFirebase = false;
 var auth = null;
 var authUser = null;
-var clientsRef = null, prospectsRef = null, revenueActualsRef = null, responsesRef = null, responseViewsRef = null, responseBillingRef = null;
+var clientsRef = null, prospectsRef = null, revenueActualsRef = null, responsesRef = null, responseViewsRef = null, responseBillingRef = null, campaignsRef = null;
 
 function initFirebase() {
   try {
@@ -829,6 +887,7 @@ function initFirebase() {
       responsesRef = db.ref("getgtm_tracker/responses");
       responseViewsRef = db.ref("getgtm_tracker/responseViews");
       responseBillingRef = db.ref("getgtm_tracker/responseBilling");
+      campaignsRef = db.ref("getgtm_tracker/campaigns");
       auth = firebase.auth();
       useFirebase = true;
 
@@ -886,12 +945,22 @@ function initFirebase() {
             state.responseBilling = snapshot.val() || {};
             if (!window._fbSaveInProgress) render();
           }, function(err) { console.log("responseBilling read error:", err.message); });
+          campaignsRef.on("value", function(snapshot) {
+            state.campaigns = snapshot.val() || [];
+            if (!window._campaignSeedDone) {
+              window._campaignSeedDone = true;
+              var addedCampaigns = seedCampaignsFromDrive();
+              if (addedCampaigns > 0) { saveState("campaigns"); }
+            }
+            if (!window._fbSaveInProgress) render();
+          }, function(err) { console.log("campaigns read error:", err.message); });
         } else {
           prospectsRef.off();
           revenueActualsRef.off();
           responseViewsRef.off();
           responsesRef.off();
           responseBillingRef.off();
+          campaignsRef.off();
         }
         render();
       });
@@ -930,10 +999,13 @@ async function loadState() {
   if (!state.responses) state.responses = [];
   if (!state.responseSavedViews) state.responseSavedViews = [];
   if (!state.responseBilling) state.responseBilling = {};
+  if (!state.campaigns) state.campaigns = [];
   // Firebase path seeds via the reactive listeners in initFirebase() instead - this block only
   // runs for the localStorage fallback (useFirebase === false).
   if (!useFirebase) {
     if (migrateResponseFields(state.responses)) { await saveState("responses"); }
+    var _campaignsAddedOnInit = seedCampaignsFromDrive();
+    if (_campaignsAddedOnInit > 0) { await saveState("campaigns"); }
     if (state.prospects.length === 0) { seedProspects(); await saveState(); }
     var _resultOnInit = refreshProspectsFromGmail();
     if (_resultOnInit.added > 0 || _resultOnInit.updated > 0) { state.lastGmailRefresh = new Date().toLocaleDateString("en-US", {year:"numeric",month:"short",day:"numeric"}); await saveState(); }
@@ -958,6 +1030,7 @@ async function saveState(scope) {
       if (authUser && (!scope || scope === "responses")) writes.push(responsesRef.set(state.responses || []));
       if (authUser && (!scope || scope === "responseViews")) writes.push(responseViewsRef.set(state.responseSavedViews || []));
       if (authUser && (!scope || scope === "responseBilling")) writes.push(responseBillingRef.set(state.responseBilling || {}));
+      if (authUser && (!scope || scope === "campaigns")) writes.push(campaignsRef.set(state.campaigns || []));
       await Promise.all(writes);
       setTimeout(function() { window._fbSaveInProgress = false; }, 500);
     }
@@ -1706,10 +1779,12 @@ function renderDashboard() {
         <button data-action="dtab" data-dtab="clients" class="${dTab==='clients'?'active':''}">Clients</button>
         <button data-action="dtab" data-dtab="prospects" class="${dTab==='prospects'?'active':''}">Prospects</button>
         <button data-action="dtab" data-dtab="responses" class="${dTab==='responses'?'active':''}">Responses</button>
+        <button data-action="dtab" data-dtab="campaigns" class="${dTab==='campaigns'?'active':''}">Campaigns</button>
         <button data-action="dtab" data-dtab="reporting" class="${dTab==='reporting'?'active':''}">Reporting</button>
       </div>
       ${dTab === "prospects" ? renderProspectsView()
         : dTab === "responses" ? renderResponsesView()
+        : dTab === "campaigns" ? renderCampaignsView()
         : dTab === "reporting" ? renderReportingView()
         : dTab === "new-engagements" ? renderNewEngagementsView(newEngagements)
         : renderClientsView(signedClients, active, launched, atRisk)}
@@ -1878,6 +1953,135 @@ function renderProspectsView() {
   `;
 }
 
+// Groups responses by Campaign then Month, with Total and Confirmed counts per group. Shared by both
+// the on-screen Reporting Snapshot table and the PDF export's pivot section, so they always match.
+function computeReportingSnapshotGroups(responses) {
+  var groups = {};
+  (responses || []).forEach(function(r) {
+    var campaign = r.campaign || "(No campaign set)";
+    var month = r.date ? new Date(r.date + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "short" }) : "(No date)";
+    var key = campaign + "||" + month;
+    if (!groups[key]) groups[key] = { campaign: campaign, month: month, monthSort: r.date ? r.date.slice(0,7) : "", total: 0, confirmed: 0 };
+    groups[key].total++;
+    if (r.confirmed) groups[key].confirmed++;
+  });
+  return Object.values(groups).sort(function(a, b) {
+    if (a.campaign !== b.campaign) return a.campaign.localeCompare(b.campaign);
+    return a.monthSort.localeCompare(b.monthSort);
+  });
+}
+
+// Pivot table by Campaign then Month, showing Total and Confirmed counts - sits below the metrics on
+// the Responses tab. Only ever reflects whatever's currently filtered/visible.
+function renderReportingSnapshot(responses) {
+  if (!responses || responses.length === 0) {
+    return '<div class="card" style="margin-bottom:16px"><div class="card-head"><h2>Reporting Snapshot</h2></div>' +
+      '<div class="card-body"><div class="small" style="color:var(--text-muted)">No responses to summarize yet.</div></div></div>';
+  }
+  var rows = computeReportingSnapshotGroups(responses);
+  var tableRows = rows.map(function(g) {
+    var pct = g.total ? Math.round(g.confirmed / g.total * 100) : 0;
+    return '<tr>' +
+      '<td>' + escapeHTML(g.campaign) + '</td>' +
+      '<td>' + escapeHTML(g.month) + '</td>' +
+      '<td>' + g.total + '</td>' +
+      '<td>' + g.confirmed + '</td>' +
+      '<td>' + pct + '%</td>' +
+      '</tr>';
+  }).join("");
+  return '<div class="card" style="margin-bottom:16px">' +
+    '<div class="card-head"><div><h2>Reporting Snapshot</h2><div class="sub">By campaign and month, with confirmed counts</div></div></div>' +
+    '<div class="card-body" style="padding:0">' +
+    '<table><thead><tr><th>Campaign</th><th>Month</th><th>Total</th><th>Confirmed</th><th>Confirmed %</th></tr></thead>' +
+    '<tbody>' + tableRows + '</tbody></table>' +
+    '</div></div>';
+}
+
+function renderCampaignsView() {
+  var allCampaigns = (state.campaigns || []).slice().sort((a,b) => (b.createdDate||"").localeCompare(a.createdDate||""));
+  var clientNames = Object.values(state.clients).map(function(c) { return c.name; }).sort();
+  var f = ui.campaignFilters || { client: "" };
+  var campaigns = allCampaigns.filter(function(c) { return !f.client || c.client === f.client; });
+
+  var totalContacts = campaigns.reduce(function(s, c) { return s + (c.totalContacts || 0); }, 0);
+  var totalAccepted = campaigns.reduce(function(s, c) { return s + (c.accepted || 0); }, 0);
+  var totalReplies = campaigns.reduce(function(s, c) { return s + (c.replies || 0); }, 0);
+  var totalReactions = campaigns.reduce(function(s, c) { return s + (c.reactions || 0); }, 0);
+  var replyRate = totalContacts ? Math.round(totalReplies / totalContacts * 100 * 10) / 10 : 0;
+
+  return `
+      <div class="kpis">
+        <div class="kpi"><div class="label">Total campaigns</div><div class="value">${campaigns.length}</div></div>
+        <div class="kpi"><div class="label">Total contacts reached</div><div class="value">${totalContacts.toLocaleString()}</div></div>
+        <div class="kpi"><div class="label">Connections accepted</div><div class="value" style="color:var(--brand)">${totalAccepted.toLocaleString()}</div></div>
+        <div class="kpi"><div class="label">Total replies</div><div class="value" style="color:var(--success)">${totalReplies}</div></div>
+        <div class="kpi"><div class="label">Reply rate</div><div class="value">${replyRate}%</div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-body" style="padding:14px 18px">
+          <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end">
+            <div>
+              <label class="small" style="display:block;margin-bottom:4px;font-weight:600">Account</label>
+              <select data-action="filter-campaign" data-filter="client" style="padding:6px 10px;border:1px solid var(--brand);border-radius:5px;background:var(--surface-1);min-width:160px;font-weight:600">
+                <option value="">All accounts</option>
+                ${clientNames.map(function(n) { return `<option value="${escapeAttr(n)}" ${f.client===n?'selected':''}>${escapeHTML(n)}</option>`; }).join("")}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Campaigns</h2>
+          <div style="display:flex;gap:8px">
+            <a href="https://drive.google.com/drive/folders/1WRKcOv9z0KKdkQ800n62XXgEbWI0eVM0" target="_blank" class="btn ghost sm">📁 Open Campaign Drive folder</a>
+            <button class="btn ghost sm" data-action="export-campaigns-pdf">⬇ Export PDF</button>
+            <button class="btn" data-action="add-campaign">+ Add campaign</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div class="small" style="padding:12px 16px;border-bottom:0.5px solid var(--border)">
+            Numbers here are a snapshot from a Heddl campaign screenshot at the time it was captured - not live. Ask Claude to check the campaign Drive folder for updated screenshots to refresh these.
+          </div>
+          ${campaigns.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">No campaigns logged yet.</div>` : `
+            <div style="overflow-x:auto">
+            <table style="min-width:1300px">
+              <thead><tr><th>Campaign</th><th>Account</th><th>Status</th><th>Created</th><th>Total Contacts</th><th>Accepted</th><th>Messages Sent</th><th>Emails Sent</th><th>Replies</th><th>Reactions</th><th>Pending</th><th>Notes</th><th>Screenshot</th><th></th></tr></thead>
+              <tbody>
+                ${campaigns.map(function(c) { return `
+                  <tr>
+                    <td><input data-campaign="${c.id}" data-key="name" value="${escapeAttr(c.name)}" style="border:none;background:transparent;padding:0;width:220px;font-weight:600"></td>
+                    <td>
+                      <select data-campaign="${c.id}" data-key="client" class="del-select">
+                        <option value="">-</option>
+                        ${clientNames.map(function(n) { return `<option ${c.client===n?'selected':''}>${escapeHTML(n)}</option>`; }).join("")}
+                      </select>
+                    </td>
+                    <td><input data-campaign="${c.id}" data-key="status" value="${escapeAttr(c.status || '')}" placeholder="Live/Paused" style="border:none;background:transparent;padding:0;width:80px"></td>
+                    <td><input type="date" data-campaign="${c.id}" data-key="createdDate" value="${escapeAttr(c.createdDate || '')}" style="border:none;background:transparent;padding:0;width:120px"></td>
+                    <td><input type="number" data-campaign="${c.id}" data-key="totalContacts" value="${escapeAttr(c.totalContacts || 0)}" style="border:none;background:transparent;padding:0;width:80px"></td>
+                    <td><input type="number" data-campaign="${c.id}" data-key="accepted" value="${escapeAttr(c.accepted || 0)}" style="border:none;background:transparent;padding:0;width:70px"></td>
+                    <td><input type="number" data-campaign="${c.id}" data-key="messagesSent" value="${escapeAttr(c.messagesSent || 0)}" style="border:none;background:transparent;padding:0;width:80px"></td>
+                    <td><input type="number" data-campaign="${c.id}" data-key="emailsSent" value="${escapeAttr(c.emailsSent || 0)}" style="border:none;background:transparent;padding:0;width:70px"></td>
+                    <td><input type="number" data-campaign="${c.id}" data-key="replies" value="${escapeAttr(c.replies || 0)}" style="border:none;background:transparent;padding:0;width:60px;color:var(--success);font-weight:600"></td>
+                    <td><input type="number" data-campaign="${c.id}" data-key="reactions" value="${escapeAttr(c.reactions || 0)}" style="border:none;background:transparent;padding:0;width:70px"></td>
+                    <td><input type="number" data-campaign="${c.id}" data-key="pending" value="${escapeAttr(c.pending || 0)}" style="border:none;background:transparent;padding:0;width:60px"></td>
+                    <td><input data-campaign="${c.id}" data-key="notes" value="${escapeAttr(c.notes || '')}" placeholder="Context" style="border:none;background:transparent;padding:0;width:160px"></td>
+                    <td>${c.screenshotUrl ? '<a href="' + escapeAttr(c.screenshotUrl) + '" target="_blank" class="small" style="color:var(--brand)">📎 view</a>' : '<span class="small" style="color:var(--text-muted)">-</span>'}</td>
+                    <td><button class="btn ghost sm" data-action="delete-campaign" data-id="${c.id}">&#128465;</button></td>
+                  </tr>
+                `;}).join("")}
+              </tbody>
+            </table>
+            </div>
+          `}
+        </div>
+      </div>
+  `;
+}
+
 function renderResponsesView() {
   var allResponses = (state.responses || []).slice().sort((a,b) => (b.date||"").localeCompare(a.date||""));
   var clientNames = Object.values(state.clients).map(function(c) { return c.name; }).sort();
@@ -1920,6 +2124,8 @@ function renderResponsesView() {
         <div class="kpi"><div class="label">Not interested %</div><div class="value" style="color:var(--danger)">${responses.length ? Math.round(heddlCounts["Not Interested"] / responses.length * 100) : 0}%</div></div>
         <div class="kpi"><div class="label">Client confirmed %</div><div class="value" style="color:var(--text-secondary)">${responses.length ? Math.round(confirmedCount / responses.length * 100) : 0}%</div></div>
       </div>
+
+      ${renderReportingSnapshot(responses)}
 
       <div class="card" style="margin-bottom:16px">
         <div class="card-body" style="padding:14px 18px">
@@ -1992,7 +2198,7 @@ function renderResponsesView() {
           ${responses.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">${anyFilterActive ? 'No responses match the current filters.' : 'No responses logged yet.'}</div>` : `
             <div style="overflow-x:auto">
             <table style="min-width:1100px">
-              <thead><tr><th>Date</th><th>Account</th><th>Contact</th><th>Company</th><th>Heddl Status</th><th>Client Status</th><th>Confirmed</th><th>Meeting Date</th><th>No Fit Reason</th><th>Notes</th><th>Screenshot</th><th></th></tr></thead>
+              <thead><tr><th>Date</th><th>Account</th><th>Contact</th><th>Company</th><th>Campaign</th><th>Heddl Status</th><th>Client Status</th><th>Confirmed</th><th>Meeting Date</th><th>No Fit Reason</th><th>Actual Reply</th><th>Notes</th><th>Screenshot</th><th></th></tr></thead>
               <tbody>
                 ${responses.map(function(r, i) {
                   var locked = !!r.confirmed;
@@ -2009,6 +2215,7 @@ function renderResponsesView() {
                     </td>
                     <td><input ${lockAttr} data-response="${r.id}" data-key="contact" value="${escapeAttr(r.contact)}" placeholder="Contact name" style="border:none;background:transparent;padding:0;width:140px;${lockStyle}"></td>
                     <td><input ${lockAttr} data-response="${r.id}" data-key="company" value="${escapeAttr(r.company || '')}" placeholder="Their company" style="border:none;background:transparent;padding:0;width:130px;${lockStyle}"></td>
+                    <td><input ${lockAttr} data-response="${r.id}" data-key="campaign" value="${escapeAttr(r.campaign || '')}" placeholder="Campaign" style="border:none;background:transparent;padding:0;width:140px;${lockStyle}"></td>
                     <td>${locked ? '<span style="' + (function(){var c=responseStatusColor(r.heddlStatus);return 'background:'+c.bg+';color:'+c.color;})() + ';font-weight:600;padding:3px 8px;border-radius:4px;font-size:12px;display:inline-block">' + escapeHTML(r.heddlStatus||'-') + '</span>' : statusSelectHtml(r, "heddlStatus", RESPONSE_STATUSES, "-")}</td>
                     <td>${locked ? '<span style="' + (function(){var c=responseStatusColor(r.clientStatus);return 'background:'+c.bg+';color:'+c.color;})() + ';font-weight:600;padding:3px 8px;border-radius:4px;font-size:12px;display:inline-block">' + escapeHTML(r.clientStatus||'Not set') + '</span>' : statusSelectHtml(r, "clientStatus", RESPONSE_STATUSES, "Not set")}</td>
                     <td style="text-align:center">
@@ -2017,6 +2224,7 @@ function renderResponsesView() {
                     </td>
                     <td>${r.clientStatus === "Meeting Booked" ? '<input type="date" ' + lockAttr + ' data-response="' + r.id + '" data-key="meetingBookedDate" value="' + escapeAttr(r.meetingBookedDate || '') + '" style="border:none;background:transparent;padding:0;width:100%;' + lockStyle + '">' : '<span class="small" style="color:var(--text-muted)">-</span>'}</td>
                     <td>${r.clientStatus === "No Fit" ? '<input ' + lockAttr + ' data-response="' + r.id + '" data-key="noFitReason" value="' + escapeAttr(r.noFitReason || '') + '" placeholder="Why not a fit" style="border:none;background:transparent;padding:0;width:100%;' + lockStyle + '">' : '<span class="small" style="color:var(--text-muted)">-</span>'}</td>
+                    <td><input ${lockAttr} data-response="${r.id}" data-key="actualReply" value="${escapeAttr(r.actualReply || '')}" placeholder="Verbatim reply text" style="border:none;background:transparent;padding:0;width:200px;${lockStyle}"></td>
                     <td><input ${lockAttr} data-response="${r.id}" data-key="notes" value="${escapeAttr(r.notes)}" placeholder="Context" style="border:none;background:transparent;padding:0;width:180px;${lockStyle}"></td>
                     <td>${r.screenshotUrl ? '<a href="' + escapeAttr(r.screenshotUrl) + '" target="_blank" class="small" style="color:var(--brand)">📎 ' + escapeHTML((r.screenshotRef||'view').slice(0,18)) + '…</a>' : '<span class="small" style="color:var(--text-muted)">' + escapeHTML((r.screenshotRef||'-').slice(0,18)) + '</span>'}</td>
                     <td><button class="btn ghost sm" data-action="delete-response" data-id="${r.id}" ${lockAttr}>&#128465;</button></td>
@@ -3087,6 +3295,98 @@ function buildProposalHTML(c, isForPDF) {
   return html;
 }
 
+function generateCampaignsPDF() {
+  var allCampaigns = (state.campaigns || []).slice().sort((a,b) => (b.createdDate||"").localeCompare(a.createdDate||""));
+  var f = ui.campaignFilters || { client: "" };
+  var campaigns = allCampaigns.filter(function(c) { return !f.client || c.client === f.client; });
+
+  var totalContacts = campaigns.reduce(function(s, c) { return s + (c.totalContacts || 0); }, 0);
+  var totalAccepted = campaigns.reduce(function(s, c) { return s + (c.accepted || 0); }, 0);
+  var totalReplies = campaigns.reduce(function(s, c) { return s + (c.replies || 0); }, 0);
+  var replyRate = totalContacts ? Math.round(totalReplies / totalContacts * 100 * 10) / 10 : 0;
+
+  function metricCard(label, value, color) {
+    return '<div style="flex:1;border:0.5px solid #e5e7eb;border-radius:6px;padding:10px 12px">' +
+      '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.3px;color:#94a3b8;margin-bottom:4px">' + escapeHTML(label) + '</div>' +
+      '<div style="font-size:18px;font-weight:700;color:' + color + '">' + value + '</div>' +
+      '</div>';
+  }
+  var metricsHtml = '<div style="display:flex;gap:10px;margin-bottom:18px">' +
+    metricCard("Total campaigns", campaigns.length, "#111") +
+    metricCard("Total contacts reached", totalContacts.toLocaleString(), "#111") +
+    metricCard("Connections accepted", totalAccepted.toLocaleString(), "#7c3aed") +
+    metricCard("Total replies", totalReplies, "#15803d") +
+    metricCard("Reply rate", replyRate + "%", "#475569") +
+    '</div>';
+
+  var logoHtml = (f.client && CLIENT_LOGOS[f.client]) ? '<img src="' + CLIENT_LOGOS[f.client] + '" style="height:40px;margin-bottom:10px">' : '';
+  var generatedStamp = 'GetGTM Report generated on ' + new Date().toLocaleDateString("en-US", {year:"numeric",month:"long",day:"numeric"}) + ' at ' + new Date().toLocaleTimeString("en-US", {hour:"2-digit",minute:"2-digit"});
+
+  var rows = campaigns.map(function(c) {
+    var screenshotCell = c.screenshotUrl
+      ? '<span style="color:#2563eb;word-break:break-all">' + escapeHTML(c.screenshotUrl) + '</span>'
+      : '<span style="color:#94a3b8">-</span>';
+    return '<tr>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px"><strong>' + escapeHTML(c.name || "-") + '</strong></td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(c.client || "-") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(c.status || "-") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;white-space:nowrap">' + escapeHTML(c.createdDate || "-") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + (c.totalContacts || 0) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + (c.accepted || 0) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + (c.messagesSent || 0) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + (c.emailsSent || 0) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;font-weight:700;color:#15803d">' + (c.replies || 0) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + (c.reactions || 0) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;max-width:160px">' + escapeHTML(c.notes || "") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:8px;max-width:150px">' + screenshotCell + '</td>' +
+      '</tr>';
+  }).join("");
+
+  var html = '<div style="font-family:Helvetica,Arial,sans-serif;padding:24px;color:#111">' +
+    logoHtml +
+    '<h1 style="font-size:18px;margin:0 0 4px">Campaigns Report</h1>' +
+    '<div style="font-size:11px;color:#64748b;margin-bottom:2px">' + escapeHTML(f.client || "All accounts") + '</div>' +
+    '<div style="font-size:10px;color:#94a3b8;margin-bottom:16px">' + escapeHTML(generatedStamp) + ' - ' + campaigns.length + ' campaign' + (campaigns.length !== 1 ? 's' : '') + '</div>' +
+    metricsHtml +
+    '<table style="width:100%;border-collapse:collapse">' +
+    '<thead><tr>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Campaign</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Account</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Status</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Created</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Total</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Accepted</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Messages</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Emails</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Replies</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Reactions</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Notes</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Screenshot link</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>' +
+    '</div>';
+
+  var container = document.createElement('div');
+  container.innerHTML = html;
+  container.style.position = 'fixed';
+  container.style.top = '0';
+  container.style.left = '0';
+  container.style.zIndex = '-9999';
+  container.style.background = '#ffffff';
+  document.body.appendChild(container);
+  var filenameSuffix = f.client ? f.client.replace(/[^a-zA-Z0-9]+/g, '_') : 'All';
+  var opt = {
+    margin: 10,
+    filename: 'Campaigns_' + filenameSuffix + '_' + new Date().toISOString().slice(0,10) + '.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+    pagebreak: { mode: ['css', 'legacy'] }
+  };
+  html2pdf().set(opt).from(container).save().then(function() {
+    document.body.removeChild(container);
+  });
+}
+
 function generateResponsesPDF() {
   var allResponses = (state.responses || []).slice().sort((a,b) => (b.date||"").localeCompare(a.date||""));
   var f = ui.responseFilters || { client: "", heddlStatus: "", clientStatus: "", confirmed: "" };
@@ -3125,6 +3425,30 @@ function generateResponsesPDF() {
     metricCard("Confirmed %", Math.round(pdfConfirmedCount / totalN * 100) + "%", "#475569") +
     '</div>';
 
+  var pivotGroups = computeReportingSnapshotGroups(responses);
+  var pivotRowsHtml = pivotGroups.map(function(g) {
+    var pct = g.total ? Math.round(g.confirmed / g.total * 100) : 0;
+    return '<tr>' +
+      '<td style="padding:5px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(g.campaign) + '</td>' +
+      '<td style="padding:5px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(g.month) + '</td>' +
+      '<td style="padding:5px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + g.total + '</td>' +
+      '<td style="padding:5px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + g.confirmed + '</td>' +
+      '<td style="padding:5px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + pct + '%</td>' +
+      '</tr>';
+  }).join("");
+  var pivotHtml = pivotGroups.length === 0 ? '' :
+    '<div style="margin-bottom:18px">' +
+    '<div style="font-size:11px;font-weight:700;margin-bottom:6px">Reporting Snapshot - by Campaign and Month</div>' +
+    '<table style="width:60%;border-collapse:collapse">' +
+    '<thead><tr>' +
+    '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Campaign</th>' +
+    '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Month</th>' +
+    '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Total</th>' +
+    '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Confirmed</th>' +
+    '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Confirmed %</th>' +
+    '</tr></thead><tbody>' + pivotRowsHtml + '</tbody></table>' +
+    '</div>';
+
   function badge(status) {
     if (!status) return '<span style="color:#94a3b8">-</span>';
     var c = responseStatusColor(status);
@@ -3140,35 +3464,59 @@ function generateResponsesPDF() {
       ? '<span style="color:#2563eb;word-break:break-all">' + escapeHTML(r.screenshotUrl) + '</span>'
       : '<span style="color:#94a3b8">' + escapeHTML(r.screenshotRef || "-") + '</span>';
     return '<tr>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px;white-space:nowrap">' + escapeHTML(r.date || "-") + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px"><strong>' + escapeHTML(r.client || "-") + '</strong><br><span style="color:#64748b">' + escapeHTML(r.contact || "") + (r.company ? ' (' + escapeHTML(r.company) + ')' : '') + '</span></td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + badge(r.heddlStatus) + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + badge(r.clientStatus) + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px;text-align:center">' + (r.confirmed ? '✓' : '') + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px;max-width:200px">' + escapeHTML(r.notes || "") + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;max-width:160px">' + screenshotCell + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;white-space:nowrap">' + escapeHTML(r.date || "-") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(r.client || "-") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(r.contact || "-") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(r.company || "-") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(r.campaign || "-") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + badge(r.heddlStatus) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + badge(r.clientStatus) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;text-align:center">' + (r.confirmed ? '✓' : '') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(r.meetingBookedDate || "-") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;max-width:120px">' + escapeHTML(r.noFitReason || "-") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;max-width:170px">' + escapeHTML(r.notes || "") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:8px;max-width:140px">' + screenshotCell + '</td>' +
       '</tr>';
   }).join("");
 
+  var logoHtml = (f.client && CLIENT_LOGOS[f.client]) ? '<img src="' + CLIENT_LOGOS[f.client] + '" style="height:40px;margin-bottom:10px">' : '';
+  var generatedStamp = 'GetGTM Report generated on ' + new Date().toLocaleDateString("en-US", {year:"numeric",month:"long",day:"numeric"}) + ' at ' + new Date().toLocaleTimeString("en-US", {hour:"2-digit",minute:"2-digit"});
+
   var html = '<div style="font-family:Helvetica,Arial,sans-serif;padding:24px;color:#111">' +
+    logoHtml +
     '<h1 style="font-size:18px;margin:0 0 4px">Response Tracker</h1>' +
     '<div style="font-size:11px;color:#64748b;margin-bottom:2px">' + escapeHTML(filterLabel) + '</div>' +
-    '<div style="font-size:10px;color:#94a3b8;margin-bottom:16px">Exported ' + new Date().toLocaleDateString("en-US", {year:"numeric",month:"long",day:"numeric"}) + ' - ' + responses.length + ' response' + (responses.length !== 1 ? 's' : '') + '</div>' +
+    '<div style="font-size:10px;color:#94a3b8;margin-bottom:16px">' + escapeHTML(generatedStamp) + ' - ' + responses.length + ' response' + (responses.length !== 1 ? 's' : '') + '</div>' +
     metricsHtml +
+    pivotHtml +
     '<table style="width:100%;border-collapse:collapse">' +
     '<thead><tr>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Date</th>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Account / Contact</th>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Heddl Status</th>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Client Status</th>' +
-    '<th style="text-align:center;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Confirmed</th>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Notes</th>' +
-    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:10px;text-transform:uppercase;color:#64748b">Screenshot link</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Date</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Account</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Contact</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Company</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Campaign</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Heddl Status</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Client Status</th>' +
+    '<th style="text-align:center;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Confirmed</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Meeting Date</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">No Fit Reason</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Notes</th>' +
+    '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Screenshot link</th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table>' +
     '</div>';
 
   var container = document.createElement('div');
   container.innerHTML = html;
+  // Pin the container off-flow before capture - appending a plain div to the end of body means it
+  // inherits normal document flow and lands far down the page (below the entire app's existing
+  // content), which html2canvas then captures as a large blank area before the real content. Fixed
+  // positioning isolates it from that regardless of how tall the rest of the page is.
+  container.style.position = 'fixed';
+  container.style.top = '0';
+  container.style.left = '0';
+  container.style.zIndex = '-9999';
+  container.style.background = '#ffffff';
   document.body.appendChild(container);
   var filenameSuffix = f.client ? f.client.replace(/[^a-zA-Z0-9]+/g, '_') : 'All';
   var opt = {
@@ -3189,6 +3537,11 @@ function generateProposalPDF(c) {
   var filename = c.name.replace(/[^a-zA-Z0-9]+/g, '_') + '_x_GetGTM_Initial_Proposal.pdf';
   var container = document.createElement('div');
   container.innerHTML = html;
+  container.style.position = 'fixed';
+  container.style.top = '0';
+  container.style.left = '0';
+  container.style.zIndex = '-9999';
+  container.style.background = '#ffffff';
   document.body.appendChild(container);
   var opt = {
     margin: 0,
@@ -3723,6 +4076,25 @@ function attachHandlers() {
         });
         saveState("responses"); render();
       }
+      else if (action === "add-campaign") {
+        if (!state.campaigns) state.campaigns = [];
+        state.campaigns.push({
+          id: "cmp_" + Math.random().toString(36).slice(2,10),
+          name: "New campaign", client: "", status: "Live", createdDate: new Date().toISOString().slice(0,10),
+          totalContacts: 0, accepted: 0, messagesSent: 0, emailsSent: 0, inmailsSent: 0, replies: 0,
+          reactions: 0, pending: 0, notes: "", screenshotRef: "", screenshotUrl: ""
+        });
+        saveState("campaigns"); render();
+      }
+      else if (action === "delete-campaign") {
+        if (confirm("Remove this campaign? This cannot be undone.")) {
+          state.campaigns = (state.campaigns || []).filter(function(c) { return c.id !== el.dataset.id; });
+          saveState("campaigns"); render();
+        }
+      }
+      else if (action === "export-campaigns-pdf") {
+        generateCampaignsPDF();
+      }
       else if (action === "delete-response") {
         var respToDelete = (state.responses || []).find(function(r) { return r.id === el.dataset.id; });
         if (respToDelete && respToDelete.confirmed) {
@@ -4081,6 +4453,24 @@ function attachHandlers() {
       ui.responseFilters[el.dataset.filter] = el.value;
       render();
     });
+  });
+  document.querySelectorAll('[data-action="filter-campaign"]').forEach(el => {
+    el.addEventListener("change", () => {
+      if (!ui.campaignFilters) ui.campaignFilters = { client: "" };
+      ui.campaignFilters[el.dataset.filter] = el.value;
+      render();
+    });
+  });
+  document.querySelectorAll("[data-campaign]").forEach(el => {
+    var handler = function() {
+      var c = (state.campaigns || []).find(function(x) { return x.id === el.dataset.campaign; });
+      if (!c) return;
+      var isNumeric = ["totalContacts","accepted","messagesSent","emailsSent","inmailsSent","replies","reactions","pending"].indexOf(el.dataset.key) !== -1;
+      c[el.dataset.key] = isNumeric ? (parseInt(el.value, 10) || 0) : el.value;
+      if (el.dataset.key === "client") { saveState("campaigns"); render(); } else { save("campaigns"); }
+    };
+    el.addEventListener("input", handler);
+    el.addEventListener("change", handler);
   });
   document.querySelectorAll('[data-action="load-response-view"]').forEach(el => {
     el.addEventListener("change", () => {
