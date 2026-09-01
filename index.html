@@ -1385,56 +1385,55 @@ function renderCallingTab(clientId) {
     renderCallingLogsPanel(clientId);
 }
 
-// PDF export. Reuses the same html2pdf / html2canvas setup as the other PDFs so appearance is
-// consistent. Includes the report card (aggregates + activity by group) and the full leads table.
-// Renders `html` into a fresh, fully isolated iframe with its own document, then hands that iframe's
-// body to html2pdf. This exists because the previous approach - appending the export container
-// directly into the main app's <body> and compensating for the page's own height via scrollY /
-// windowHeight overrides passed to html2canvas - depends on the ENTIRE surrounding page's layout at
-// capture time. As the app grew (more tabs, bigger tables, audit logs, docs), that coupling became
-// unreliable: html2canvas could crop or entirely drop the top portion of a PDF's first page depending
-// on exactly how tall the rest of the page happened to be and where the browser's scroll position sat,
-// producing intermittent blank-space or missing-content bugs that were hard to pin to one exact cause.
-// An iframe has its own document, so its own scrollHeight/layout has no relationship whatsoever to the
-// parent page's size - there's nothing left to compensate for, and no coupling left to break.
+// Renders `html` into a temporary container and captures it to PDF. Earlier approaches tried here:
+//   1. Append the container to the end of <body> and tell html2canvas to compensate via scrollY /
+//      windowWidth / windowHeight overrides. This coupled correctness to the ENTIRE surrounding page's
+//      height at capture time - as the app grew (more tabs, bigger tables, audit logs), that
+//      compensation became unreliable and could crop or drop the top of a PDF's first page.
+//   2. Render the container inside a fully isolated iframe with its own document, to remove that
+//      coupling entirely. This backfired differently: html2canvas/html2pdf are loaded in the PARENT
+//      window, and handing them a DOM node from a separate iframe document broke their internal
+//      size/coordinate assumptions - confirmed by the captured canvas coming out ~7x taller than the
+//      actual content, which then split into dozens of mostly-blank PDF pages.
+// The fix that actually works: stay in the SAME document (so html2canvas's own window/script context
+// matches the captured element - no cross-frame weirdness), but temporarily hide every other child of
+// <body> while the container is captured, so the container is the only thing on the page and its
+// position is naturally (0,0) - nothing to compensate for, because there's nothing else competing for
+// vertical space during the capture.
 function renderHtmlToPdf(html, pdfOptions) {
   return new Promise(function(resolve, reject) {
-    var iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.top = '0';
-    iframe.style.left = '0';
-    iframe.style.width = '1600px';
-    iframe.style.height = '600px';
-    iframe.style.opacity = '0';
-    iframe.style.pointerEvents = 'none';
-    iframe.style.border = 'none';
-    document.body.appendChild(iframe);
+    var container = document.createElement('div');
+    container.innerHTML = html;
+    container.style.background = '#ffffff';
 
-    function cleanup() { if (iframe.parentNode) document.body.removeChild(iframe); }
+    var hiddenSiblings = [];
+    Array.prototype.forEach.call(document.body.children, function(el) {
+      if (el.style.display !== 'none') {
+        hiddenSiblings.push({ el: el, prevDisplay: el.style.display });
+        el.style.display = 'none';
+      }
+    });
+    document.body.appendChild(container);
+    // Belt-and-braces: with every sibling hidden, the page's scrollable area collapses to just the
+    // container, so the browser should already sit at (0,0) - but force it explicitly rather than
+    // assume, since a stale non-zero scroll position was part of what made the original bug so hard
+    // to pin down.
+    window.scrollTo(0, 0);
 
-    try {
-      // An iframe's contentDocument (already showing about:blank) is available synchronously the
-      // instant the element is attached to the DOM - waiting on a 'load' event for about:blank is
-      // unreliable across browsers (some fire it before a listener can attach, some not at all), so
-      // write directly instead of waiting for any load signal.
-      var idoc = iframe.contentDocument || iframe.contentWindow.document;
-      idoc.open();
-      idoc.write('<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;background:#fff"></body></html>');
-      idoc.close();
-      idoc.body.innerHTML = html;
-      var contentHeight = Math.max(idoc.body.scrollHeight, idoc.documentElement.scrollHeight);
-      iframe.style.height = contentHeight + 'px';
-      // Two animation-frame ticks: one for the height change above to commit layout, one more to be
-      // safe with any image/font loads that started as a result of the innerHTML write.
+    function cleanup() {
+      if (container.parentNode) document.body.removeChild(container);
+      hiddenSiblings.forEach(function(s) { s.el.style.display = s.prevDisplay; });
+    }
+
+    // Let layout settle after hiding siblings and inserting the container before capturing.
+    requestAnimationFrame(function() {
       requestAnimationFrame(function() {
-        requestAnimationFrame(function() {
-          html2pdf().set(pdfOptions).from(idoc.body).save().then(function() {
-            cleanup();
-            resolve();
-          }).catch(function(err) { cleanup(); reject(err); });
-        });
+        html2pdf().set(pdfOptions).from(container).save().then(function() {
+          cleanup();
+          resolve();
+        }).catch(function(err) { cleanup(); reject(err); });
       });
-    } catch (err) { cleanup(); reject(err); }
+    });
   });
 }
 
