@@ -915,7 +915,569 @@ var dbRef = null;
 var useFirebase = false;
 var auth = null;
 var authUser = null;
-var clientsRef = null, prospectsRef = null, revenueActualsRef = null, responsesRef = null, responseViewsRef = null, responseBillingRef = null, campaignsRef = null;
+var clientsRef = null, prospectsRef = null, revenueActualsRef = null, responsesRef = null, responseViewsRef = null, responseBillingRef = null, campaignsRef = null, callingLeadsRef = null, callingLogsRef = null;
+
+// ============================================================================
+// CALLING FEATURE
+// ----------------------------------------------------------------------------
+// A calling workspace where each client works a list of warm leads. Team uploads
+// leads (from a public Google Sheet); clients (or team) update statuses. Data lives
+// under state.callingLeads[clientId] = [lead, ...] and state.callingLogs[clientId] = [log, ...].
+// Firebase paths: getgtm_tracker/callingLeads (open) and getgtm_tracker/callingLogs (auth-only-read).
+// ============================================================================
+
+var CALLING_STATUSES = ["New", "Busy", "Follow-Up", "Meeting Booked", "Not Interested", "Not Relevant"];
+var CALLING_ENRICH_STATUSES = ["", "Valid", "Invalid"];
+
+// Column header aliases for CSV import - all lowercased, trimmed to letters, so "First Name",
+// "first_name", "FIRSTNAME", "First-Name" all resolve to the same target field. Order in each array
+// doesn't matter; the first header in the CSV that matches wins.
+var CALLING_CSV_COLUMN_MAP = {
+  firstName: ["firstname", "first", "fname", "givenname"],
+  lastName: ["lastname", "last", "lname", "surname", "familyname"],
+  title: ["title", "jobtitle", "position", "role"],
+  company: ["company", "organization", "organisation", "employer", "account"],
+  location: ["location", "city", "country", "region", "geo"],
+  linkedin: ["linkedin", "linkedinurl", "linkedinprofile", "profile", "profileurl"],
+  phone: ["phone", "phonenumber", "mobile", "cell", "tel", "telephone"],
+  email: ["email", "emailaddress", "workemail"],
+  warmReason: ["reason", "warmreason", "warmsignal", "notes", "context", "why", "warm", "intent"],
+};
+
+function normalizeCsvHeader(h) {
+  return String(h || "").toLowerCase().replace(/[^a-z]/g, "");
+}
+
+// Minimal CSV parser: handles quoted fields (RFC 4180 style), commas inside quotes, escaped double
+// quotes ("" -> "), and \r\n or \n line endings. Kept in-house to avoid pulling in papaparse for one
+// use. Returns array of rows, each an array of string cells.
+function parseCsv(text) {
+  var rows = [];
+  var row = [];
+  var cell = "";
+  var inQuotes = false;
+  var i = 0, len = (text || "").length;
+  while (i < len) {
+    var ch = text.charAt(i);
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < len && text.charAt(i + 1) === '"') { cell += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
+      }
+      cell += ch; i++; continue;
+    }
+    if (ch === '"') { inQuotes = true; i++; continue; }
+    if (ch === ",") { row.push(cell); cell = ""; i++; continue; }
+    if (ch === "\r") { i++; continue; }
+    if (ch === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; i++; continue; }
+    cell += ch; i++;
+  }
+  // Flush trailing cell / row
+  if (cell.length > 0 || row.length > 0) { row.push(cell); rows.push(row); }
+  return rows.filter(function(r) { return r.length > 1 || (r.length === 1 && r[0] !== ""); });
+}
+
+// Turn a Google Sheets share URL into the CSV export URL for the first sheet tab. Accepts:
+//   https://docs.google.com/spreadsheets/d/SHEET_ID/edit#gid=0
+//   https://docs.google.com/spreadsheets/d/SHEET_ID/edit?usp=sharing
+//   https://docs.google.com/spreadsheets/d/SHEET_ID
+// Preserves the gid if present (so importing from a specific tab works). Returns null if the URL
+// doesn't look like a Google Sheets URL - the caller should surface a clear error rather than fetching.
+function googleSheetUrlToCsv(url) {
+  var m = String(url || "").match(/spreadsheets\/d\/([a-zA-Z0-9\-_]+)/);
+  if (!m) return null;
+  var sheetId = m[1];
+  var gidMatch = String(url).match(/[#?&]gid=(\d+)/);
+  var gid = gidMatch ? gidMatch[1] : "0";
+  return "https://docs.google.com/spreadsheets/d/" + sheetId + "/export?format=csv&gid=" + gid;
+}
+
+// Given CSV rows (first row = headers) and the aliased column map above, produce lead objects. Rows
+// missing BOTH a name and a company are skipped as garbage. Returns { leads, skipped, mapping } - the
+// mapping is surfaced back to the user in the confirm step so they can see how columns resolved.
+function mapCsvRowsToLeads(rows) {
+  if (!rows || rows.length < 2) return { leads: [], skipped: 0, mapping: {} };
+  var headers = rows[0].map(normalizeCsvHeader);
+  var mapping = {};
+  Object.keys(CALLING_CSV_COLUMN_MAP).forEach(function(field) {
+    var aliases = CALLING_CSV_COLUMN_MAP[field];
+    for (var i = 0; i < headers.length; i++) {
+      if (aliases.indexOf(headers[i]) !== -1) { mapping[field] = i; return; }
+    }
+  });
+  var leads = [];
+  var skipped = 0;
+  for (var r = 1; r < rows.length; r++) {
+    var cells = rows[r];
+    function pick(field) {
+      var idx = mapping[field];
+      if (idx === undefined) return "";
+      return String(cells[idx] || "").trim();
+    }
+    var firstName = pick("firstName");
+    var lastName = pick("lastName");
+    var company = pick("company");
+    if (!firstName && !lastName && !company) { skipped++; continue; }
+    leads.push({
+      id: "cl_" + Math.random().toString(36).slice(2, 10),
+      firstName: firstName,
+      lastName: lastName,
+      title: pick("title"),
+      company: company,
+      location: pick("location"),
+      linkedin: pick("linkedin"),
+      phone: pick("phone"),
+      email: pick("email"),
+      warmReason: pick("warmReason"),
+      callingStatus: "New",
+      followUpDate: "",
+      meetingBookedDate: "",
+      notRelevantReason: "",
+      emailStatus: "",
+      emailNotes: "",
+      phoneStatus: "",
+      phoneNotes: "",
+      nextStep: "",
+      firstCallDate: "",
+      latestCallDate: "",
+      uploadedAt: new Date().toISOString(),
+    });
+  }
+  return { leads: leads, skipped: skipped, mapping: mapping };
+}
+
+// Append a log entry for a lead change. Anyone can write (see rules note above), but only signed-in
+// team members can read the log back. Keeps last 5000 entries per client to bound Firebase size.
+function recordCallingLog(clientId, leadId, field, before, after) {
+  if (!state.callingLogs) state.callingLogs = {};
+  if (!state.callingLogs[clientId]) state.callingLogs[clientId] = [];
+  state.callingLogs[clientId].push({
+    id: "log_" + Math.random().toString(36).slice(2, 10),
+    leadId: leadId,
+    field: field,
+    before: before === undefined ? "" : String(before),
+    after: after === undefined ? "" : String(after),
+    at: new Date().toISOString(),
+    // authUser is the team member if signed in, else null - which lets the team distinguish their own
+    // edits from anonymous client-side edits when reviewing the audit trail later.
+    by: (typeof authUser !== "undefined" && authUser && authUser.email) ? authUser.email : "anonymous",
+  });
+  if (state.callingLogs[clientId].length > 5000) {
+    state.callingLogs[clientId] = state.callingLogs[clientId].slice(-5000);
+  }
+}
+
+// Updates a single field on a single lead, stamps call-date fields if a status change occurred,
+// records the audit entry, and persists. Central point for every lead mutation so the audit trail
+// is impossible to bypass by accident.
+function updateCallingLead(clientId, leadId, field, value) {
+  var leads = (state.callingLeads && state.callingLeads[clientId]) || [];
+  var lead = leads.find(function(l) { return l.id === leadId; });
+  if (!lead) return;
+  var before = lead[field];
+  if (before === value) return;
+  lead[field] = value;
+  recordCallingLog(clientId, leadId, field, before, value);
+
+  // Auto-stamp call dates on any status change. First call date sticks the first time the status
+  // moves off "New"; latest call date always updates. Today's date in YYYY-MM-DD (local, since these
+  // are being viewed and compared as calendar dates, not timestamps).
+  if (field === "callingStatus") {
+    var today = new Date().toISOString().slice(0, 10);
+    if (!lead.firstCallDate && before === "New" && value !== "New") lead.firstCallDate = today;
+    lead.latestCallDate = today;
+    // Also clear stale conditional fields when transitioning out of their status, so old values
+    // don't linger and confuse the display (e.g. a follow-up date shown after status became Meeting Booked).
+    if (value !== "Follow-Up") lead.followUpDate = "";
+    if (value !== "Meeting Booked") lead.meetingBookedDate = "";
+    if (value !== "Not Relevant") lead.notRelevantReason = "";
+  }
+  saveState("callingLeads");
+  saveState("callingLogs");
+}
+
+// Options string for a <select> with the currently-selected value pre-marked. Shared by every editable
+// cell in the leads table.
+function callingSelectOptions(currentValue, choices, placeholder) {
+  var opts = "";
+  if (placeholder !== undefined) opts += '<option value="">' + escapeHTML(placeholder) + '</option>';
+  choices.forEach(function(v) {
+    if (v === "" && placeholder !== undefined) return; // avoid dup empty option
+    opts += '<option value="' + escapeAttr(v) + '"' + (currentValue === v ? ' selected' : '') + '>' + escapeHTML(v) + '</option>';
+  });
+  return opts;
+}
+
+// Filters leads by ui.callingFilters (status, search text, date range on latestCallDate). Range
+// filters are inclusive; empty string means no bound. Search matches name/company/title/email/phone
+// substrings (case-insensitive) so a rep can find "the Acme lead" without knowing exact spelling.
+function filterCallingLeads(leads, filters) {
+  filters = filters || {};
+  var q = (filters.q || "").toLowerCase().trim();
+  var status = filters.status || "";
+  var from = filters.from || "";
+  var to = filters.to || "";
+  return (leads || []).filter(function(l) {
+    if (status && l.callingStatus !== status) return false;
+    if (from && (!l.latestCallDate || l.latestCallDate < from)) return false;
+    if (to && (!l.latestCallDate || l.latestCallDate > to)) return false;
+    if (q) {
+      var hay = ((l.firstName || "") + " " + (l.lastName || "") + " " + (l.company || "") + " " + (l.title || "") + " " + (l.email || "") + " " + (l.phone || "")).toLowerCase();
+      if (hay.indexOf(q) === -1) return false;
+    }
+    return true;
+  });
+}
+
+// Aggregates for the client's own report: totals by status, calls made per day/week/month over the
+// last N periods. Pure function so both the on-screen report card and the PDF export use the same
+// numbers.
+function computeCallingReport(leads, opts) {
+  opts = opts || {};
+  var groupBy = opts.groupBy || "day"; // "day" | "week" | "month"
+  var byStatus = {};
+  CALLING_STATUSES.forEach(function(s) { byStatus[s] = 0; });
+  var byBucket = {};
+  (leads || []).forEach(function(l) {
+    byStatus[l.callingStatus] = (byStatus[l.callingStatus] || 0) + 1;
+    if (!l.latestCallDate) return;
+    var d = l.latestCallDate; // YYYY-MM-DD
+    var bucket;
+    if (groupBy === "month") { bucket = d.slice(0, 7); }
+    else if (groupBy === "week") {
+      // ISO week starts Monday. Compute Monday of the week the date falls in, label as "YYYY-MM-DD (wk start)".
+      var dt = new Date(d + "T00:00:00");
+      var day = dt.getUTCDay(); // 0=Sun ... 6=Sat
+      var diff = (day === 0 ? -6 : 1 - day); // shift so Monday = 0
+      dt.setUTCDate(dt.getUTCDate() + diff);
+      bucket = dt.toISOString().slice(0, 10);
+    } else {
+      bucket = d;
+    }
+    byBucket[bucket] = (byBucket[bucket] || 0) + 1;
+  });
+  var buckets = Object.keys(byBucket).sort().map(function(k) { return { bucket: k, count: byBucket[k] }; });
+  return { byStatus: byStatus, buckets: buckets, total: (leads || []).length };
+}
+
+// Actual CSV import flow: prompts for Sheet URL, fetches CSV, parses, previews mapping + count,
+// confirms, appends to state.callingLeads[clientId]. Team-only in the UI (button hidden unless auth),
+// but this function doesn't re-check auth so a signed-in team member can still call it programmatically
+// from the console if they want.
+async function importCallingLeadsFromSheet(clientId) {
+  if (!clientId) { alert("No client selected for import."); return; }
+  var url = prompt("Paste the Google Sheet URL (the sheet must be shared as 'Anyone with the link can view'):");
+  if (!url) return;
+  var csvUrl = googleSheetUrlToCsv(url);
+  if (!csvUrl) { alert("That doesn't look like a Google Sheets URL. Expected: https://docs.google.com/spreadsheets/d/…"); return; }
+  try {
+    var res = await fetch(csvUrl);
+    if (!res.ok) throw new Error("HTTP " + res.status + " - check the sheet is shared as 'Anyone with the link can view'.");
+    var text = await res.text();
+    var rows = parseCsv(text);
+    if (rows.length < 2) { alert("The sheet appears empty or has no rows below the header."); return; }
+    var mapped = mapCsvRowsToLeads(rows);
+    if (mapped.leads.length === 0) { alert("No valid leads found. Every row was missing first name, last name, and company."); return; }
+
+    // Show the mapping to the user so they can catch a misnamed column before committing.
+    var mappingReport = Object.keys(CALLING_CSV_COLUMN_MAP).map(function(f) {
+      var idx = mapped.mapping[f];
+      return "  " + f + ": " + (idx === undefined ? "— NOT FOUND —" : rows[0][idx]);
+    }).join("\n");
+    if (!confirm("Ready to import " + mapped.leads.length + " lead(s)" + (mapped.skipped ? " (skipping " + mapped.skipped + " empty rows)" : "") + ".\n\nColumn mapping detected:\n" + mappingReport + "\n\nProceed? (Existing leads for this client are preserved.)")) return;
+
+    if (!state.callingLeads) state.callingLeads = {};
+    if (!state.callingLeads[clientId]) state.callingLeads[clientId] = [];
+    // Append rather than replace - importing from an updated sheet later should ADD new rows, not
+    // wipe out any status/notes work the client has already done on existing rows. Dedup by
+    // (firstName+lastName+company) case-insensitive so re-importing the same sheet is idempotent.
+    var existing = state.callingLeads[clientId];
+    var existingKeys = {};
+    existing.forEach(function(l) {
+      var k = ((l.firstName || "") + "|" + (l.lastName || "") + "|" + (l.company || "")).toLowerCase();
+      existingKeys[k] = true;
+    });
+    var added = 0, dupes = 0;
+    mapped.leads.forEach(function(l) {
+      var k = ((l.firstName || "") + "|" + (l.lastName || "") + "|" + (l.company || "")).toLowerCase();
+      if (existingKeys[k]) { dupes++; return; }
+      existing.push(l);
+      recordCallingLog(clientId, l.id, "__imported", "", "from sheet");
+      added++;
+    });
+    await saveState("callingLeads");
+    await saveState("callingLogs");
+    alert("Imported " + added + " new lead(s). " + (dupes ? "Skipped " + dupes + " duplicate(s) already in the list." : ""));
+    render();
+  } catch (err) {
+    alert("Import failed: " + err.message);
+  }
+}
+
+// Renders the leads table + toolbar. Called from two contexts: the client-view Calling tab (scoped to
+// one client, no client picker) and the dashboard Calling tab (aggregate: shows a client picker and
+// then delegates to the same table body for the selected client).
+function renderCallingLeadsTable(clientId) {
+  var leads = (state.callingLeads && state.callingLeads[clientId]) || [];
+  var f = ui.callingFilters || (ui.callingFilters = { q: "", status: "", from: "", to: "" });
+  var visible = filterCallingLeads(leads, f);
+  var report = computeCallingReport(leads);
+  var isTeam = ((typeof authUser !== "undefined" && authUser) || (ui && ui.isAuth));
+
+  var statusPills = CALLING_STATUSES.map(function(s) {
+    return '<span class="pill" style="margin-right:6px;font-size:11px;background:var(--surface-1);border:1px solid var(--border);padding:3px 8px;border-radius:12px">' +
+      escapeHTML(s) + ': <strong>' + (report.byStatus[s] || 0) + '</strong></span>';
+  }).join("");
+
+  var rowsHtml = visible.map(function(l) {
+    function inputCell(field, value, opts) {
+      opts = opts || {};
+      return '<input data-calling-lead="' + l.id + '" data-calling-field="' + field + '" value="' + escapeAttr(value || "") + '"' +
+        (opts.placeholder ? ' placeholder="' + escapeAttr(opts.placeholder) + '"' : '') +
+        (opts.type ? ' type="' + opts.type + '"' : '') +
+        ' style="border:none;background:transparent;padding:2px 4px;width:' + (opts.width || "100px") + '">';
+    }
+    function selectCell(field, value, choices, placeholder) {
+      return '<select data-calling-lead="' + l.id + '" data-calling-field="' + field + '" style="max-width:160px">' +
+        callingSelectOptions(value, choices, placeholder) + '</select>';
+    }
+    var conditionalCell = "";
+    if (l.callingStatus === "Follow-Up") conditionalCell = inputCell("followUpDate", l.followUpDate, { type: "date", width: "130px" });
+    else if (l.callingStatus === "Meeting Booked") conditionalCell = inputCell("meetingBookedDate", l.meetingBookedDate, { type: "date", width: "130px" });
+    else if (l.callingStatus === "Not Relevant") conditionalCell = inputCell("notRelevantReason", l.notRelevantReason, { placeholder: "Reason", width: "160px" });
+
+    var linkedinCell = l.linkedin
+      ? '<a href="' + escapeAttr(l.linkedin) + '" target="_blank" style="color:var(--brand)">↗</a>'
+      : '<span style="color:var(--muted)">—</span>';
+
+    return '<tr>' +
+      '<td>' + inputCell("firstName", l.firstName, { width: "90px" }) + '</td>' +
+      '<td>' + inputCell("lastName", l.lastName, { width: "90px" }) + '</td>' +
+      '<td>' + inputCell("title", l.title, { width: "140px" }) + '</td>' +
+      '<td>' + inputCell("company", l.company, { width: "120px" }) + '</td>' +
+      '<td>' + inputCell("location", l.location, { width: "100px" }) + '</td>' +
+      '<td style="text-align:center">' + linkedinCell + '</td>' +
+      '<td>' + inputCell("phone", l.phone, { width: "110px" }) + '</td>' +
+      '<td>' + inputCell("email", l.email, { width: "160px" }) + '</td>' +
+      '<td>' + selectCell("callingStatus", l.callingStatus, CALLING_STATUSES) + '</td>' +
+      '<td>' + conditionalCell + '</td>' +
+      '<td>' + selectCell("emailStatus", l.emailStatus, CALLING_ENRICH_STATUSES, "—") + '</td>' +
+      '<td>' + inputCell("emailNotes", l.emailNotes, { placeholder: "email notes", width: "140px" }) + '</td>' +
+      '<td>' + selectCell("phoneStatus", l.phoneStatus, CALLING_ENRICH_STATUSES, "—") + '</td>' +
+      '<td>' + inputCell("phoneNotes", l.phoneNotes, { placeholder: "phone notes", width: "140px" }) + '</td>' +
+      '<td>' + inputCell("nextStep", l.nextStep, { placeholder: "Next step", width: "160px" }) + '</td>' +
+      '<td style="white-space:nowrap;font-size:11px;color:var(--muted)">' + escapeHTML(l.firstCallDate || "—") + '</td>' +
+      '<td style="white-space:nowrap;font-size:11px;color:var(--muted)">' + escapeHTML(l.latestCallDate || "—") + '</td>' +
+      (isTeam ? '<td><button class="btn ghost sm" data-action="calling-delete-lead" data-calling-lead="' + l.id + '" data-calling-client="' + clientId + '" style="color:var(--danger)">×</button></td>' : '') +
+      '</tr>';
+  }).join("");
+
+  var toolbar =
+    '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">' +
+      '<input data-calling-filter="q" value="' + escapeAttr(f.q) + '" placeholder="🔍 Search name, company, title, email, phone…" style="flex:1;min-width:240px;padding:6px 10px">' +
+      '<select data-calling-filter="status"><option value="">All statuses</option>' + CALLING_STATUSES.map(function(s) { return '<option value="' + escapeAttr(s) + '"' + (f.status === s ? ' selected' : '') + '>' + escapeHTML(s) + '</option>'; }).join("") + '</select>' +
+      '<label style="font-size:12px;color:var(--muted)">From <input data-calling-filter="from" type="date" value="' + escapeAttr(f.from) + '"></label>' +
+      '<label style="font-size:12px;color:var(--muted)">To <input data-calling-filter="to" type="date" value="' + escapeAttr(f.to) + '"></label>' +
+      (isTeam ? '<button class="btn sm" data-action="calling-import" data-calling-client="' + clientId + '">📥 Import from Google Sheet</button>' : '') +
+      '<button class="btn sm ghost" data-action="calling-export-pdf" data-calling-client="' + clientId + '">⬇ Export PDF</button>' +
+    '</div>';
+
+  var summary = '<div style="margin-bottom:12px">' + statusPills +
+    '<span style="margin-left:12px;font-size:12px;color:var(--muted)">Showing ' + visible.length + ' of ' + leads.length + ' leads</span></div>';
+
+  if (leads.length === 0) {
+    return '<div class="card"><div class="card-body">' +
+      '<div style="text-align:center;padding:32px;color:var(--muted)">No leads yet.' +
+      (isTeam ? ' Click <strong>Import from Google Sheet</strong> above to load a list.' : ' Your team hasn\'t uploaded a list yet.') +
+      '</div>' + (isTeam ? toolbar : '') + '</div></div>';
+  }
+
+  var tableHtml =
+    '<div class="card"><div class="card-body">' +
+    toolbar + summary +
+    '<div style="overflow-x:auto">' +
+    '<table style="min-width:1900px"><thead><tr>' +
+    '<th>First</th><th>Last</th><th>Title</th><th>Company</th><th>Location</th><th>LI</th>' +
+    '<th>Phone</th><th>Email</th><th>Status</th><th>Follow-Up / Meeting / Reason</th>' +
+    '<th>Email valid?</th><th>Email notes</th><th>Phone valid?</th><th>Phone notes</th>' +
+    '<th>Next step</th><th>First call</th><th>Latest call</th>' + (isTeam ? '<th></th>' : '') +
+    '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>' +
+    '</div></div>';
+
+  return tableHtml;
+}
+
+// Team-only: recent audit log entries for one client. Shown collapsed under the leads table when a
+// team member is signed in. Newest first, capped at 100 for readability.
+function renderCallingLogsPanel(clientId) {
+  var isTeam = ((typeof authUser !== "undefined" && authUser) || (ui && ui.isAuth));
+  if (!isTeam) return "";
+  var logs = ((state.callingLogs && state.callingLogs[clientId]) || []).slice().reverse().slice(0, 100);
+  if (logs.length === 0) return '<div class="card" style="margin-top:16px"><div class="card-head"><h3>Audit log</h3><div class="sub">Team-only view. No changes yet.</div></div></div>';
+  var leadsById = {};
+  ((state.callingLeads && state.callingLeads[clientId]) || []).forEach(function(l) { leadsById[l.id] = l; });
+  var rows = logs.map(function(g) {
+    var l = leadsById[g.leadId];
+    var who = l ? ((l.firstName || "") + " " + (l.lastName || "") + " · " + (l.company || "")) : "(deleted lead)";
+    return '<tr>' +
+      '<td style="font-size:11px;white-space:nowrap;color:var(--muted)">' + escapeHTML(new Date(g.at).toLocaleString()) + '</td>' +
+      '<td style="font-size:11px">' + escapeHTML(who) + '</td>' +
+      '<td style="font-size:11px"><code>' + escapeHTML(g.field) + '</code></td>' +
+      '<td style="font-size:11px;color:var(--muted)">' + escapeHTML(g.before || "—") + '</td>' +
+      '<td style="font-size:11px"><strong>' + escapeHTML(g.after || "—") + '</strong></td>' +
+      '<td style="font-size:11px;color:var(--muted)">' + escapeHTML(g.by) + '</td>' +
+      '</tr>';
+  }).join("");
+  return '<div class="card" style="margin-top:16px">' +
+    '<div class="card-head"><h3>Audit log</h3><div class="sub">Team-only view. Last ' + logs.length + ' change(s), newest first.</div></div>' +
+    '<div class="card-body" style="padding:0"><div style="overflow-x:auto"><table>' +
+    '<thead><tr><th>When</th><th>Lead</th><th>Field</th><th>Before</th><th>After</th><th>By</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table></div></div></div>';
+}
+
+// Simple date-range + grouping report card. Same computeCallingReport() feeds the PDF.
+function renderCallingReportCard(clientId) {
+  var leads = (state.callingLeads && state.callingLeads[clientId]) || [];
+  var group = (ui.callingReportGroup || "day");
+  var report = computeCallingReport(leads, { groupBy: group });
+  var bucketRows = report.buckets.map(function(b) {
+    return '<tr><td>' + escapeHTML(b.bucket) + '</td><td>' + b.count + '</td></tr>';
+  }).join("");
+  var totalCalls = report.buckets.reduce(function(s, b) { return s + b.count; }, 0);
+  var totalsRow = '<tr style="font-weight:700;background:var(--surface-1);border-top:2px solid var(--border)">' +
+    '<td>Total</td><td>' + totalCalls + '</td></tr>';
+
+  return '<div class="card" style="margin-bottom:16px">' +
+    '<div class="card-head">' +
+      '<div><h3>Calling activity</h3><div class="sub">Calls grouped by ' + group + '. A "call" is any status change from New.</div></div>' +
+      '<div><label style="font-size:12px;color:var(--muted);margin-right:8px">Group by</label>' +
+      '<select data-calling-report-group>' +
+        ['day', 'week', 'month'].map(function(g) { return '<option value="' + g + '"' + (group === g ? ' selected' : '') + '>' + g + '</option>'; }).join("") +
+      '</select></div>' +
+    '</div>' +
+    '<div class="card-body" style="padding:0">' +
+    (report.buckets.length === 0
+      ? '<div style="padding:24px;text-align:center;color:var(--muted)">No calls logged yet.</div>'
+      : '<table><thead><tr><th>' + (group === "week" ? "Week starting" : group === "month" ? "Month" : "Date") + '</th><th>Calls made</th></tr></thead><tbody>' + bucketRows + totalsRow + '</tbody></table>') +
+    '</div></div>';
+}
+
+// Whole Calling tab body. Same function serves the client-view tab and the dashboard tab; the
+// dashboard passes a null clientId and gets a client picker prepended.
+function renderCallingTab(clientId) {
+  var isDashboardMode = !clientId;
+  var pickerHtml = "";
+  if (isDashboardMode) {
+    var clients = Object.values(state.clients || {}).sort(function(a,b) { return (a.name||"").localeCompare(b.name||""); });
+    var selected = ui.callingSelectedClient || (clients[0] && clients[0].id) || "";
+    pickerHtml = '<div class="card" style="margin-bottom:16px"><div class="card-body">' +
+      '<label style="font-size:12px;color:var(--muted);margin-right:8px">Client</label>' +
+      '<select data-calling-picker>' +
+        clients.map(function(c) { return '<option value="' + escapeAttr(c.id) + '"' + (c.id === selected ? ' selected' : '') + '>' + escapeHTML(c.name) + '</option>'; }).join("") +
+      '</select>' +
+      '</div></div>';
+    clientId = selected;
+    if (!clientId) return pickerHtml + '<div class="card"><div class="card-body" style="text-align:center;color:var(--muted);padding:32px">No clients set up yet.</div></div>';
+  }
+  return pickerHtml +
+    renderCallingReportCard(clientId) +
+    renderCallingLeadsTable(clientId) +
+    renderCallingLogsPanel(clientId);
+}
+
+// PDF export. Reuses the same html2pdf / html2canvas setup as the other PDFs so appearance is
+// consistent. Includes the report card (aggregates + activity by group) and the full leads table.
+function generateCallingPDF(clientId) {
+  var leads = (state.callingLeads && state.callingLeads[clientId]) || [];
+  var c = (state.clients || {})[clientId];
+  var clientName = (c && c.name) || "Client";
+  var group = ui.callingReportGroup || "day";
+  var report = computeCallingReport(leads, { groupBy: group });
+
+  var generatedStamp = 'GetGTM Report generated on ' + new Date().toLocaleDateString("en-US", {year:"numeric",month:"long",day:"numeric"}) + ' at ' + new Date().toLocaleTimeString("en-US", {hour:"2-digit",minute:"2-digit"});
+  var accentColor = "#7c3aed";
+
+  var statusCards = CALLING_STATUSES.map(function(s) {
+    return '<div style="flex:1;border:0.5px solid #e5e7eb;border-radius:6px;padding:8px 10px">' +
+      '<div style="font-size:9px;text-transform:uppercase;color:#94a3b8;margin-bottom:3px">' + escapeHTML(s) + '</div>' +
+      '<div style="font-size:16px;font-weight:700">' + (report.byStatus[s] || 0) + '</div>' +
+      '</div>';
+  }).join("");
+
+  var bucketRows = report.buckets.map(function(b) {
+    return '<tr><td style="padding:5px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + escapeHTML(b.bucket) + '</td>' +
+      '<td style="padding:5px 8px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + b.count + '</td></tr>';
+  }).join("");
+  var bucketTotals = report.buckets.reduce(function(s, b) { return s + b.count; }, 0);
+
+  var leadRows = leads.map(function(l) {
+    var extra = "";
+    if (l.callingStatus === "Follow-Up" && l.followUpDate) extra = " (FU: " + l.followUpDate + ")";
+    else if (l.callingStatus === "Meeting Booked" && l.meetingBookedDate) extra = " (Meeting: " + l.meetingBookedDate + ")";
+    else if (l.callingStatus === "Not Relevant" && l.notRelevantReason) extra = " (Reason: " + l.notRelevantReason + ")";
+    return '<tr>' +
+      '<td style="padding:4px 6px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML((l.firstName || "") + " " + (l.lastName || "")) + '</td>' +
+      '<td style="padding:4px 6px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(l.title || "") + '</td>' +
+      '<td style="padding:4px 6px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(l.company || "") + '</td>' +
+      '<td style="padding:4px 6px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(l.location || "") + '</td>' +
+      '<td style="padding:4px 6px;border-bottom:0.5px solid #e5e7eb;font-size:9px"><strong>' + escapeHTML(l.callingStatus || "") + '</strong>' + escapeHTML(extra) + '</td>' +
+      '<td style="padding:4px 6px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + escapeHTML(l.nextStep || "") + '</td>' +
+      '<td style="padding:4px 6px;border-bottom:0.5px solid #e5e7eb;font-size:9px;white-space:nowrap">' + escapeHTML(l.firstCallDate || "—") + '</td>' +
+      '<td style="padding:4px 6px;border-bottom:0.5px solid #e5e7eb;font-size:9px;white-space:nowrap">' + escapeHTML(l.latestCallDate || "—") + '</td>' +
+      '</tr>';
+  }).join("");
+
+  var html = '<div style="font-family:Helvetica,Arial,sans-serif;padding:24px;color:#111">' +
+    '<h1 style="font-size:18px;margin:0 0 4px;color:' + accentColor + '">Calling Report</h1>' +
+    '<div style="font-size:12px;color:#64748b;margin-bottom:2px">' + escapeHTML(clientName) + '</div>' +
+    '<div style="font-size:10px;color:#94a3b8;margin-bottom:16px">' + escapeHTML(generatedStamp) + ' - ' + leads.length + ' lead(s), ' + bucketTotals + ' call(s) logged</div>' +
+    '<div style="display:flex;gap:8px;margin-bottom:16px">' + statusCards + '</div>' +
+    '<div style="font-size:12px;font-weight:700;margin-bottom:8px;color:' + accentColor + '">Activity by ' + group + '</div>' +
+    (report.buckets.length === 0
+      ? '<div style="font-size:10px;color:#94a3b8;margin-bottom:16px">No calls logged yet.</div>'
+      : '<table style="width:50%;border-collapse:collapse;margin-bottom:20px">' +
+        '<thead><tr>' +
+        '<th style="text-align:left;padding:5px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">' + escapeHTML(group === "week" ? "Week starting" : group === "month" ? "Month" : "Date") + '</th>' +
+        '<th style="text-align:left;padding:5px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Calls</th>' +
+        '</tr></thead><tbody>' + bucketRows +
+        '<tr style="font-weight:700;background:#f8fafc"><td style="padding:6px 8px;border-top:1.5px solid #111;font-size:10px">Total</td><td style="padding:6px 8px;border-top:1.5px solid #111;font-size:10px">' + bucketTotals + '</td></tr>' +
+        '</tbody></table>') +
+    '<div style="font-size:12px;font-weight:700;margin-bottom:8px;color:' + accentColor + '">All leads</div>' +
+    (leads.length === 0
+      ? '<div style="font-size:10px;color:#94a3b8">No leads uploaded yet.</div>'
+      : '<table style="width:100%;border-collapse:collapse">' +
+        '<thead><tr>' +
+        '<th style="text-align:left;padding:5px 6px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Name</th>' +
+        '<th style="text-align:left;padding:5px 6px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Title</th>' +
+        '<th style="text-align:left;padding:5px 6px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Company</th>' +
+        '<th style="text-align:left;padding:5px 6px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Location</th>' +
+        '<th style="text-align:left;padding:5px 6px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Status</th>' +
+        '<th style="text-align:left;padding:5px 6px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Next step</th>' +
+        '<th style="text-align:left;padding:5px 6px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">First call</th>' +
+        '<th style="text-align:left;padding:5px 6px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Latest call</th>' +
+        '</tr></thead><tbody>' + leadRows + '</tbody></table>') +
+    '</div>';
+
+  var container = document.createElement('div');
+  container.innerHTML = html;
+  container.style.background = '#ffffff';
+  document.body.appendChild(container);
+  var opt = {
+    margin: 10,
+    filename: 'Calling_' + clientName.replace(/[^a-zA-Z0-9]+/g, '_') + '_' + new Date().toISOString().slice(0,10) + '.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: -window.scrollY, windowWidth: document.documentElement.scrollWidth, windowHeight: document.documentElement.scrollHeight },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+    pagebreak: { mode: ['css', 'legacy'] }
+  };
+  html2pdf().set(opt).from(container).save().then(function() {
+    document.body.removeChild(container);
+  });
+}
+
+// ============================================================================
+// END CALLING FEATURE
+// ============================================================================
 
 function initFirebase() {
   try {
@@ -930,6 +1492,11 @@ function initFirebase() {
       responseViewsRef = db.ref("getgtm_tracker/responseViews");
       responseBillingRef = db.ref("getgtm_tracker/responseBilling");
       campaignsRef = db.ref("getgtm_tracker/campaigns");
+      // Calling: leads are readable+writable by anyone so anonymous clients can update statuses
+      // through their share link. Logs are auth-only-read (team audit trail) but write-open so client
+      // status changes can still emit log entries even without a user account.
+      callingLeadsRef = db.ref("getgtm_tracker/callingLeads");
+      callingLogsRef = db.ref("getgtm_tracker/callingLogs");
       auth = firebase.auth();
       useFirebase = true;
 
@@ -948,6 +1515,14 @@ function initFirebase() {
         applyClientViewRouting();
         if (!window._fbSaveInProgress) render();
       }, function(err) { console.log("clients read error:", err.message); });
+
+      // Calling leads: readable by anyone (clients working their list from a share link with no
+      // login). Same anonymous-access pattern as clients. Team-only concerns (upload, logs) are
+      // enforced at the UI layer, not at the DB.
+      callingLeadsRef.on("value", function(snapshot) {
+        state.callingLeads = snapshot.val() || {};
+        if (!window._fbSaveInProgress) render();
+      }, function(err) { console.log("callingLeads read error:", err.message); });
 
       // Auth state drives whether we also listen to team-only data
       auth.onAuthStateChanged(function(user) {
@@ -996,6 +1571,10 @@ function initFirebase() {
             }
             if (!window._fbSaveInProgress) render();
           }, function(err) { console.log("campaigns read error:", err.message); });
+          callingLogsRef.on("value", function(snapshot) {
+            state.callingLogs = snapshot.val() || {};
+            if (!window._fbSaveInProgress) render();
+          }, function(err) { console.log("callingLogs read error:", err.message); });
         } else {
           prospectsRef.off();
           revenueActualsRef.off();
@@ -1003,6 +1582,7 @@ function initFirebase() {
           responsesRef.off();
           responseBillingRef.off();
           campaignsRef.off();
+          callingLogsRef.off();
         }
         render();
       });
@@ -1042,6 +1622,8 @@ async function loadState() {
   if (!state.responseSavedViews) state.responseSavedViews = [];
   if (!state.responseBilling) state.responseBilling = {};
   if (!state.campaigns) state.campaigns = [];
+  if (!state.callingLeads) state.callingLeads = {};
+  if (!state.callingLogs) state.callingLogs = {};
   // Firebase path seeds via the reactive listeners in initFirebase() instead - this block only
   // runs for the localStorage fallback (useFirebase === false).
   if (!useFirebase) {
@@ -1073,6 +1655,10 @@ async function saveState(scope) {
       if (authUser && (!scope || scope === "responseViews")) writes.push(responseViewsRef.set(state.responseSavedViews || []));
       if (authUser && (!scope || scope === "responseBilling")) writes.push(responseBillingRef.set(state.responseBilling || {}));
       if (authUser && (!scope || scope === "campaigns")) writes.push(campaignsRef.set(state.campaigns || []));
+      // Calling leads: writable anonymously (clients update statuses from their share link), so this
+      // save is unconditional on auth - same pattern as clients.
+      if (!scope || scope === "callingLeads") writes.push(callingLeadsRef.set(state.callingLeads || {}));
+      if (authUser && (!scope || scope === "callingLogs")) writes.push(callingLogsRef.set(state.callingLogs || {}));
       await Promise.all(writes);
       setTimeout(function() { window._fbSaveInProgress = false; }, 500);
     }
@@ -1823,11 +2409,13 @@ function renderDashboard() {
         <button data-action="dtab" data-dtab="responses" class="${dTab==='responses'?'active':''}">Responses</button>
         <button data-action="dtab" data-dtab="campaigns" class="${dTab==='campaigns'?'active':''}">Campaigns</button>
         <button data-action="dtab" data-dtab="reporting" class="${dTab==='reporting'?'active':''}">Reporting</button>
+        <button data-action="dtab" data-dtab="calling" class="${dTab==='calling'?'active':''}">Calling</button>
       </div>
       ${dTab === "prospects" ? renderProspectsView()
         : dTab === "responses" ? renderResponsesView()
         : dTab === "campaigns" ? renderCampaignsView()
         : dTab === "reporting" ? renderReportingView()
+        : dTab === "calling" ? renderCallingTab(null)
         : dTab === "new-engagements" ? renderNewEngagementsView(newEngagements)
         : renderClientsView(signedClients, active, launched, atRisk)}
     </div>
@@ -2605,6 +3193,7 @@ function renderClient() {
         <button data-action="tab" data-tab="timeline" class="${ui.tab==='timeline'?'active':''}">Timeline</button>
         ${c.proposal && c.proposal.stage === 'approved' ? '<button data-action="tab" data-tab="delivery" class="' + (ui.tab==='delivery'?'active':'') + '">Delivery</button>' : ''}
         <button data-action="tab" data-tab="outcomes" class="${ui.tab==='outcomes'?'active':''}">Outcomes</button>
+        <button data-action="tab" data-tab="calling" class="${ui.tab==='calling'?'active':''}">Calling</button>
       </div>
 
       <div id="tab-body">${
@@ -2614,6 +3203,7 @@ function renderClient() {
         : ui.tab === "proposal" ? renderProposalTab(c)
         : ui.tab === "delivery" ? renderDeliveryTab(c)
         : ui.tab === "timeline" ? renderTimelineTab(c)
+        : ui.tab === "calling" ? renderCallingTab(c.id)
         : renderOutcomesTab(c)
       }</div>
     </div>
@@ -4263,6 +4853,26 @@ function attachHandlers() {
           alert("Removed " + dedupeResult.removed + " duplicate(s). " + dedupeResult.kept.length + " unique responses remain.");
         }
       }
+      else if (action === "calling-import") {
+        await importCallingLeadsFromSheet(el.dataset.callingClient);
+      }
+      else if (action === "calling-export-pdf") {
+        generateCallingPDF(el.dataset.callingClient);
+      }
+      else if (action === "calling-delete-lead") {
+        var cid = el.dataset.callingClient;
+        var lid = el.dataset.callingLead;
+        if (!confirm("Delete this lead? This can't be undone (though the audit log will preserve the history).")) return;
+        var leads = (state.callingLeads && state.callingLeads[cid]) || [];
+        var idx = leads.findIndex(function(l) { return l.id === lid; });
+        if (idx === -1) return;
+        var removed = leads[idx];
+        leads.splice(idx, 1);
+        recordCallingLog(cid, lid, "__deleted", (removed.firstName || "") + " " + (removed.lastName || ""), "");
+        await saveState("callingLeads");
+        await saveState("callingLogs");
+        render();
+      }
       else if (action === "refresh-from-drive") {
         // Triggers the backend GitHub Actions workflow that reads new Drive screenshots and writes
         // classified responses to Firebase. Two paths:
@@ -4586,6 +5196,47 @@ function attachHandlers() {
       saveState(); render();
     });
   });
+
+  // ==== Calling tab bindings ====
+  // Lead field edits: use the central updateCallingLead(), which stamps call dates + writes audit log.
+  // Live-committing on input for text fields would flood the log with every keystroke, so we save
+  // on blur (change) for inputs, and immediately for selects/dates (single-action changes).
+  document.querySelectorAll("[data-calling-lead][data-calling-field]").forEach(el => {
+    var clientId = ui.view === "client" ? ui.clientId : (ui.callingSelectedClient || "");
+    if (!clientId && ui.view === "dashboard") {
+      // Dashboard mode: infer from the picker's current value
+      var picker = document.querySelector("[data-calling-picker]");
+      if (picker) clientId = picker.value;
+    }
+    if (!clientId) return;
+    el.addEventListener("change", function() {
+      var isStatusChange = el.dataset.callingField === "callingStatus";
+      updateCallingLead(clientId, el.dataset.callingLead, el.dataset.callingField, el.value);
+      // Status change reveals/hides the conditional column (follow-up date / meeting date / reason),
+      // so re-render the table to update the DOM. Other field edits don't need a re-render.
+      if (isStatusChange) render();
+    });
+  });
+
+  // Filter controls: rebind on any change, re-render to apply.
+  document.querySelectorAll("[data-calling-filter]").forEach(el => {
+    el.addEventListener("input", function() {
+      if (!ui.callingFilters) ui.callingFilters = { q: "", status: "", from: "", to: "" };
+      ui.callingFilters[el.dataset.callingFilter] = el.value;
+      render();
+    });
+  });
+
+  // Report grouping switcher (day/week/month).
+  document.querySelectorAll("[data-calling-report-group]").forEach(el => {
+    el.addEventListener("change", function() { ui.callingReportGroup = el.value; render(); });
+  });
+
+  // Dashboard-only client picker.
+  document.querySelectorAll("[data-calling-picker]").forEach(el => {
+    el.addEventListener("change", function() { ui.callingSelectedClient = el.value; render(); });
+  });
+
   document.querySelectorAll("[data-aeo-card]").forEach(el => {
     el.addEventListener("click", () => {
       const cl = state.clients[ui.clientId];
