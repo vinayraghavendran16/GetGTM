@@ -2258,7 +2258,22 @@ function renderResponsesView() {
                     </td>
                     <td><input ${lockAttr} data-response="${r.id}" data-key="contact" value="${escapeAttr(r.contact)}" placeholder="Contact name" style="border:none;background:transparent;padding:0;width:140px;${lockStyle}"></td>
                     <td><input ${lockAttr} data-response="${r.id}" data-key="company" value="${escapeAttr(r.company || '')}" placeholder="Their company" style="border:none;background:transparent;padding:0;width:130px;${lockStyle}"></td>
-                    <td><input ${lockAttr} data-response="${r.id}" data-key="campaign" value="${escapeAttr(r.campaign || '')}" placeholder="Campaign" style="border:none;background:transparent;padding:0;width:140px;${lockStyle}"></td>
+                    <td>${(function(){
+                      // Dropdown of campaigns for THIS row's client, so blank rows can be assigned in one click
+                      // and typos are impossible. Includes the row's current value even if it no longer matches
+                      // a live campaign (so nothing silently disappears), plus an explicit "— Unassigned —" option.
+                      var rowCampaigns = (state.campaigns || []).filter(function(c) { return c.client === r.client; });
+                      var current = r.campaign || "";
+                      var currentInList = rowCampaigns.some(function(c) { return c.name === current; });
+                      var opts = '<option value="">— Unassigned —</option>';
+                      rowCampaigns.forEach(function(c) {
+                        opts += '<option value="' + escapeAttr(c.name) + '"' + (c.name === current ? ' selected' : '') + '>' + escapeHTML(c.name) + '</option>';
+                      });
+                      if (current && !currentInList) {
+                        opts += '<option value="' + escapeAttr(current) + '" selected>' + escapeHTML(current) + ' (legacy)</option>';
+                      }
+                      return '<select ' + lockAttr + ' data-response="' + r.id + '" data-key="campaign" class="del-select" style="max-width:180px;' + lockStyle + '">' + opts + '</select>';
+                    })()}</td>
                     <td>${locked ? '<span style="' + (function(){var c=responseStatusColor(r.heddlStatus);return 'background:'+c.bg+';color:'+c.color;})() + ';font-weight:600;padding:3px 8px;border-radius:4px;font-size:12px;display:inline-block">' + escapeHTML(r.heddlStatus||'-') + '</span>' : statusSelectHtml(r, "heddlStatus", RESPONSE_STATUSES, "-")}</td>
                     <td>${locked ? '<span style="' + (function(){var c=responseStatusColor(r.clientStatus);return 'background:'+c.bg+';color:'+c.color;})() + ';font-weight:600;padding:3px 8px;border-radius:4px;font-size:12px;display:inline-block">' + escapeHTML(r.clientStatus||'Not set') + '</span>' : statusSelectHtml(r, "clientStatus", RESPONSE_STATUSES, "Not set")}</td>
                     <td style="text-align:center">
