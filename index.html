@@ -1513,7 +1513,17 @@ function initFirebase() {
           saveState("clients");
         }
         applyClientViewRouting();
-        if (!window._fbSaveInProgress) render();
+        // Always render here, unconditionally. This listener is the sole source of truth for
+        // state.clients and for whether an anonymous visitor should be routed into the client view via
+        // ?client=<id>. The fire-and-forget saveState("clients") call above sets _fbSaveInProgress =
+        // true synchronously (before its first await), so on a fresh page load - where this listener's
+        // first snapshot both populates state.clients AND triggers the one-time seed save - the render
+        // guard used elsewhere to avoid flicker during in-flight local edits would incorrectly suppress
+        // this render too, even though applyClientViewRouting() had already correctly switched
+        // ui.view to "client". That left fresh share-link visits stuck on the login screen: internally
+        // routed correctly, but the DOM never told to catch up. Client-view routing must never be
+        // silently skipped, so this render is unconditional.
+        render();
       }, function(err) { console.log("clients read error:", err.message); });
 
       // Calling leads: readable by anyone (clients working their list from a share link with no
