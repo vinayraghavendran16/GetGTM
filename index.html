@@ -1387,6 +1387,57 @@ function renderCallingTab(clientId) {
 
 // PDF export. Reuses the same html2pdf / html2canvas setup as the other PDFs so appearance is
 // consistent. Includes the report card (aggregates + activity by group) and the full leads table.
+// Renders `html` into a fresh, fully isolated iframe with its own document, then hands that iframe's
+// body to html2pdf. This exists because the previous approach - appending the export container
+// directly into the main app's <body> and compensating for the page's own height via scrollY /
+// windowHeight overrides passed to html2canvas - depends on the ENTIRE surrounding page's layout at
+// capture time. As the app grew (more tabs, bigger tables, audit logs, docs), that coupling became
+// unreliable: html2canvas could crop or entirely drop the top portion of a PDF's first page depending
+// on exactly how tall the rest of the page happened to be and where the browser's scroll position sat,
+// producing intermittent blank-space or missing-content bugs that were hard to pin to one exact cause.
+// An iframe has its own document, so its own scrollHeight/layout has no relationship whatsoever to the
+// parent page's size - there's nothing left to compensate for, and no coupling left to break.
+function renderHtmlToPdf(html, pdfOptions) {
+  return new Promise(function(resolve, reject) {
+    var iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.top = '0';
+    iframe.style.left = '0';
+    iframe.style.width = '1600px';
+    iframe.style.height = '600px';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+
+    function cleanup() { if (iframe.parentNode) document.body.removeChild(iframe); }
+
+    try {
+      // An iframe's contentDocument (already showing about:blank) is available synchronously the
+      // instant the element is attached to the DOM - waiting on a 'load' event for about:blank is
+      // unreliable across browsers (some fire it before a listener can attach, some not at all), so
+      // write directly instead of waiting for any load signal.
+      var idoc = iframe.contentDocument || iframe.contentWindow.document;
+      idoc.open();
+      idoc.write('<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;background:#fff"></body></html>');
+      idoc.close();
+      idoc.body.innerHTML = html;
+      var contentHeight = Math.max(idoc.body.scrollHeight, idoc.documentElement.scrollHeight);
+      iframe.style.height = contentHeight + 'px';
+      // Two animation-frame ticks: one for the height change above to commit layout, one more to be
+      // safe with any image/font loads that started as a result of the innerHTML write.
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          html2pdf().set(pdfOptions).from(idoc.body).save().then(function() {
+            cleanup();
+            resolve();
+          }).catch(function(err) { cleanup(); reject(err); });
+        });
+      });
+    } catch (err) { cleanup(); reject(err); }
+  });
+}
+
 function generateCallingPDF(clientId) {
   var leads = (state.callingLeads && state.callingLeads[clientId]) || [];
   var c = (state.clients || {})[clientId];
@@ -1458,21 +1509,15 @@ function generateCallingPDF(clientId) {
         '</tr></thead><tbody>' + leadRows + '</tbody></table>') +
     '</div>';
 
-  var container = document.createElement('div');
-  container.innerHTML = html;
-  container.style.background = '#ffffff';
-  document.body.appendChild(container);
   var opt = {
     margin: 10,
     filename: 'Calling_' + clientName.replace(/[^a-zA-Z0-9]+/g, '_') + '_' + new Date().toISOString().slice(0,10) + '.pdf',
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: -window.scrollY, windowWidth: document.documentElement.scrollWidth, windowHeight: document.documentElement.scrollHeight },
+    html2canvas: { scale: 2, useCORS: true },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
     pagebreak: { mode: ['css', 'legacy'] }
   };
-  html2pdf().set(opt).from(container).save().then(function() {
-    document.body.removeChild(container);
-  });
+  renderHtmlToPdf(html, opt);
 }
 
 // ============================================================================
@@ -2260,21 +2305,15 @@ function generateDocsPDF() {
     '<div class="section-divider">' + renderReleaseNotes() + '</div>' +
     '</div>';
 
-  var container = document.createElement('div');
-  container.innerHTML = html;
-  container.style.background = '#ffffff';
-  document.body.appendChild(container);
   var opt = {
     margin: 14,
     filename: 'GetGTM_Docs_' + new Date().toISOString().slice(0,10) + '.pdf',
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: -window.scrollY, windowWidth: document.documentElement.scrollWidth, windowHeight: document.documentElement.scrollHeight },
+    html2canvas: { scale: 2, useCORS: true },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
     pagebreak: { mode: ['css', 'legacy'] }
   };
-  html2pdf().set(opt).from(container).save().then(function() {
-    document.body.removeChild(container);
-  });
+  renderHtmlToPdf(html, opt);
 }
 
 function renderDocs() {
@@ -4170,22 +4209,16 @@ function generateCampaignsPDF() {
     referencesPageHtml +
     '</div>';
 
-  var container = document.createElement('div');
-  container.innerHTML = html;
-  container.style.background = '#ffffff';
-  document.body.appendChild(container);
   var filenameSuffix = f.client ? f.client.replace(/[^a-zA-Z0-9]+/g, '_') : 'All';
   var opt = {
     margin: 10,
     filename: 'Campaigns_' + filenameSuffix + '_' + new Date().toISOString().slice(0,10) + '.pdf',
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: -window.scrollY, windowWidth: document.documentElement.scrollWidth, windowHeight: document.documentElement.scrollHeight },
+    html2canvas: { scale: 2, useCORS: true },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
     pagebreak: { mode: ['css', 'legacy'] }
   };
-  html2pdf().set(opt).from(container).save().then(function() {
-    document.body.removeChild(container);
-  });
+  renderHtmlToPdf(html, opt);
 }
 
 function generateResponsesPDF() {
@@ -4363,56 +4396,30 @@ function generateResponsesPDF() {
     refListHtml +
     '</div>';
 
-  var container = document.createElement('div');
-  container.innerHTML = html;
-  // Pin the container off-flow before capture - appending a plain div to the end of body means it
-  // inherits normal document flow and lands far down the page (below the entire app's existing
-  // content), which html2canvas then captures as a large blank area before the real content. Fixed
-  // positioning isolates it from that regardless of how tall the rest of the page is.
-  // No CSS positioning tricks - both z-index hiding and far off-screen positioning turned out to
-  // cause html2canvas to capture a blank page. Instead, the container stays in normal document flow,
-  // and html2canvas is told explicitly to capture from scroll position (0,0) via scrollX/scrollY
-  // below, regardless of where the container actually sits on the page. This is the documented fix
-  // for capturing an element that isn't at the top of a long page.
-  container.style.background = '#ffffff';
-  document.body.appendChild(container);
   var filenameSuffix = f.client ? f.client.replace(/[^a-zA-Z0-9]+/g, '_') : 'All';
   var opt = {
     margin: 10,
     filename: 'Response_Tracker_' + filenameSuffix + '_' + new Date().toISOString().slice(0,10) + '.pdf',
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: -window.scrollY, windowWidth: document.documentElement.scrollWidth, windowHeight: document.documentElement.scrollHeight },
+    html2canvas: { scale: 2, useCORS: true },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
     pagebreak: { mode: ['css', 'legacy'] }
   };
-  html2pdf().set(opt).from(container).save().then(function() {
-    document.body.removeChild(container);
-  });
+  renderHtmlToPdf(html, opt);
 }
 
 function generateProposalPDF(c) {
   var html = buildProposalHTML(c, true);
   var filename = c.name.replace(/[^a-zA-Z0-9]+/g, '_') + '_x_GetGTM_Initial_Proposal.pdf';
-  var container = document.createElement('div');
-  container.innerHTML = html;
-  // No CSS positioning tricks - both z-index hiding and far off-screen positioning turned out to
-  // cause html2canvas to capture a blank page. Instead, the container stays in normal document flow,
-  // and html2canvas is told explicitly to capture from scroll position (0,0) via scrollX/scrollY
-  // below, regardless of where the container actually sits on the page. This is the documented fix
-  // for capturing an element that isn't at the top of a long page.
-  container.style.background = '#ffffff';
-  document.body.appendChild(container);
   var opt = {
     margin: 0,
     filename: filename,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: -window.scrollY, windowWidth: document.documentElement.scrollWidth, windowHeight: document.documentElement.scrollHeight },
+    html2canvas: { scale: 2, useCORS: true },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
     pagebreak: { mode: ['css', 'legacy'] }
   };
-  html2pdf().set(opt).from(container).save().then(function() {
-    document.body.removeChild(container);
-  });
+  renderHtmlToPdf(html, opt);
 }
 
 function buildProposalEmailBody(c) {
