@@ -93,32 +93,14 @@ async function downloadFileAsBase64(fileId) {
   return Buffer.from(res.data).toString('base64');
 }
 
-// Note: the campaign list for the current client is injected at call time (see buildExtractionPrompt)
-// so the model can match the reply to one of the client's REAL, currently-live campaigns by name -
-// otherwise it either invented a plausible-looking name or left campaign context in freeform prose,
-// both of which meant the frontend had nothing structured to render into the Campaign column.
-export function buildExtractionPrompt(campaignNames) {
-  const hasCampaigns = Array.isArray(campaignNames) && campaignNames.length > 0;
-  const campaignBlock = hasCampaigns
-    ? `The following campaigns are currently active for this client. Pick the ONE whose subject matter
-best matches the outreach thread in the screenshot. Match on the substance of what's being asked
-(products, use-cases, personas) - do NOT guess based on which name looks plausible. If none clearly
-fits, use "":
-
-${campaignNames.map((n, i) => `  ${i + 1}. ${n}`).join('\n')}
-
-Return the campaign field as EXACTLY one of the strings above, character-for-character, or "".`
-    : `No known campaigns for this client - return "" for the campaign field.`;
-
-  return `You are looking at a screenshot from a sales outreach tool (Heddl), showing a reply
+const EXTRACTION_PROMPT = `You are looking at a screenshot from a sales outreach tool (Heddl), showing a reply
 thread with a prospect. Extract the following as strict JSON, no other text:
 
 {
   "contact": "Full name of the prospect who replied, with their company in parentheses if visible, e.g. 'Jane Doe (Acme Corp)'",
   "date": "The date of the most recent/relevant reply shown, in YYYY-MM-DD format. If year is ambiguous, assume 2026.",
   "heddlStatus": "One of exactly: Positive Reply, Meeting Booked, No Fit, Not Interested",
-  "campaign": "The name of the campaign this reply belongs to - see the campaign list below",
-  "notes": "One or two sentences summarizing what the reply actually said - quote short key phrases where useful, in third person, no more than 40 words. Do NOT restate the campaign name here; the campaign field already captures that."
+  "notes": "One or two sentences summarizing the campaign context and what the reply actually said - quote short key phrases where useful, in third person, no more than 40 words."
 }
 
 Guidance for heddlStatus:
@@ -127,25 +109,20 @@ Guidance for heddlStatus:
 - "No Fit": the prospect replies but says they're not the right person, wrong team, or the ask doesn't apply to their role - without a hostile or final "not interested" tone
 - "Not Interested": a clear decline, "not interested", "no thanks", or similar
 
-Guidance for campaign:
-${campaignBlock}
-
 If you cannot confidently identify a contact name or reply content in the image, respond with:
 {"error": "could not extract - not a recognizable reply screenshot"}
 
 Respond with ONLY the JSON object, nothing else.`;
-}
 
-async function classifyScreenshot(base64Image, mimeType, campaignNames) {
-  const prompt = buildExtractionPrompt(campaignNames);
+async function classifyScreenshot(base64Image, mimeType) {
   const msg = await anthropic.messages.create({
     model: 'claude-sonnet-5',
-    max_tokens: 500,
+    max_tokens: 400,
     messages: [{
       role: 'user',
       content: [
         { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64Image } },
-        { type: 'text', text: prompt },
+        { type: 'text', text: EXTRACTION_PROMPT },
       ],
     }],
   });
@@ -173,25 +150,12 @@ export function isValidClassification(extracted) {
   return HEDDL_STATUSES.includes(extracted.heddlStatus);
 }
 
-export function contactKey(client, contact) {
-  return (client || '').trim().toLowerCase() + '::' + (contact || '').trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
 export function filterNewFiles(files, existingRefs) {
   const refsSet = existingRefs instanceof Set ? existingRefs : new Set(existingRefs);
   return files.filter((f) => !refsSet.has(f.name));
 }
 
-// Only accept the campaign value if it exactly matches one of the client's live campaign names,
-// otherwise blank it. This is deliberately strict - a made-up or misspelled campaign in Firebase is
-// worse than blank, because it can't be filtered on and won't roll up correctly in the pivot.
-export function validateCampaign(extractedCampaign, campaignNames) {
-  if (!extractedCampaign || typeof extractedCampaign !== 'string') return '';
-  const list = Array.isArray(campaignNames) ? campaignNames : [];
-  return list.includes(extractedCampaign) ? extractedCampaign : '';
-}
-
-export function buildEntry(clientName, file, extracted, campaignNames) {
+export function buildEntry(clientName, file, extracted) {
   return {
     id: 'r_' + Math.random().toString(36).slice(2, 10),
     client: clientName,
@@ -200,7 +164,6 @@ export function buildEntry(clientName, file, extracted, campaignNames) {
     heddlStatus: extracted.heddlStatus,
     clientStatus: '',
     confirmed: false,
-    campaign: validateCampaign(extracted.campaign, campaignNames),
     notes: extracted.notes || '',
     screenshotRef: file.name,
     screenshotUrl: file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`,
@@ -214,23 +177,7 @@ async function main() {
   const responsesSnap = await db.ref('getgtm_tracker/responses').once('value');
   const existingResponses = responsesSnap.val() || [];
   const existingRefs = new Set(existingResponses.map((r) => r.screenshotRef));
-  // Content-based dedup: the same reply thread can get screenshotted more than once, producing a
-  // new filename each time - filename dedup alone misses that. Track (client, contact) pairs too,
-  // seeded from what's already logged, so a re-screenshotted thread is skipped instead of duplicated.
-  const seenContactKeys = new Set(existingResponses.map((r) => contactKey(r.client, r.contact)));
   console.log(`${existingResponses.length} responses already logged in Firebase.`);
-
-  // Load the campaign catalog once and group by client, so each client's replies get classified
-  // against ONLY their own campaigns (avoids cross-client contamination in the model's choices).
-  const campaignsSnap = await db.ref('getgtm_tracker/campaigns').once('value');
-  const allCampaigns = campaignsSnap.val() || [];
-  const campaignsByClient = {};
-  allCampaigns.forEach((c) => {
-    if (!c || !c.client || !c.name) return;
-    if (!campaignsByClient[c.client]) campaignsByClient[c.client] = [];
-    campaignsByClient[c.client].push(c.name);
-  });
-  console.log(`Loaded ${allCampaigns.length} campaign(s) across ${Object.keys(campaignsByClient).length} client(s).`);
 
   const clientFolders = await listSubfolders(DRIVE_RESPONSES_ROOT_ID);
   console.log(`Found ${clientFolders.length} client folder(s):`, clientFolders.map((f) => f.name).join(', '));
@@ -239,36 +186,28 @@ async function main() {
 
   for (const folder of clientFolders) {
     const clientName = folder.name;
-    const clientCampaigns = campaignsByClient[clientName] || [];
     const files = await listImageFiles(folder.id);
     const newFiles = filterNewFiles(files, existingRefs);
     if (newFiles.length === 0) {
-      console.log(`[${clientName}] no new screenshots (${clientCampaigns.length} known campaign(s)).`);
+      console.log(`[${clientName}] no new screenshots.`);
       continue;
     }
-    console.log(`[${clientName}] ${newFiles.length} new screenshot(s) to process against ${clientCampaigns.length} known campaign(s).`);
+    console.log(`[${clientName}] ${newFiles.length} new screenshot(s) to process.`);
 
     for (const file of newFiles) {
       try {
         const base64 = await downloadFileAsBase64(file.id);
         const mimeType = guessMimeType(file.name);
-        const extracted = await classifyScreenshot(base64, mimeType, clientCampaigns);
+        const extracted = await classifyScreenshot(base64, mimeType);
 
         if (!isValidClassification(extracted)) {
           console.log(`  - ${file.name}: skipped (${extracted.error || 'invalid heddlStatus'})`);
           continue;
         }
 
-        const key = contactKey(clientName, extracted.contact);
-        if (seenContactKeys.has(key)) {
-          console.log(`  - ${file.name}: skipped (duplicate - "${extracted.contact}" at ${clientName} already logged, likely the same thread screenshotted again)`);
-          continue;
-        }
-        seenContactKeys.add(key);
-
-        const entry = buildEntry(clientName, file, extracted, clientCampaigns);
+        const entry = buildEntry(clientName, file, extracted);
         newEntries.push(entry);
-        console.log(`  - ${file.name}: added as "${entry.contact}" (${entry.heddlStatus})${entry.campaign ? ' [campaign: ' + entry.campaign + ']' : ' [no campaign matched]'}`);
+        console.log(`  - ${file.name}: added as "${entry.contact}" (${entry.heddlStatus})`);
       } catch (err) {
         console.error(`  - ${file.name}: FAILED -`, err.message);
       }
