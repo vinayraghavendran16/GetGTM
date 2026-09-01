@@ -2238,6 +2238,7 @@ function renderResponsesView() {
           <h2>Response Tracker</h2>
           <div style="display:flex;gap:8px">
             <a href="https://drive.google.com/drive/folders/1Hr3GWko3ixmEJZTl6DHgNiJauG502gL8" target="_blank" class="btn ghost sm">📁 Open Drive folder</a>
+            <button class="btn ghost sm" data-action="refresh-from-drive" style="color:var(--brand)">🔄 Refresh from Drive</button>
             <button class="btn ghost sm" data-action="dedupe-responses" style="color:var(--danger)">🧹 Dedupe</button>
             <button class="btn ghost sm" data-action="fix-campaigns" style="color:var(--danger)">🔧 Fix Campaigns</button>
             ${f.client ? '<button class="btn ghost sm" data-action="bulk-assign-campaign" style="color:var(--brand)">🏷 Bulk assign campaign</button>' : ''}
@@ -4246,6 +4247,79 @@ function attachHandlers() {
           saveState("responses").then(function() { render(); });
           alert("Removed " + dedupeResult.removed + " duplicate(s). " + dedupeResult.kept.length + " unique responses remain.");
         }
+      }
+      else if (action === "refresh-from-drive") {
+        // Triggers the backend GitHub Actions workflow that reads new Drive screenshots and writes
+        // classified responses to Firebase. Two paths:
+        //   (1) Fully wired: if the team has stored a GitHub repo path + PAT (once, via prompt), this
+        //       POSTs to the workflow_dispatch API and the backend runs immediately - the tracker
+        //       picks up new rows live via the existing Firebase subscription, no manual reload.
+        //   (2) Not yet wired: opens the Actions page in a new tab so the user can hit "Run workflow"
+        //       manually. Same end result, one extra click.
+        // Config lives at getgtm_tracker/config/githubDispatch so any signed-in team member benefits
+        // from the setup done by whoever configured it first - not stored per-browser.
+        (async function() {
+          var configRef = (typeof db !== "undefined" && db && db.ref) ? db.ref("getgtm_tracker/config/githubDispatch") : null;
+          var cfg = null;
+          if (configRef) {
+            try {
+              var snap = await configRef.once("value");
+              cfg = snap.val();
+            } catch (e) { /* fall through to prompt path */ }
+          }
+
+          if (!cfg || !cfg.repo || !cfg.token || !cfg.workflow) {
+            // First-run setup - collect once, store, then trigger.
+            var repo = prompt("First-time setup for the Refresh button.\n\nEnter the backend repo path in owner/name format (e.g. vinayraghavendran16/getgtm-backend):");
+            if (!repo) return;
+            var workflow = prompt("Workflow filename to trigger:", "refresh-responses.yml");
+            if (!workflow) return;
+            var token = prompt("GitHub Personal Access Token with actions:write scope for that repo.\n\nCreate one at: https://github.com/settings/tokens?type=beta - restrict to the single backend repo, permission: Actions = Read and write. This is stored in Firebase for the whole team.");
+            if (!token) return;
+            var branch = prompt("Branch to run the workflow on:", "main") || "main";
+            cfg = { repo: repo.trim(), workflow: workflow.trim(), token: token.trim(), branch: branch.trim() };
+            if (configRef) {
+              try { await configRef.set(cfg); } catch (e) { console.warn("Could not persist dispatch config:", e.message); }
+            }
+          }
+
+          // Fire the workflow. GitHub returns 204 No Content on success, 401/403/404 on auth or path
+          // errors - show a clean, actionable message either way so setup errors don't look mysterious.
+          var url = "https://api.github.com/repos/" + cfg.repo + "/actions/workflows/" + cfg.workflow + "/dispatches";
+          try {
+            var res = await fetch(url, {
+              method: "POST",
+              headers: {
+                "Accept": "application/vnd.github+json",
+                "Authorization": "Bearer " + cfg.token,
+                "X-GitHub-Api-Version": "2022-11-28",
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({ ref: cfg.branch || "main" })
+            });
+            if (res.status === 204) {
+              alert("Triggered ✓ The backend is now scanning Drive. New rows will appear here automatically in 30-60 seconds - no reload needed.");
+            } else if (res.status === 401 || res.status === 403) {
+              if (confirm("GitHub rejected the token (" + res.status + "). Reset the setup and try again?")) {
+                if (configRef) await configRef.remove();
+              }
+            } else if (res.status === 404) {
+              if (confirm("Not found (404) - the repo path or workflow filename is wrong. Reset the setup and try again?")) {
+                if (configRef) await configRef.remove();
+              }
+            } else {
+              var body = "";
+              try { body = await res.text(); } catch (e) {}
+              alert("GitHub returned " + res.status + ". Response: " + body.slice(0, 200));
+            }
+          } catch (err) {
+            // Network/CORS failure - open the Actions page as a graceful fallback so the user still
+            // gets to Run workflow with one more click.
+            if (confirm("Could not reach the GitHub API from the browser (" + err.message + "). Open the Actions page in a new tab instead so you can Run workflow manually?")) {
+              window.open("https://github.com/" + cfg.repo + "/actions/workflows/" + cfg.workflow, "_blank");
+            }
+          }
+        })();
       }
       else if (action === "bulk-assign-campaign") {
         // Only reachable when a client filter is active (button is conditionally rendered above), but
