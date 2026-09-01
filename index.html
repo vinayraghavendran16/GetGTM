@@ -2021,6 +2021,9 @@ function renderReportingSnapshot(responses) {
       '<div class="card-body"><div class="small" style="color:var(--text-muted)">No responses to summarize yet.</div></div></div>';
   }
   var rows = computeReportingSnapshotGroups(responses);
+  var totalTotal = rows.reduce(function(s, g) { return s + g.total; }, 0);
+  var totalConfirmed = rows.reduce(function(s, g) { return s + g.confirmed; }, 0);
+  var totalPct = totalTotal ? Math.round(totalConfirmed / totalTotal * 100) : 0;
   var tableRows = rows.map(function(g) {
     var pct = g.total ? Math.round(g.confirmed / g.total * 100) : 0;
     return '<tr>' +
@@ -2031,11 +2034,18 @@ function renderReportingSnapshot(responses) {
       '<td>' + pct + '%</td>' +
       '</tr>';
   }).join("");
+  var totalsRow = '<tr style="font-weight:700;background:var(--surface-1);border-top:2px solid var(--border)">' +
+    '<td>Total</td>' +
+    '<td>—</td>' +
+    '<td>' + totalTotal + '</td>' +
+    '<td>' + totalConfirmed + '</td>' +
+    '<td>' + totalPct + '%</td>' +
+    '</tr>';
   return '<div class="card" style="margin-bottom:16px">' +
     '<div class="card-head"><div><h2>Reporting Snapshot</h2><div class="sub">By campaign and month, with confirmed counts</div></div></div>' +
     '<div class="card-body" style="padding:0">' +
     '<table><thead><tr><th>Campaign</th><th>Month</th><th>Total</th><th>Confirmed</th><th>Confirmed %</th></tr></thead>' +
-    '<tbody>' + tableRows + '</tbody></table>' +
+    '<tbody>' + tableRows + totalsRow + '</tbody></table>' +
     '</div></div>';
 }
 
@@ -2230,6 +2240,7 @@ function renderResponsesView() {
             <a href="https://drive.google.com/drive/folders/1Hr3GWko3ixmEJZTl6DHgNiJauG502gL8" target="_blank" class="btn ghost sm">📁 Open Drive folder</a>
             <button class="btn ghost sm" data-action="dedupe-responses" style="color:var(--danger)">🧹 Dedupe</button>
             <button class="btn ghost sm" data-action="fix-campaigns" style="color:var(--danger)">🔧 Fix Campaigns</button>
+            ${f.client ? '<button class="btn ghost sm" data-action="bulk-assign-campaign" style="color:var(--brand)">🏷 Bulk assign campaign</button>' : ''}
             <button class="btn ghost sm" data-action="export-responses-pdf">⬇ Export PDF</button>
             <button class="btn" data-action="add-response">+ Add response</button>
           </div>
@@ -3490,6 +3501,9 @@ function generateResponsesPDF() {
     '</div>';
 
   var pivotGroups = computeReportingSnapshotGroups(responses);
+  var pivotTotal = pivotGroups.reduce(function(s, g) { return s + g.total; }, 0);
+  var pivotConfirmed = pivotGroups.reduce(function(s, g) { return s + g.confirmed; }, 0);
+  var pivotTotalPct = pivotTotal ? Math.round(pivotConfirmed / pivotTotal * 100) : 0;
   var pivotRowsHtml = pivotGroups.map(function(g) {
     var pct = g.total ? Math.round(g.confirmed / g.total * 100) : 0;
     return '<tr>' +
@@ -3500,6 +3514,13 @@ function generateResponsesPDF() {
       '<td style="padding:6px 10px;border-bottom:0.5px solid #e5e7eb;font-size:10px;font-weight:600">' + pct + '%</td>' +
       '</tr>';
   }).join("");
+  var pivotTotalsRow = '<tr style="font-weight:700;background:#f8fafc">' +
+    '<td style="padding:7px 10px;border-top:1.5px solid #111;font-size:10px">Total</td>' +
+    '<td style="padding:7px 10px;border-top:1.5px solid #111;font-size:10px">—</td>' +
+    '<td style="padding:7px 10px;border-top:1.5px solid #111;font-size:10px">' + pivotTotal + '</td>' +
+    '<td style="padding:7px 10px;border-top:1.5px solid #111;font-size:10px">' + pivotConfirmed + '</td>' +
+    '<td style="padding:7px 10px;border-top:1.5px solid #111;font-size:10px;color:' + accentColor + '">' + pivotTotalPct + '%</td>' +
+    '</tr>';
   var pivotHtml = pivotGroups.length === 0 ? '' :
     '<div>' +
     '<div style="font-size:12px;font-weight:700;margin-bottom:8px;color:' + accentColor + '">Reporting Snapshot - by Campaign and Month</div>' +
@@ -3510,7 +3531,7 @@ function generateResponsesPDF() {
     '<th style="text-align:left;padding:6px 10px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Total</th>' +
     '<th style="text-align:left;padding:6px 10px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Confirmed</th>' +
     '<th style="text-align:left;padding:6px 10px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Confirmed %</th>' +
-    '</tr></thead><tbody>' + pivotRowsHtml + '</tbody></table>' +
+    '</tr></thead><tbody>' + pivotRowsHtml + pivotTotalsRow + '</tbody></table>' +
     '</div>';
 
   function badge(status) {
@@ -4225,6 +4246,47 @@ function attachHandlers() {
           saveState("responses").then(function() { render(); });
           alert("Removed " + dedupeResult.removed + " duplicate(s). " + dedupeResult.kept.length + " unique responses remain.");
         }
+      }
+      else if (action === "bulk-assign-campaign") {
+        // Only reachable when a client filter is active (button is conditionally rendered above), but
+        // guard again here so state can't drift and produce cross-client garbage in a race.
+        var bulkClient = ui.responseFilters && ui.responseFilters.client;
+        if (!bulkClient) { alert("Filter by a specific client first, then use Bulk assign."); return; }
+        var clientCampaigns = (state.campaigns || []).filter(function(c) { return c.client === bulkClient; });
+        if (clientCampaigns.length === 0) { alert("No campaigns are set up for " + bulkClient + " yet - add them in the Campaigns tab first."); return; }
+
+        // Scope: apply to whatever is currently visible AND has no campaign yet. We recompute the
+        // filtered set here so this action stays honest even if other filters (heddl status, client
+        // status, confirmed) are also active - it never touches a row the user can't see.
+        var visibleUnassigned = (state.responses || []).filter(function(r) {
+          if (r.client !== bulkClient) return false;
+          if (r.campaign) return false;
+          if (r.confirmed) return false; // don't silently rewrite locked rows
+          var ff = ui.responseFilters || {};
+          if (ff.heddlStatus && r.heddlStatus !== ff.heddlStatus) return false;
+          if (ff.clientStatus && r.clientStatus !== ff.clientStatus) return false;
+          if (ff.confirmed === "yes" && !r.confirmed) return false;
+          if (ff.confirmed === "no" && r.confirmed) return false;
+          return true;
+        });
+        if (visibleUnassigned.length === 0) {
+          alert("No unassigned + unlocked rows in the current view. Everything visible already has a campaign, or is confirmed (locked).");
+          return;
+        }
+
+        var menu = clientCampaigns.map(function(c, i) { return (i + 1) + ". " + c.name; }).join("\n");
+        var choice = prompt(
+          visibleUnassigned.length + " visible row(s) for " + bulkClient + " have no campaign assigned. Pick a campaign to assign to all of them:\n\n" + menu + "\n\nEnter the number (1-" + clientCampaigns.length + "), or Cancel."
+        );
+        if (choice === null) return;
+        var idx = parseInt(choice, 10) - 1;
+        if (isNaN(idx) || idx < 0 || idx >= clientCampaigns.length) { alert("Invalid choice - nothing changed."); return; }
+        var chosen = clientCampaigns[idx].name;
+
+        if (!confirm("Assign \"" + chosen + "\" to " + visibleUnassigned.length + " response(s)? You can still change each row individually afterwards.")) return;
+        visibleUnassigned.forEach(function(r) { r.campaign = chosen; });
+        saveState("responses").then(function() { render(); });
+        alert("Assigned \"" + chosen + "\" to " + visibleUnassigned.length + " response(s).");
       }
       else if (action === "fix-campaigns") {
         var changes = [];
