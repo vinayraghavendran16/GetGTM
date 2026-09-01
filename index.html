@@ -1995,21 +1995,18 @@ function renderProspectsView() {
   `;
 }
 
-// Groups responses by Campaign then Month, with Total and Confirmed counts per group. Shared by both
+// Groups responses by Campaign only, with Total and Confirmed counts per campaign. Shared by both
 // the on-screen Reporting Snapshot table and the PDF export's pivot section, so they always match.
 function computeReportingSnapshotGroups(responses) {
   var groups = {};
   (responses || []).forEach(function(r) {
     var campaign = r.campaign || "(No campaign set)";
-    var month = r.date ? new Date(r.date + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "short" }) : "(No date)";
-    var key = campaign + "||" + month;
-    if (!groups[key]) groups[key] = { campaign: campaign, month: month, monthSort: r.date ? r.date.slice(0,7) : "", total: 0, confirmed: 0 };
-    groups[key].total++;
-    if (r.confirmed) groups[key].confirmed++;
+    if (!groups[campaign]) groups[campaign] = { campaign: campaign, total: 0, confirmed: 0 };
+    groups[campaign].total++;
+    if (r.confirmed) groups[campaign].confirmed++;
   });
   return Object.values(groups).sort(function(a, b) {
-    if (a.campaign !== b.campaign) return a.campaign.localeCompare(b.campaign);
-    return a.monthSort.localeCompare(b.monthSort);
+    return a.campaign.localeCompare(b.campaign);
   });
 }
 
@@ -2028,7 +2025,6 @@ function renderReportingSnapshot(responses) {
     var pct = g.total ? Math.round(g.confirmed / g.total * 100) : 0;
     return '<tr>' +
       '<td>' + escapeHTML(g.campaign) + '</td>' +
-      '<td>' + escapeHTML(g.month) + '</td>' +
       '<td>' + g.total + '</td>' +
       '<td>' + g.confirmed + '</td>' +
       '<td>' + pct + '%</td>' +
@@ -2036,15 +2032,14 @@ function renderReportingSnapshot(responses) {
   }).join("");
   var totalsRow = '<tr style="font-weight:700;background:var(--surface-1);border-top:2px solid var(--border)">' +
     '<td>Total</td>' +
-    '<td>—</td>' +
     '<td>' + totalTotal + '</td>' +
     '<td>' + totalConfirmed + '</td>' +
     '<td>' + totalPct + '%</td>' +
     '</tr>';
   return '<div class="card" style="margin-bottom:16px">' +
-    '<div class="card-head"><div><h2>Reporting Snapshot</h2><div class="sub">By campaign and month, with confirmed counts</div></div></div>' +
+    '<div class="card-head"><div><h2>Reporting Snapshot</h2><div class="sub">By campaign, with confirmed counts</div></div></div>' +
     '<div class="card-body" style="padding:0">' +
-    '<table><thead><tr><th>Campaign</th><th>Month</th><th>Total</th><th>Confirmed</th><th>Confirmed %</th></tr></thead>' +
+    '<table><thead><tr><th>Campaign</th><th>Total</th><th>Confirmed</th><th>Confirmed %</th></tr></thead>' +
     '<tbody>' + tableRows + totalsRow + '</tbody></table>' +
     '</div></div>';
 }
@@ -3392,9 +3387,23 @@ function generateCampaignsPDF() {
   var logoHtml = (f.client && CLIENT_LOGOS[f.client]) ? '<img src="' + CLIENT_LOGOS[f.client] + '" style="height:40px;margin-bottom:10px">' : '';
   var generatedStamp = 'GetGTM Report generated on ' + new Date().toLocaleDateString("en-US", {year:"numeric",month:"long",day:"numeric"}) + ' at ' + new Date().toLocaleTimeString("en-US", {hour:"2-digit",minute:"2-digit"});
 
-  var rows = campaigns.map(function(c) {
-    var screenshotCell = c.screenshotUrl
-      ? '<span style="color:#2563eb;word-break:break-all">' + escapeHTML(c.screenshotUrl) + '</span>'
+  // Screenshots get a short numbered reference in the main table (not the raw URL - a long URL forced
+  // to wrap across multiple lines inside a narrow cell breaks most PDF viewers' automatic link
+  // detection, since they only recognize an unbroken run of URL text). The full, unwrapped, single-
+  // line URL for each reference lives on its own dedicated page at the end. Same fix as Response PDF.
+  var campaignRefMap = [];
+  var refByIndex = {};
+  campaigns.forEach(function(c, i) {
+    if (c.screenshotUrl) {
+      var refNum = campaignRefMap.length + 1;
+      campaignRefMap.push({ ref: refNum, name: c.name, client: c.client, url: c.screenshotUrl });
+      refByIndex[i] = refNum;
+    }
+  });
+
+  var rows = campaigns.map(function(c, i) {
+    var screenshotCell = refByIndex[i]
+      ? '<span style="color:#2563eb;font-weight:700">Ref #' + refByIndex[i] + '</span>'
       : '<span style="color:#94a3b8">-</span>';
     return '<tr>' +
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px"><strong>' + escapeHTML(c.name || "-") + '</strong></td>' +
@@ -3408,9 +3417,22 @@ function generateCampaignsPDF() {
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;font-weight:700;color:#15803d">' + (c.replies || 0) + '</td>' +
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px">' + (c.reactions || 0) + '</td>' +
       '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;max-width:160px">' + escapeHTML(c.notes || "") + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:8px;max-width:150px">' + screenshotCell + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #e5e7eb;font-size:9px;text-align:center">' + screenshotCell + '</td>' +
       '</tr>';
   }).join("");
+
+  var referencesPageHtml = campaignRefMap.length === 0 ? '' :
+    '<div style="page-break-before:always;padding-top:10px">' +
+    '<h2 style="font-size:14px;margin:0 0 12px;color:#111">Screenshot References</h2>' +
+    campaignRefMap.map(function(item) {
+      // One reference per line, full page width, no wrapping - so PDF viewers reliably auto-link.
+      return '<div style="font-size:9px;margin-bottom:6px;line-height:1.4">' +
+        '<span style="font-weight:700;color:#2563eb">Ref #' + item.ref + '</span> - ' +
+        escapeHTML(item.name) + ' (' + escapeHTML(item.client || '') + '): ' +
+        '<span style="color:#2563eb">' + escapeHTML(item.url) + '</span>' +
+        '</div>';
+    }).join("") +
+    '</div>';
 
   var html = '<div style="font-family:Helvetica,Arial,sans-serif;padding:24px;color:#111">' +
     logoHtml +
@@ -3433,15 +3455,11 @@ function generateCampaignsPDF() {
     '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Notes</th>' +
     '<th style="text-align:left;padding:6px 8px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Screenshot link</th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table>' +
+    referencesPageHtml +
     '</div>';
 
   var container = document.createElement('div');
   container.innerHTML = html;
-  // No CSS positioning tricks - both z-index hiding and far off-screen positioning turned out to
-  // cause html2canvas to capture a blank page. Instead, the container stays in normal document flow,
-  // and html2canvas is told explicitly to capture from scroll position (0,0) via scrollX/scrollY
-  // below, regardless of where the container actually sits on the page. This is the documented fix
-  // for capturing an element that isn't at the top of a long page.
   container.style.background = '#ffffff';
   document.body.appendChild(container);
   var filenameSuffix = f.client ? f.client.replace(/[^a-zA-Z0-9]+/g, '_') : 'All';
@@ -3509,7 +3527,6 @@ function generateResponsesPDF() {
     var pct = g.total ? Math.round(g.confirmed / g.total * 100) : 0;
     return '<tr>' +
       '<td style="padding:6px 10px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + escapeHTML(g.campaign) + '</td>' +
-      '<td style="padding:6px 10px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + escapeHTML(g.month) + '</td>' +
       '<td style="padding:6px 10px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + g.total + '</td>' +
       '<td style="padding:6px 10px;border-bottom:0.5px solid #e5e7eb;font-size:10px">' + g.confirmed + '</td>' +
       '<td style="padding:6px 10px;border-bottom:0.5px solid #e5e7eb;font-size:10px;font-weight:600">' + pct + '%</td>' +
@@ -3517,18 +3534,16 @@ function generateResponsesPDF() {
   }).join("");
   var pivotTotalsRow = '<tr style="font-weight:700;background:#f8fafc">' +
     '<td style="padding:7px 10px;border-top:1.5px solid #111;font-size:10px">Total</td>' +
-    '<td style="padding:7px 10px;border-top:1.5px solid #111;font-size:10px">—</td>' +
     '<td style="padding:7px 10px;border-top:1.5px solid #111;font-size:10px">' + pivotTotal + '</td>' +
     '<td style="padding:7px 10px;border-top:1.5px solid #111;font-size:10px">' + pivotConfirmed + '</td>' +
     '<td style="padding:7px 10px;border-top:1.5px solid #111;font-size:10px;color:' + accentColor + '">' + pivotTotalPct + '%</td>' +
     '</tr>';
   var pivotHtml = pivotGroups.length === 0 ? '' :
     '<div>' +
-    '<div style="font-size:12px;font-weight:700;margin-bottom:8px;color:' + accentColor + '">Reporting Snapshot - by Campaign and Month</div>' +
+    '<div style="font-size:12px;font-weight:700;margin-bottom:8px;color:' + accentColor + '">Reporting Snapshot - by Campaign</div>' +
     '<table style="width:65%;border-collapse:collapse">' +
     '<thead><tr>' +
     '<th style="text-align:left;padding:6px 10px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Campaign</th>' +
-    '<th style="text-align:left;padding:6px 10px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Month</th>' +
     '<th style="text-align:left;padding:6px 10px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Total</th>' +
     '<th style="text-align:left;padding:6px 10px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Confirmed</th>' +
     '<th style="text-align:left;padding:6px 10px;border-bottom:1.5px solid #111;font-size:9px;text-transform:uppercase;color:#64748b">Confirmed %</th>' +
