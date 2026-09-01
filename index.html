@@ -2229,12 +2229,63 @@ function renderLogin() {
   `;
 }
 
+// Docs PDF export. Reuses the exact same HTML the in-app docs pages render (renderHowItWorks +
+// renderReleaseNotes), so the PDF can never drift out of sync with what's shown on screen - one
+// content source, two presentations. Portrait orientation since this is prose/reference content,
+// not a data table.
+function generateDocsPDF() {
+  var accentColor = "#7c3aed";
+  var generatedStamp = 'GetGTM Report generated on ' + new Date().toLocaleDateString("en-US", {year:"numeric",month:"long",day:"numeric"}) + ' at ' + new Date().toLocaleTimeString("en-US", {hour:"2-digit",minute:"2-digit"});
+
+  var docStyles = `
+    <style>
+      .docs-pdf h1 { font-size:20px; color:${accentColor}; margin:0 0 6px; }
+      .docs-pdf h2 { font-size:14px; color:#111; margin:22px 0 6px; border-bottom:1px solid #e5e7eb; padding-bottom:4px; }
+      .docs-pdf h3 { font-size:12px; color:#111; margin:14px 0 4px; }
+      .docs-pdf p { font-size:10.5px; color:#334155; line-height:1.5; margin:0 0 8px; }
+      .docs-pdf .docs-lead { font-size:11.5px; color:#475569; margin-bottom:14px; }
+      .docs-pdf ul { margin:0 0 10px; padding-left:18px; }
+      .docs-pdf li { font-size:10.5px; color:#334155; line-height:1.5; margin-bottom:4px; }
+      .docs-pdf code { background:#f1f5f9; padding:1px 4px; border-radius:3px; font-size:9.5px; }
+      .docs-pdf .rel-entry { margin-bottom:14px; padding-bottom:12px; border-bottom:0.5px solid #e5e7eb; }
+      .docs-pdf .rel-tag { display:inline-block; background:${accentColor}; color:#fff; font-size:8px; text-transform:uppercase; font-weight:700; padding:2px 6px; border-radius:3px; margin-bottom:4px; }
+      .docs-pdf .section-divider { page-break-before:always; }
+    </style>`;
+
+  var html = '<div class="docs-pdf" style="font-family:Helvetica,Arial,sans-serif;padding:28px;color:#111">' +
+    docStyles +
+    '<h1>GetGTM Engagement Tracker - Documentation</h1>' +
+    '<div style="font-size:9.5px;color:#94a3b8;margin-bottom:20px">' + escapeHTML(generatedStamp) + '</div>' +
+    renderHowItWorks() +
+    '<div class="section-divider">' + renderReleaseNotes() + '</div>' +
+    '</div>';
+
+  var container = document.createElement('div');
+  container.innerHTML = html;
+  container.style.background = '#ffffff';
+  document.body.appendChild(container);
+  var opt = {
+    margin: 14,
+    filename: 'GetGTM_Docs_' + new Date().toISOString().slice(0,10) + '.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: -window.scrollY, windowWidth: document.documentElement.scrollWidth, windowHeight: document.documentElement.scrollHeight },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['css', 'legacy'] }
+  };
+  html2pdf().set(opt).from(container).save().then(function() {
+    document.body.removeChild(container);
+  });
+}
+
 function renderDocs() {
   var t = ui.docsTab || "howitworks";
   return `
     <div class="topbar">
       <div class="brand"><div class="logo">GTM</div> <strong>Documentation</strong></div>
-      <div style="margin-left:auto"><button class="btn ghost sm" data-action="docs-back">${'\u2190'} Back</button></div>
+      <div style="margin-left:auto;display:flex;gap:10px">
+        <button class="btn ghost sm" data-action="docs-export-pdf">⬇ Download PDF</button>
+        <button class="btn ghost sm" data-action="docs-back">${'\u2190'} Back</button>
+      </div>
     </div>
     <div class="wrap">
       <div class="tabs" style="margin-bottom:16px">
@@ -2296,7 +2347,33 @@ function renderHowItWorks() {
     <p><strong>Refresh from Gmail</strong> pulls in anything new without duplicating (matched by company name). This isn't a live API poll - it's triggered either by clicking the button, or by asking Claude in chat to search Gmail fresh; either way the result lands in the same place, safely, every time.</p>
     <p><strong>Convert to engagement</strong> on any prospect creates a New Engagement pre-filled with their name and email, marks the prospect Converted, and drops straight into Client Intake. If a client with that name already exists, the button becomes "Open engagement" instead, so nothing ever gets duplicated.</p>
 
-    <h2>Reporting</h2>
+    <h2>Response Tracker</h2>
+    <p>Tracks every client reply sourced from Heddl (the outreach platform), organized by campaign, with a backend pipeline that classifies new reply screenshots automatically.</p>
+    <ul>
+      <li><strong>Automatic classification</strong> - a GitHub Actions workflow scans a Drive folder every 30 minutes (or on-demand via the <strong>🔄 Refresh from Drive</strong> button), reads each new screenshot with Claude's vision API, and extracts contact, date, Heddl status (Positive Reply / Meeting Booked / No Fit / Not Interested), campaign, and a short summary. Campaign is read verbatim from the "CAMPAIGN" panel in the screenshot's right sidebar - not inferred from the message content - and validated against that client's real campaign list before being written, so a misread never lands as a wrong campaign in the data.</li>
+      <li><strong>Client Status & Confirmed</strong> - set manually once you've agreed classification with the client; locks the row (fields become read-only) to protect confirmed data from accidental edits.</li>
+      <li><strong>Dedup</strong> - runs automatically on every backend refresh (scheduled or manual), matching by normalized contact name (letters only, company suffixes and punctuation stripped) within the same client. Keeps the most complete record (confirmed status wins, then longest notes).</li>
+      <li><strong>Campaign dropdown</strong> - each row's Campaign field is a client-scoped dropdown (only that client's campaigns appear), with an explicit "— Unassigned —" option and a "🏷 Bulk assign campaign" action (visible once you filter by client) to fill in many blank rows at once.</li>
+      <li><strong>PDF export</strong> - metrics + a Reporting Snapshot pivot (by campaign, with a totals row) on page one, the full data table on page two, and numbered screenshot reference links (<code>Ref #N</code>) on a dedicated final page - long URLs inside table cells don't reliably open as links in PDF viewers, so each reference gets its own full-width line instead.</li>
+    </ul>
+
+    <h2>Campaigns</h2>
+    <p>One row per Heddl campaign per client - name, status, created date, and cumulative stats (contacts reached, connections accepted, messages, emails, replies, reactions). Screenshot link included per campaign, same numbered-reference PDF pattern as the Response Tracker.</p>
+
+    <h2>Reporting Snapshot</h2>
+    <p>Aggregates every logged response by campaign (Total, Confirmed, Confirmed %), with a totals row at the bottom. Shown both on-screen in the Response Tracker tab and in the exported PDF, computed by the same shared function so the two never disagree.</p>
+
+    <h2>Calling</h2>
+    <p>A lead-calling workspace where each client works a list of warm leads uploaded by the GetGTM team. Lives in two places sharing the same data: a <strong>Calling</strong> tab inside each client's engagement view (client-facing, reachable via their share link - no login needed), and a team-only <strong>Calling</strong> tab on the dashboard with a client picker for an aggregate view.</p>
+    <ul>
+      <li><strong>Import (team-only)</strong> - paste a Google Sheet URL (must be shared "Anyone with the link can view"). Column headers are matched by alias (e.g. "First Name", "firstname", "fname" all resolve), previewed before committing, and appended - re-importing an updated sheet adds only new rows, matched by name + company, so nothing duplicates.</li>
+      <li><strong>Per-lead fields</strong> - First/Last name, Title, Company, Location, LinkedIn, Phone, Email, Calling Status (New / Busy / Follow-Up / Meeting Booked / Not Interested / Not Relevant) with a conditional field that appears based on status (follow-up date, meeting date, or not-relevant reason), Email/Phone enrichment status + notes, Next Step, and auto-stamped First Call Date / Latest Call Date - every status change restamps Latest Call Date to today; First Call Date is set once, the first time a lead moves off "New", and never resets.</li>
+      <li><strong>Client-side edits are open</strong> - a client on their share link can update any lead's status and notes without logging in, same trust model as the rest of the client view. Import, delete, and the audit log stay team-only.</li>
+      <li><strong>Audit log (team-only)</strong> - every field change is recorded with timestamp, before/after values, and who made it (a signed-in team email, or "anonymous" for client-side edits) - visible under the leads table only when signed in.</li>
+      <li><strong>Report + PDF</strong> - calls-made grouped by day/week/month, plus per-status counts, exportable as a PDF alongside the full leads list.</li>
+    </ul>
+
+    <h2>Reporting (financial)</h2>
     <p>The financial rollup, built from the actual signed GTM Services Agreement for each client (pulled from Drive, not estimated) wherever a contract exists:</p>
     <ul>
       <li><strong>MRR</strong> - this calendar month's contracted base (or actual, once entered) summed across every account with status Onboarding/Active/At Risk/Renewed.</li>
@@ -2322,6 +2399,41 @@ function renderReleaseNotes() {
 
     <div class="rel-entry">
       <div class="rel-tag">Latest</div>
+      <h3>Fix: Share links could get stuck on login screen</h3>
+      <p>Found and fixed a race condition where a fresh visit to a client's share link could land on the login screen and stay there, even though the app had internally routed correctly to the client view. The cause: when Firebase first delivers client data, a one-time background "seed known accounts" save sets a safety flag (used elsewhere to avoid flicker during live edits) - and that flag was incorrectly suppressing the very screen update that would show the client view. That specific update is now unconditional. Added a dedicated regression test that reproduces the exact race and confirms the fix.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Calling tab</h3>
+      <p>New lead-calling workspace, in both the client engagement view (client-facing, share-link accessible, no login) and the dashboard (team-only, with a client picker). Team uploads a Google Sheet of warm leads; clients or team work the list with status tracking (New / Busy / Follow-Up / Meeting Booked / Not Interested / Not Relevant), conditional follow-up/meeting-date/reason fields, email + phone enrichment status and notes, next-step capture, and auto-stamped first/latest call dates. Every change is written to a team-only audit log. Report + PDF export group calls made by day, week, or month.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Reporting Snapshot: by Campaign, with totals</h3>
+      <p>Simplified the pivot from "by Campaign and Month" to just "by Campaign" (aggregated across all months), and added a totals row at the bottom - on-screen and in the PDF. Also fixed the Campaigns PDF's screenshot links, which weren't opening: long URLs wrapped across multiple lines inside table cells don't get auto-detected as clickable by most PDF viewers, so screenshot links now use the same numbered-reference pattern (<code>Ref #N</code> in the table, full-width single-line URLs on a dedicated final page) already used in the Response Tracker PDF.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Backend: auto-dedupe on every refresh</h3>
+      <p>The Dedupe button's letters-only contact-matching logic now also runs automatically inside the backend classifier, on every scheduled and manual refresh - not just when someone clicks the button. Also opportunistically cleans up any pre-existing duplicates from before this was added, even on runs with no new screenshots.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Response Tracker: one-click Refresh from Drive</h3>
+      <p>Added a button that triggers the backend classification workflow directly via the GitHub Actions API, from inside the tracker - no need to leave the page. First click walks through a one-time setup (repo, workflow file, a scoped GitHub token, branch), saved to Firebase so the whole team benefits from one person's setup. Falls back to opening the Actions page manually if the API call fails.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Backend: campaign read from the Heddl screenshot's sidebar</h3>
+      <p>The classification prompt was guessing which campaign a reply belonged to by matching message content to campaign names - unreliable, since a reply's subject matter doesn't always map cleanly to a campaign name. Rewrote it to read the campaign directly, verbatim, from the "CAMPAIGN" panel in the screenshot's right sidebar instead - the same field a human would look at - then validate that value against the client's real campaign list before writing.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Response Tracker: campaign dropdown + bulk assign</h3>
+      <p>Root-caused why so many responses had no campaign set: the backend classifier wasn't writing a campaign field at all, and the frontend's fallback (guessing from freeform notes) only matched a narrow format. Fixed the backend to always write a validated campaign, and replaced the frontend's free-text Campaign input with a dropdown scoped to each row's client (so typos and cross-client mixups are impossible), plus a "🏷 Bulk assign campaign" action to backfill many blank rows at once when filtered by client.</p>
+    </div>
+
+    <div class="rel-entry">
       <h3>Documentation & release notes</h3>
       <p>Added this page - an in-app "How It Works" reference and version history, reachable from the topbar on every screen, including before login.</p>
     </div>
@@ -4794,6 +4906,7 @@ function attachHandlers() {
         render();
       }
       else if (action === "docs-tab") { ui.docsTab = el.dataset.docsTab; render(); }
+      else if (action === "docs-export-pdf") { generateDocsPDF(); }
       else if (action === "new-client") { ui.modal = { type: "new-client" }; render(); }
       else if (action === "delete-client") {
         var cl = state.clients[el.dataset.id];
