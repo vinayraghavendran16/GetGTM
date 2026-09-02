@@ -1595,6 +1595,17 @@ function initFirebase() {
         authUser = user;
         if (user) {
           ui.isAuth = true;
+          // If the very first, synchronous render already locked ui.view into "login" (because it ran
+          // before Firebase had a chance to check IndexedDB for a persisted session - an async lookup),
+          // a returning team member with a valid session gets stuck staring at the login form forever:
+          // isAuth is now correctly true, but nothing else transitions ui.view away from "login", since
+          // the only other code that does that lives in the manual password-entry handlers. Do here
+          // what those handlers do - move to the dashboard - so an auto-restored session actually takes
+          // the user somewhere. This also fixes the case of a signed-in team member opening a client
+          // share link in the same browser: the link intentionally keeps signed-in team on their own
+          // dashboard rather than the client's scoped view, but was leaving them stranded on login
+          // instead of actually landing on that dashboard.
+          if (ui.view === "login") { ui.view = "dashboard"; }
           prospectsRef.on("value", function(snapshot) {
             state.prospects = snapshot.val() || [];
             if (!window._prospectSeedDone) {
