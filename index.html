@@ -518,7 +518,7 @@ var REVENUE_CONTRACTS = {
 };
 
 let state = { clients: {}, prospects: [], responses: [], responseSavedViews: [], responseBilling: {}, revenueActuals: {}, campaigns: [] };
-let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: null, dashboardTab: "clients", responseFilters: { client: "", heddlStatus: "", clientStatus: "", confirmed: "" }, campaignFilters: { client: "" } };
+let ui = { view: null, isAuth: false, clientId: null, tab: "overview", modal: null, dashboardTab: "clients", responseFilters: { client: "", heddlStatus: "", clientStatus: "", confirmed: "" }, campaignFilters: { client: "" }, teamPreviewingClient: false };
 
 function seedProspects() {
   state.prospects = [
@@ -846,6 +846,10 @@ function refreshResponsesFromDrive() {
 }
 
 var isClientView = false;
+// The only ui.tab values valid while isClientView is true. Defined once here so the three places that
+// need to enforce it (URL-based routing, the manual "Preview as client" toggle, and the tab-click
+// handler itself) can never drift out of sync with each other.
+var CLIENT_TAB_IDS = ["client-outcomes", "client-campaigns", "client-responses", "calling"];
 function roAttr() { return isClientView ? " disabled" : ""; }
 function roStyle() { return isClientView ? " style=\"opacity:.7;pointer-events:none\"" : ""; }
 var clientViewId = null;
@@ -1590,6 +1594,29 @@ function initFirebase() {
         if (!window._fbSaveInProgress) render();
       }, function(err) { console.log("callingLeads read error:", err.message); });
 
+      // Responses and campaigns: readable by anyone. These used to be listened to only after
+      // signing in (they were originally team-only screens), but the client view now has its own
+      // Responses and Campaigns tabs (filtered to that one client) - an anonymous client visiting
+      // their share link needs this data synced to their browser too, or those tabs would just be
+      // permanently empty regardless of what the Firebase rules allow. Write access follows the
+      // same open pattern as clients/callingLeads: clients can update Client Status/Confirmed on
+      // their own responses without an account, same trust model as everything else client-facing.
+      responsesRef.on("value", function(snapshot) {
+        state.responses = snapshot.val() || [];
+        var migratedAny = migrateResponseFields(state.responses);
+        if (migratedAny && !window._fbSaveInProgress) { saveState("responses"); }
+        if (!window._fbSaveInProgress) render();
+      }, function(err) { console.log("responses read error:", err.message); });
+      campaignsRef.on("value", function(snapshot) {
+        state.campaigns = snapshot.val() || [];
+        if (!window._campaignSeedDone) {
+          window._campaignSeedDone = true;
+          var addedCampaigns = seedCampaignsFromDrive();
+          if (addedCampaigns > 0) { saveState("campaigns"); }
+        }
+        if (!window._fbSaveInProgress) render();
+      }, function(err) { console.log("campaigns read error:", err.message); });
+
       // Auth state drives whether we also listen to team-only data
       auth.onAuthStateChanged(function(user) {
         authUser = user;
@@ -1621,16 +1648,6 @@ function initFirebase() {
             state.revenueActuals = snapshot.val() || {};
             if (!window._fbSaveInProgress) render();
           }, function(err) { console.log("revenueActuals read error:", err.message); });
-          responsesRef.on("value", function(snapshot) {
-            state.responses = snapshot.val() || [];
-            var migratedAny = migrateResponseFields(state.responses);
-            if (migratedAny && !window._fbSaveInProgress) { saveState("responses"); }
-            // Note: the old hardcoded-list auto-seed used to run here. Removed - the backend
-            // (GitHub Actions, scripts/refresh-responses.mjs) now handles new screenshots for real,
-            // and re-running the old hardcoded list would fight with the Dedupe button by re-adding
-            // entries that were intentionally removed as duplicates.
-            if (!window._fbSaveInProgress) render();
-          }, function(err) { console.log("responses read error:", err.message); });
           responseViewsRef.on("value", function(snapshot) {
             state.responseSavedViews = snapshot.val() || [];
             if (!window._fbSaveInProgress) render();
@@ -1639,15 +1656,6 @@ function initFirebase() {
             state.responseBilling = snapshot.val() || {};
             if (!window._fbSaveInProgress) render();
           }, function(err) { console.log("responseBilling read error:", err.message); });
-          campaignsRef.on("value", function(snapshot) {
-            state.campaigns = snapshot.val() || [];
-            if (!window._campaignSeedDone) {
-              window._campaignSeedDone = true;
-              var addedCampaigns = seedCampaignsFromDrive();
-              if (addedCampaigns > 0) { saveState("campaigns"); }
-            }
-            if (!window._fbSaveInProgress) render();
-          }, function(err) { console.log("campaigns read error:", err.message); });
           callingLogsRef.on("value", function(snapshot) {
             state.callingLogs = snapshot.val() || {};
             if (!window._fbSaveInProgress) render();
@@ -1656,9 +1664,7 @@ function initFirebase() {
           prospectsRef.off();
           revenueActualsRef.off();
           responseViewsRef.off();
-          responsesRef.off();
           responseBillingRef.off();
-          campaignsRef.off();
           callingLogsRef.off();
         }
         render();
@@ -3333,13 +3339,26 @@ function renderClient() {
   const c = state.clients[ui.clientId];
   if (!c) { ui.view = "dashboard"; return renderDashboard(); }
   const prog = progressOf(c);
+  // Three distinct states in the topbar's right-hand badge area:
+  //  1. isClientView && teamPreviewingClient - a signed-in team member clicked "Preview as client".
+  //     Read-only, byte-for-byte what a real client sees, but with a clear way back to their own
+  //     dashboard (a raw client never has this, since they were never signed in to begin with).
+  //  2. isClientView && !teamPreviewingClient - an actual client, arrived via their ?client= share
+  //     link with no session at all. Shows the same "Live - synced" reassurance as before.
+  //  3. !isClientView - normal team browsing of their own dashboard. The badge is now a real button
+  //     (it used to be inert decorative text) that enters preview mode.
+  const badgeHtml = isClientView
+    ? (ui.teamPreviewingClient
+        ? '<div class="badge" style="background:#7c3aed">👁 Previewing as client</div><button class="btn ghost sm" data-action="exit-client-preview">← Exit preview</button>'
+        : '<div class="badge" style="background:#15803d">Live - synced</div>')
+    : '<button class="btn ghost sm" data-action="preview-as-client">👁 Preview as client</button>';
 
   return `
     <div class="topbar">
       <div class="brand"><div class="logo">GTM</div> <strong>${escapeHTML(c.name)}</strong></div>
       <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
         <button class="btn ghost sm" data-action="open-docs">📖 Docs</button>
-        ${isClientView ? '<div class="badge" style="background:#15803d">Live - synced</div>' : '<div class="badge">Client view</div>'}
+        ${badgeHtml}
       </div>
     </div>
     <div class="wrap">
@@ -3369,28 +3388,222 @@ function renderClient() {
       </div>
 
       <div class="tabs">
-        ${isClientView ? '' : '<button data-action="tab" data-tab="offers" class="' + (ui.tab==='offers'?'active':'') + '">Offers</button>'}
-        ${isClientView ? '' : '<button data-action="tab" data-tab="intake" class="' + (ui.tab==='intake'?'active':'') + '">Client Intake</button>'}
-        <button data-action="tab" data-tab="overview" class="${ui.tab==='overview'?'active':''}">Overview</button>
-        ${isClientView ? '' : '<button data-action="tab" data-tab="proposal" class="' + (ui.tab==='proposal'?'active':'') + '">Proposal</button>'}
-        <button data-action="tab" data-tab="timeline" class="${ui.tab==='timeline'?'active':''}">Timeline</button>
-        ${c.proposal && c.proposal.stage === 'approved' ? '<button data-action="tab" data-tab="delivery" class="' + (ui.tab==='delivery'?'active':'') + '">Delivery</button>' : ''}
-        <button data-action="tab" data-tab="outcomes" class="${ui.tab==='outcomes'?'active':''}">Outcomes</button>
-        <button data-action="tab" data-tab="calling" class="${ui.tab==='calling'?'active':''}">Calling</button>
+        ${isClientView ? `
+          <button data-action="tab" data-tab="client-outcomes" class="${ui.tab==='client-outcomes'?'active':''}">Outcomes</button>
+          <button data-action="tab" data-tab="client-campaigns" class="${ui.tab==='client-campaigns'?'active':''}">Campaigns</button>
+          <button data-action="tab" data-tab="client-responses" class="${ui.tab==='client-responses'?'active':''}">Responses</button>
+          <button data-action="tab" data-tab="calling" class="${ui.tab==='calling'?'active':''}">Calling</button>
+        ` : `
+          <button data-action="tab" data-tab="offers" class="${ui.tab==='offers'?'active':''}">Offers</button>
+          <button data-action="tab" data-tab="intake" class="${ui.tab==='intake'?'active':''}">Client Intake</button>
+          <button data-action="tab" data-tab="overview" class="${ui.tab==='overview'?'active':''}">Overview</button>
+          <button data-action="tab" data-tab="proposal" class="${ui.tab==='proposal'?'active':''}">Proposal</button>
+          <button data-action="tab" data-tab="timeline" class="${ui.tab==='timeline'?'active':''}">Timeline</button>
+          ${c.proposal && c.proposal.stage === 'approved' ? '<button data-action="tab" data-tab="delivery" class="' + (ui.tab==='delivery'?'active':'') + '">Delivery</button>' : ''}
+          <button data-action="tab" data-tab="outcomes" class="${ui.tab==='outcomes'?'active':''}">Outcomes</button>
+          <button data-action="tab" data-tab="calling" class="${ui.tab==='calling'?'active':''}">Calling</button>
+        `}
       </div>
 
       <div id="tab-body">${
-        ui.tab === "offers" ? renderOffersTab(c)
-        : ui.tab === "intake" ? renderIntakeTab(c)
-        : ui.tab === "overview" ? renderOverviewTab(c)
-        : ui.tab === "proposal" ? renderProposalTab(c)
-        : ui.tab === "delivery" ? renderDeliveryTab(c)
-        : ui.tab === "timeline" ? renderTimelineTab(c)
-        : ui.tab === "calling" ? renderCallingTab(c.id)
-        : renderOutcomesTab(c)
+        isClientView ? (
+          ui.tab === "client-campaigns" ? renderClientCampaignsTab(c)
+          : ui.tab === "client-responses" ? renderClientResponsesTab(c)
+          : ui.tab === "calling" ? renderCallingTab(c.id)
+          : renderClientOutcomesTab(c)
+        ) : (
+          ui.tab === "offers" ? renderOffersTab(c)
+          : ui.tab === "intake" ? renderIntakeTab(c)
+          : ui.tab === "overview" ? renderOverviewTab(c)
+          : ui.tab === "proposal" ? renderProposalTab(c)
+          : ui.tab === "delivery" ? renderDeliveryTab(c)
+          : ui.tab === "timeline" ? renderTimelineTab(c)
+          : ui.tab === "calling" ? renderCallingTab(c.id)
+          : renderOutcomesTab(c)
+        )
       }</div>
     </div>
   `;
+}
+
+// Single-client version of the goal-vs-achieved computation used by renderGoalsAchievedBlock() (which
+// rolls this up across ALL clients for the team dashboard). Extracted so both can share the exact same
+// target/achieved/percentage math and never drift apart.
+function computeClientGoalRows(c) {
+  var rows = [];
+  if (c.goalLines && c.goalLines.length > 0) {
+    c.goalLines.forEach(function(line) {
+      ["m1","m2","m3"].forEach(function(m) {
+        var gm = line.goals[m];
+        if (!gm) return;
+        [["Positive replies", gm.replies, gm.achievedReplies], ["Meetings booked", gm.meetings, gm.achievedMeetings]].forEach(function(pair) {
+          var metric = pair[0], target = pair[1], achieved = pair[2];
+          if (!target && !achieved) return;
+          rows.push({ line: line.name, month: m.toUpperCase(), metric: metric, target: target, achieved: achieved });
+        });
+      });
+    });
+    if (c.goalLines.length > 1) {
+      ["m1","m2","m3"].forEach(function(m) {
+        [["Positive replies", "replies", "achievedReplies"], ["Meetings booked", "meetings", "achievedMeetings"]].forEach(function(pair) {
+          var metric = pair[0], tKey = pair[1], aKey = pair[2];
+          var tSum = 0, aSum = 0, anyT = false, anyA = false;
+          c.goalLines.forEach(function(line) {
+            var t = parseFloat(line.goals[m][tKey]), a = parseFloat(line.goals[m][aKey]);
+            if (!isNaN(t)) { tSum += t; anyT = true; }
+            if (!isNaN(a)) { aSum += a; anyA = true; }
+          });
+          if (!anyT && !anyA) return;
+          rows.push({ line: "Combined", month: m.toUpperCase(), metric: metric,
+            target: anyT ? String(tSum) : "", achieved: anyA ? String(aSum) : "", isRollup: true });
+        });
+      });
+    }
+  } else if (c.goals) {
+    ["m1","m2","m3"].forEach(function(m) {
+      var gm = c.goals[m];
+      if (!gm) return;
+      [["Positive replies", gm.replies, gm.achievedReplies], ["Meetings booked", gm.meetings, gm.achievedMeetings]].forEach(function(pair) {
+        var metric = pair[0], target = pair[1], achieved = pair[2];
+        if (!target && !achieved) return;
+        rows.push({ line: "-", month: m.toUpperCase(), metric: metric, target: target, achieved: achieved });
+      });
+    });
+  }
+  return rows;
+}
+
+// Client-facing Outcomes tab: what was promised per month (target) vs what actually happened
+// (achieved), with a computed % achievement. Read-only - these numbers are set during
+// Overview/Proposal by the team, not edited here. Reuses computeClientGoalRows() so this can never
+// show different numbers than the team-side rollup on the dashboard.
+function renderClientOutcomesTab(c) {
+  var rows = computeClientGoalRows(c);
+  if (rows.length === 0) {
+    return '<div class="card"><div class="card-body" style="padding:32px;text-align:center;color:var(--text-muted)">' +
+      'Monthly targets haven\'t been set yet. Once your GetGTM team adds them, you\'ll see target vs. achieved numbers here.' +
+      '</div></div>';
+  }
+  var tableRows = rows.map(function(r) {
+    var tNum = parseFloat(r.target), aNum = parseFloat(r.achieved);
+    var pctHtml = '<span class="small" style="color:var(--text-muted)">-</span>';
+    if (tNum && !isNaN(tNum) && !isNaN(aNum)) {
+      var pct = Math.round((aNum / tNum) * 100);
+      var color = pct >= 100 ? "var(--success)" : pct >= 60 ? "var(--brand)" : "var(--danger)";
+      pctHtml = '<strong style="color:' + color + '">' + pct + '%</strong>';
+    }
+    return '<tr' + (r.isRollup ? ' style="background:var(--surface-1);font-weight:600"' : '') + '>' +
+      (rows.some(function(x) { return x.line && x.line !== "-"; }) ? '<td>' + escapeHTML(r.line || "-") + '</td>' : '') +
+      '<td>' + escapeHTML(r.month) + '</td>' +
+      '<td>' + escapeHTML(r.metric) + '</td>' +
+      '<td>' + escapeHTML(r.target || "-") + '</td>' +
+      '<td>' + escapeHTML(r.achieved || "-") + '</td>' +
+      '<td>' + pctHtml + '</td>' +
+      '</tr>';
+  }).join("");
+  var showLineCol = rows.some(function(x) { return x.line && x.line !== "-"; });
+  return '<div class="card">' +
+    '<div class="card-head"><h2>Outcomes</h2><div class="sub">What was promised each month vs. what was actually achieved.</div></div>' +
+    '<div class="card-body" style="padding:0"><div style="overflow-x:auto"><table>' +
+    '<thead><tr>' + (showLineCol ? '<th>Line</th>' : '') + '<th>Month</th><th>Metric</th><th>Target</th><th>Achieved</th><th>% Achieved</th></tr></thead>' +
+    '<tbody>' + tableRows + '</tbody></table></div></div></div>';
+}
+
+// Client-facing Campaigns tab: same stats as the team's Campaigns view, filtered to this one client,
+// read-only (plain text instead of inputs - editing campaign data belongs to the team dashboard).
+function renderClientCampaignsTab(c) {
+  var campaigns = (state.campaigns || []).filter(function(camp) { return camp.client === c.name; })
+    .slice().sort(function(a, b) { return (b.createdDate || "").localeCompare(a.createdDate || ""); });
+
+  var totalContacts = campaigns.reduce(function(s, camp) { return s + (camp.totalContacts || 0); }, 0);
+  var totalAccepted = campaigns.reduce(function(s, camp) { return s + (camp.accepted || 0); }, 0);
+  var totalReplies = campaigns.reduce(function(s, camp) { return s + (camp.replies || 0); }, 0);
+  var replyRate = totalContacts ? Math.round(totalReplies / totalContacts * 100 * 10) / 10 : 0;
+
+  var rows = campaigns.map(function(camp) {
+    return '<tr>' +
+      '<td><strong>' + escapeHTML(camp.name || "-") + '</strong></td>' +
+      '<td>' + escapeHTML(camp.status || "-") + '</td>' +
+      '<td style="white-space:nowrap">' + escapeHTML(camp.createdDate || "-") + '</td>' +
+      '<td>' + (camp.totalContacts || 0) + '</td>' +
+      '<td>' + (camp.accepted || 0) + '</td>' +
+      '<td>' + (camp.messagesSent || 0) + '</td>' +
+      '<td style="font-weight:700;color:var(--success)">' + (camp.replies || 0) + '</td>' +
+      '<td>' + (camp.reactions || 0) + '</td>' +
+      '</tr>';
+  }).join("");
+
+  return '<div class="kpis">' +
+    '<div class="kpi"><div class="label">Total campaigns</div><div class="value">' + campaigns.length + '</div></div>' +
+    '<div class="kpi"><div class="label">Contacts reached</div><div class="value">' + totalContacts.toLocaleString() + '</div></div>' +
+    '<div class="kpi"><div class="label">Connections accepted</div><div class="value" style="color:var(--brand)">' + totalAccepted.toLocaleString() + '</div></div>' +
+    '<div class="kpi"><div class="label">Total replies</div><div class="value" style="color:var(--success)">' + totalReplies + '</div></div>' +
+    '<div class="kpi"><div class="label">Reply rate</div><div class="value">' + replyRate + '%</div></div>' +
+    '</div>' +
+    '<div class="card">' +
+    '<div class="card-head"><h2>Campaigns</h2><button class="btn ghost sm" data-action="client-export-campaigns-pdf">⬇ Export PDF</button></div>' +
+    '<div class="card-body" style="padding:0">' +
+    (campaigns.length === 0 ? '<div style="padding:20px;text-align:center;color:var(--text-secondary)">No campaigns logged yet.</div>' :
+      '<div style="overflow-x:auto"><table><thead><tr><th>Campaign</th><th>Status</th><th>Created</th><th>Contacts</th><th>Accepted</th><th>Messages</th><th>Replies</th><th>Reactions</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div>') +
+    '</div></div>';
+}
+
+// Client-facing Responses tab: same pivot + response list as the team's Responses view, filtered to
+// this client. Only Client Status and Confirmed are editable (reuses the exact same [data-response]
+// field-change listener the team table uses, including the PIN-lock on unconfirming - no separate
+// wiring needed). Every other field is read-only text, since campaign assignment, Heddl Status,
+// notes, etc. are set by the classification pipeline or the team, not the client.
+function renderClientResponsesTab(c) {
+  var responses = (state.responses || []).filter(function(r) { return r.client === c.name; })
+    .slice().sort(function(a, b) { return (b.date || "").localeCompare(a.date || ""); });
+
+  var heddlCounts = { "Positive Reply": 0, "Meeting Booked": 0, "No Fit": 0, "Not Interested": 0 };
+  responses.forEach(function(r) { if (heddlCounts[r.heddlStatus] !== undefined) heddlCounts[r.heddlStatus]++; });
+  var confirmedCount = responses.filter(function(r) { return r.confirmed; }).length;
+
+  function statusSelectHtml(r, key, options, placeholder) {
+    var val = r[key];
+    var col = responseStatusColor(val);
+    return '<select data-response="' + r.id + '" data-key="' + key + '" class="del-select" style="background:' + col.bg + ';color:' + col.color + ';font-weight:600;border-color:transparent">' +
+      '<option value="">' + placeholder + '</option>' +
+      options.map(function(s) { return '<option ' + (val === s ? 'selected' : '') + '>' + s + '</option>'; }).join("") +
+      '</select>';
+  }
+
+  var rows = responses.map(function(r) {
+    var locked = !!r.confirmed;
+    return '<tr' + (locked ? ' style="background:var(--surface-1)"' : '') + '>' +
+      '<td style="white-space:nowrap">' + escapeHTML(r.date || "-") + '</td>' +
+      '<td>' + escapeHTML(r.contact || "-") + '</td>' +
+      '<td>' + escapeHTML(r.company || "-") + '</td>' +
+      '<td>' + escapeHTML(r.campaign || "Unassigned") + '</td>' +
+      '<td><span style="' + (function() { var col = responseStatusColor(r.heddlStatus); return 'background:' + col.bg + ';color:' + col.color; })() + ';font-weight:600;padding:3px 8px;border-radius:4px;font-size:12px;display:inline-block">' + escapeHTML(r.heddlStatus || "-") + '</span></td>' +
+      '<td>' + statusSelectHtml(r, "clientStatus", RESPONSE_STATUSES, "Not set") + '</td>' +
+      '<td style="text-align:center"><input type="checkbox" data-response="' + r.id + '" data-key="confirmed" data-type="checkbox" ' + (r.confirmed ? 'checked' : '') + ' style="width:16px;height:16px;cursor:pointer">' +
+      (locked ? '<div class="small" style="color:var(--text-muted);margin-top:2px">🔒 locked</div>' : '') + '</td>' +
+      '<td>' + (r.clientStatus === "Meeting Booked" ? escapeHTML(r.meetingBookedDate || "-") : '<span class="small" style="color:var(--text-muted)">-</span>') + '</td>' +
+      '<td>' + (r.clientStatus === "No Fit" ? escapeHTML(r.noFitReason || "-") : '<span class="small" style="color:var(--text-muted)">-</span>') + '</td>' +
+      '<td style="max-width:200px">' + escapeHTML((r.notes || "").length > 80 ? (r.notes || "").slice(0, 80) + "…" : (r.notes || "")) + '</td>' +
+      '<td>' + (r.screenshotUrl ? '<a href="' + escapeAttr(r.screenshotUrl) + '" target="_blank" class="small" style="color:var(--brand)">📎 view</a>' : '<span class="small" style="color:var(--text-muted)">-</span>') + '</td>' +
+      '</tr>';
+  }).join("");
+
+  return '<div class="kpis">' +
+    '<div class="kpi"><div class="label">Total responses</div><div class="value">' + responses.length + '</div></div>' +
+    '<div class="kpi"><div class="label">Positive replies</div><div class="value" style="color:var(--success)">' + heddlCounts["Positive Reply"] + '</div></div>' +
+    '<div class="kpi"><div class="label">Meetings booked</div><div class="value" style="color:var(--brand)">' + heddlCounts["Meeting Booked"] + '</div></div>' +
+    '<div class="kpi"><div class="label">Confirmed</div><div class="value">' + confirmedCount + ' / ' + responses.length + '</div></div>' +
+    '</div>' +
+    renderReportingSnapshot(responses) +
+    '<div class="card">' +
+    '<div class="card-head"><h2>Response Tracker</h2><button class="btn ghost sm" data-action="client-export-responses-pdf">⬇ Export PDF</button></div>' +
+    '<div class="card-body" style="padding:0">' +
+    '<div class="small" style="padding:12px 16px;border-bottom:0.5px solid var(--border)">You can update <strong>Client Status</strong> and <strong>Confirmed</strong> below - everything else is set by your GetGTM team.</div>' +
+    (responses.length === 0 ? '<div style="padding:20px;text-align:center;color:var(--text-secondary)">No responses logged yet.</div>' :
+      '<div style="overflow-x:auto"><table style="min-width:1100px"><thead><tr><th>Date</th><th>Contact</th><th>Company</th><th>Campaign</th><th>Heddl Status</th><th>Client Status</th><th>Confirmed</th><th>Meeting Date</th><th>No Fit Reason</th><th>Notes</th><th>Screenshot</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div>') +
+    '</div></div>';
 }
 
 function renderOffersTab(c) {
@@ -4924,6 +5137,21 @@ function attachHandlers() {
         if (useFirebase && auth) { auth.signOut(); }
         ui.isAuth = false; ui.view = "login"; render();
       }
+      else if (action === "preview-as-client") {
+        // Team member testing what a client sees on their share link. Reuses the exact same
+        // isClientView flag that a real anonymous client visit sets, so rendering is byte-for-byte
+        // identical (client-only tabs, read-only fields, the same banner text) - teamPreviewingClient
+        // only distinguishes it for the exit button, it doesn't change what's shown.
+        ui.teamPreviewingClient = true;
+        isClientView = true;
+        if (CLIENT_TAB_IDS.indexOf(ui.tab) === -1) ui.tab = "client-outcomes";
+        render();
+      }
+      else if (action === "exit-client-preview") {
+        ui.teamPreviewingClient = false;
+        isClientView = false;
+        render();
+      }
       else if (action === "open-docs") {
         ui.docsReturnView = ui.view; ui.docsReturnClientId = ui.clientId;
         ui.view = "docs"; ui.docsTab = ui.docsTab || "howitworks";
@@ -5007,6 +5235,21 @@ function attachHandlers() {
       }
       else if (action === "calling-import") {
         await importCallingLeadsFromSheet(el.dataset.callingClient);
+      }
+      else if (action === "client-export-campaigns-pdf") {
+        // Temporarily scope the shared campaigns-filter state to this client so the existing
+        // generateCampaignsPDF() (built for the team dashboard) produces the same client-scoped PDF
+        // without needing a separate export function to maintain.
+        var prevCampaignFilter = ui.campaignFilters;
+        ui.campaignFilters = { client: state.clients[ui.clientId].name };
+        generateCampaignsPDF();
+        ui.campaignFilters = prevCampaignFilter;
+      }
+      else if (action === "client-export-responses-pdf") {
+        var prevResponseFilter = ui.responseFilters;
+        ui.responseFilters = { client: state.clients[ui.clientId].name, heddlStatus: "", clientStatus: "", confirmed: "" };
+        generateResponsesPDF();
+        ui.responseFilters = prevResponseFilter;
       }
       else if (action === "calling-export-pdf") {
         generateCallingPDF(el.dataset.callingClient);
@@ -5248,7 +5491,7 @@ function attachHandlers() {
         ui.view = "dashboard";
         render();
       }
-      else if (action === "tab") { if (isClientView && (el.dataset.tab === "offers" || el.dataset.tab === "intake" || el.dataset.tab === "proposal")) return; ui.tab = el.dataset.tab; render(); }
+      else if (action === "tab") { if (isClientView && CLIENT_TAB_IDS.indexOf(el.dataset.tab) === -1) return; ui.tab = el.dataset.tab; render(); }
       else if (action === "skip-ppt") { ui.tab = "intake"; render(); }
       else if (action === "offer-prev") {
         ui.offerPage = Math.max(0, (ui.offerPage || 0) - 1);
@@ -5622,7 +5865,7 @@ function applyClientViewRouting() {
     clientViewId = cid;
     ui.clientId = cid;
     ui.view = "client";
-    if (!ui.tab || ui.tab === "offers" || ui.tab === "intake" || ui.tab === "proposal") ui.tab = "overview";
+    if (CLIENT_TAB_IDS.indexOf(ui.tab) === -1) ui.tab = "client-outcomes";
   }
 }
 
