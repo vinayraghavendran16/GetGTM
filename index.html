@@ -587,6 +587,13 @@ function refreshProspectsFromGmail() {
     source: "Partner referral via Howard (autotechco.co / Heddl ecosystem)",
     notes: "Howard introduced Vinay as a partner-org resource who has already researched new market entry opportunities and engagement models for QNu Labs. A prepared growth plan deck (QNu_Labs_GetGTM_Growth_Plan.pptx) was attached to the intro. This came through Heddl's partner channel, not a direct GetGTM-sourced lead."
   })) added++;
+  if (addIfMissing({
+    name: "Tommaso Trionfi", company: "Shared Studios", email: "tommaso@sharedstudios.com",
+    dateContacted: "2026-09-01", status: "Deck Shared",
+    nextStep: "Awaiting Tommaso's read after discussing GetGTM internally with a colleague",
+    source: "Rajiv led, intro via Boardy.ai call the prior day",
+    notes: "Tommaso (CEO/Co-founder of Shared Studios) and Rajiv had a call the day before (facilitated/logged via Boardy.ai). Tommaso followed up Sep 1 sharing Shared Studios' own sales overview deck and a short video, and said he'd shared getgtm with a colleague and would circle back. Rajiv acknowledged same day and is waiting to hear their thoughts."
+  })) added++;
 
   // Update existing prospects when their Gmail thread has moved since we last checked.
   // Only touches status/nextStep/notes - never overwrites name/company/email/dateContacted/source,
@@ -607,8 +614,13 @@ function refreshProspectsFromGmail() {
   })) updated++;
   if (updateIfExists("QNu Labs", {
     status: "Follow-up Sent",
-    nextStep: "Awaiting response to specific opportunities/engagement models sent Aug 25",
-    notes: "Howard introduced Vinay Aug 21 via Heddl's partner channel, with a prepared growth plan deck attached. Vinay followed up directly Aug 25 with mapped new-market entry opportunities and engagement models covering outbound, inbound, and AEO."
+    nextStep: "Vinay looped in Rajiv (Founder) and Swapnesh (Head of CS/Delivery) Aug 29 proposing a scoping call - still awaiting Hermaan's response",
+    notes: "Howard introduced Vinay Aug 21 via Heddl's partner channel, with a prepared growth plan deck attached. Vinay followed up directly Aug 25 with mapped new-market entry opportunities and engagement models covering outbound, inbound, and AEO. No reply yet, so Vinay followed up again Aug 29 introducing Rajiv and Swapnesh and proposing a scoping call with the team."
+  })) updated++;
+  if (updateIfExists("Emerald Art Studio", {
+    status: "Stalled",
+    nextStep: "Two more follow-ups sent (Aug 24, Aug 29) with no response - Rajiv reached out Aug 29 to referral source Pinkesh (Delightloop) to check if Nirav is still interested",
+    notes: "GTM plan shared May 26 targeting HR/People leaders in the Bay Area. Setup requirements and $600/mo + $100/meeting pricing discussed Jun 5. Full proposal doc sent Jul 21. Went quiet for a month. Vinay re-engaged Aug 24 asking to connect, then followed up again Aug 29 proposing a scoping discussion - still no response from Nirav. Rajiv forwarded the thread to Pinkesh (original referral source at Delightloop) same day to check whether Nirav is still interested."
   })) updated++;
   if (updateIfExists("Inspiration Digital", {
     status: "Closed Lost",
