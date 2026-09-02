@@ -2374,9 +2374,10 @@ function renderHowItWorks() {
     <h2>Access model</h2>
     <p>Two ways in:</p>
     <ul>
-      <li><strong>GetGTM team</strong> - sign in with a team email/password (Firebase Authentication). Full read/write access to everything.</li>
-      <li><strong>Clients</strong> - get a direct link (<code>?client=CLIENT_ID</code>). No login required. They see Overview, Timeline, Delivery, and Outcomes for their own engagement - never Offers, Intake, Proposal, Prospects, or Reporting.</li>
+      <li><strong>GetGTM team</strong> - sign in with a team email/password (Firebase Authentication). Full read/write access to everything. Clicking a client from the Clients list lands on whatever tab matches their current stage (Client Intake, Proposal, or Delivery) rather than always opening the Offers presentation - that's now reserved for brand-new engagements with no stage history yet.</li>
+      <li><strong>Clients</strong> - get a direct link (<code>?client=CLIENT_ID</code>). No login required. They see a purpose-built set of tabs - Outcomes, Campaigns, Responses, and Calling - never Offers, Intake, Proposal, Overview, Timeline, Delivery, Prospects, or Reporting.</li>
     </ul>
+    <p><strong>Preview as client</strong> - any signed-in team member can click this button on a client's page to see byte-for-byte what that client sees (same tabs, same read-only fields), with a clear "Exit preview" back to the normal team view. Useful for checking a share link actually looks right before sending it.</p>
 
     <h2>The pipeline: New Engagements to Clients</h2>
     <p>Every engagement starts in <strong>New Engagements</strong> and only moves to <strong>Clients</strong> once its proposal is approved. This split keeps signed, delivering accounts separate from active sales conversations.</p>
@@ -2400,14 +2401,23 @@ function renderHowItWorks() {
     </ul>
     <p>Sections 06-10 of every proposal (Commercial Terms, KPI Verification, Obligations, Terms & Ways of Working, Acceptance) are a fixed template - identical structure and legal language for every client, with only names, prices, and dates substituted. This keeps every proposal legally consistent.</p>
 
+    <h2>Pipeline Phase badge</h2>
+    <p>Every client page shows a small Presales / Sales / Post-sales CS badge next to the client name (team view only). It's entirely computed - from the stage tracker, the proposal's stage, and, once signed, the existing Account Status field - so there's nothing separate to update by hand and it can never fall out of sync with reality:</p>
+    <ul>
+      <li><strong>Presales</strong> - current stage is Qualification or Scoping.</li>
+      <li><strong>Sales</strong> - current stage is Proposal or Commercial Handover; the badge shows the specific proposal stage (Draft / Scope Review / Final Sent).</li>
+      <li><strong>Post-sales CS</strong> - proposal approved. Shows "Onboarding & Launch (<em>stage</em>)" while delivery is still running, then switches to Account Status (Onboarding/Active/At Risk/Paused/Renewed/Churned) once fully delivered.</li>
+    </ul>
+    <p>The New Engagements table also shows a Phase column (Presales/Sales) so you can tell at a glance which prospects are still being qualified vs. already in proposal, without opening each one.</p>
+
     <h2>Timeline - auto-tracked, always visible</h2>
     <p>A horizontal progress bar sits above every tab (except the full-screen Offers deck), showing all 11 delivery stages from Qualification through First Review. It updates itself: package selection completes Qualification, proposal approval completes Scoping/Proposal, delivery checklist items completing (SOW signed, kickoff done, campaign launched) push the corresponding stage forward. Every stage is still manually overridable from the Timeline tab if reality differs from the auto-read.</p>
 
     <h2>Delivery</h2>
     <p>Unlocks once the proposal is approved. A 16-item onboarding-through-launch checklist (SOW signed, invoice sent, Drive/Slack setup, LinkedIn/Sales Nav connected, domains warmed, kickoff held, ICP fitment, TAM built, messaging approved, campaign QA'd, launched, MSP signed off) with status, date, owner, and notes per item - plus a running log of weekly updates.</p>
 
-    <h2>Outcomes</h2>
-    <p>Weekly metric logging against the M1/M2/M3 goals set in Overview.</p>
+    <h2>Outcomes (team view)</h2>
+    <p>Weekly metric logging against the M1/M2/M3 goals set in Overview - a manual, freeform log for the team's own tracking. Not the same as the client-facing Outcomes tab (see "What clients see" below), which is a different, auto-computed view of the same underlying goals.</p>
 
     <h2>Prospects</h2>
     <p>A separate pipeline, tracked independently of signed clients - pulled from Gmail. Threads where Rajiv led, looped Vinay in, Sean led, or Vinay/Sean reached out directly. Each row: date contacted, status (New through Converted/Stalled/Not a Fit), a manual "potential $/mo" field, next step, and source.</p>
@@ -2440,6 +2450,16 @@ function renderHowItWorks() {
       <li><strong>Report + PDF</strong> - calls-made grouped by day/week/month, plus per-status counts, exportable as a PDF alongside the full leads list.</li>
     </ul>
 
+    <h2>What clients see</h2>
+    <p>A client's share link opens four tabs, in this order:</p>
+    <ul>
+      <li><strong>Outcomes</strong> - what was promised each month vs. what was actually achieved, with a computed % achievement, pulled straight from the same goals/goalLines data the team sets in Overview. Read-only; handles multi-line contracts (each line shown separately plus a Combined rollup).</li>
+      <li><strong>Campaigns</strong> - the same stats and table as the team's Campaigns tab, filtered to this client only. Read-only.</li>
+      <li><strong>Responses</strong> - the same Reporting Snapshot pivot and response list as the team's Responses tab, filtered to this client. Clients can edit <strong>Client Status</strong> and <strong>Confirmed</strong> on their own responses (same field logic the team uses, including the PIN-lock once something's confirmed) - everything else (Campaign, Heddl Status, Notes, Contact, Company) is read-only.</li>
+      <li><strong>Calling</strong> - same as described above.</li>
+    </ul>
+    <p>Overview, Timeline, Delivery, Offers, Client Intake, and Proposal are internal-process tabs and never shown to clients.</p>
+
     <h2>Reporting (financial)</h2>
     <p>The financial rollup, built from the actual signed GTM Services Agreement for each client (pulled from Drive, not estimated) wherever a contract exists:</p>
     <ul>
@@ -2454,7 +2474,7 @@ function renderHowItWorks() {
     <p>Approving a proposal fires a Slack message to #notifications and an email (via EmailJS) to the configured recipient list. Both run directly from the browser - no backend required. More triggers (delivery item blocked, prospect stalled, account churned) can be added the same way whenever needed.</p>
 
     <h2>Data & sync</h2>
-    <p>Firebase Realtime Database keeps GetGTM's browser and every client's browser looking at the same data, live. Client engagement records are readable and writable by anyone with that client's link (this is what lets clients see live progress and check off their side of the Delivery checklist). Prospects and Reporting data require a signed-in GetGTM team account to read or write at all - a client link never exposes pipeline or financial data.</p>
+    <p>Firebase Realtime Database keeps GetGTM's browser and every client's browser looking at the same data, live. Client engagement records, responses, campaigns, and calling leads are all readable and writable by anyone with that client's link - this is what lets clients see live progress, view their own campaign and response data, and update Client Status/Confirmed on the client-facing Responses tab. Prospects and financial Reporting data require a signed-in GetGTM team account to read or write at all - a client link never exposes pipeline or financial data.</p>
     <p>If Firebase is ever unreachable, the tool falls back to the browser's local storage automatically - nothing breaks, it just stops syncing across devices until reconnected.</p>
   `;
 }
@@ -2466,6 +2486,46 @@ function renderReleaseNotes() {
 
     <div class="rel-entry">
       <div class="rel-tag">Latest</div>
+      <h3>Pipeline Phase badge: Presales / Sales / Post-sales CS</h3>
+      <p>Added a computed phase badge next to the client name on every client page (team view only), plus a Phase column on the New Engagements table. Entirely derived from data already being updated - the stage tracker, the proposal's stage, and (once signed) the existing Account Status field - so it advances automatically with no separate field to maintain and can never say something different from the underlying data.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Clicking a client opens their current stage, not the Offers presentation</h3>
+      <p>Opening a client from the Clients list used to always open the full-screen Offers presentation - a prospect-facing pitch deck, not useful once you already know the client. It now lands on whichever tab matches where the engagement actually is: Client Intake during Qualification/Scoping, Proposal during Proposal/Commercial Handover, Delivery once signed. Creating a brand-new engagement still opens Offers first, since that's the right thing to show a fresh prospect with no stage history yet.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Fix: client Campaigns/Responses tabs were empty for real clients</h3>
+      <p>The new client-facing Campaigns and Responses tabs relied on data (<code>responses</code>, <code>campaigns</code>) that was only ever synced to the browser after signing in as team - an anonymous client's browser never even asked for it, regardless of what the Firebase rules allowed. Both now sync for everyone, the same way client records and calling leads already did. Firebase rules for <code>responses</code> and <code>campaigns</code> also opened up to match (read/write for anyone with the link, same trust model as the rest of the client-facing data).</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Client view rebuilt: Outcomes, Campaigns, Responses, Calling</h3>
+      <p>Replaced the client-facing Overview/Timeline/Delivery tabs with four new ones, in this order: Outcomes (target vs. achieved by month, auto-computed from the same goals data the team sets), Campaigns (read-only stats, filtered to that client), Responses (Client Status/Confirmed editable, everything else read-only), and Calling (unchanged). Internal-process tabs (Offers, Intake, Proposal, Overview, Timeline, Delivery) are no longer part of the client experience at all.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Preview as client</h3>
+      <p>The inert "Client view" label in a client's topbar is now a real button. Any signed-in team member can click <strong>👁 Preview as client</strong> to see byte-for-byte what that client's share link shows - same tabs, same read-only fields - with a clear <strong>← Exit preview</strong> back to the normal team view. A real anonymous client (never signed in) still just sees the plain "Live - synced" badge, no exit button, since they have nothing to exit to.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Fix: signed-in team sessions could get stuck on the login screen</h3>
+      <p>Root-caused a second, more general version of the earlier share-link login bug: a team member with a persisted Firebase session (the normal way returning users stay signed in) could load a fresh tab, have the very first render lock onto "login" before the session finished resolving, and then never get moved off it once the session actually came back - even though the app had correctly recognized them as signed in underneath. Fixed by transitioning to the dashboard whenever a persisted session resolves and the screen is still stuck on login, mirroring what the manual sign-in button already did. Traced live via a browser console dump showing <code>isAuth: true</code> with <code>uiView: "login"</code> - confirmed the exact race with a dedicated regression test before shipping.</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Prospects: Gmail refresh picked up new activity</h3>
+      <p>Added a new prospect (Tommaso Trionfi, Shared Studios) found via a fresh Gmail sweep, and updated two existing ones with newer thread activity - Nirav Shah/Emerald Art Studio (two more follow-ups, plus outreach to the original referral source to check continued interest) and Hermaan Kohli/QNu Labs (Rajiv and Swapnesh looped in for a scoping call).</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Fix (properly this time): PDF export blank-space bug</h3>
+      <p>The previous attempt at this fix (isolating PDF content in a separate iframe document) introduced a different bug: handing html2canvas a DOM node from another document broke its internal size measurement, producing a captured canvas roughly 7x taller than the real content and dozens of mostly-blank pages. Replaced with a same-document approach instead - temporarily hide every other element on the page during capture, so the PDF content is the only thing there and its position is naturally (0,0), nothing to compensate for. Verified via a real headless-Chromium harness (not just simulated) at up to 32,000px of artificially inflated surrounding page content, across all five PDF export types.</p>
+    </div>
+
+    <div class="rel-entry">
       <h3>Fix: Share links could get stuck on login screen</h3>
       <p>Found and fixed a race condition where a fresh visit to a client's share link could land on the login screen and stay there, even though the app had internally routed correctly to the client view. The cause: when Firebase first delivers client data, a one-time background "seed known accounts" save sets a safety flag (used elsewhere to avoid flicker during live edits) - and that flag was incorrectly suppressing the very screen update that would show the client view. That specific update is now unconditional. Added a dedicated regression test that reproduces the exact race and confirms the fix.</p>
     </div>
