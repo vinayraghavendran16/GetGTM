@@ -2669,14 +2669,17 @@ function renderNewEngagementsView(clients) {
           ${clients.length === 0 ? `<div style="padding:20px;text-align:center;color:var(--text-secondary)">Nothing in the pipeline. <button class="btn" style="margin-top:12px" data-action="new-client">Create one</button></div>` : `
             <table>
               <thead><tr>
-                <th>Prospect</th><th>Path</th><th>Proposal stage</th><th></th>
+                <th>Prospect</th><th>Phase</th><th>Path</th><th>Proposal stage</th><th></th>
               </tr></thead>
               <tbody>
                 ${clients.map(c => {
                   const stageLabel = { draft: "Draft", sent: "Scope Review", final: "Final Sent" }[c.proposal ? c.proposal.stage : "draft"] || "Draft";
+                  const phaseInfo = computePipelinePhase(c);
+                  const phaseColor = phaseInfo.phase === "Presales" ? "#64748b" : "#b45309";
                   const url = window.location.origin + window.location.pathname + "?client=" + c.id;
                   return `<tr>
                     <td><strong onclick="window.openClient('${c.id}')" style="cursor:pointer">${escapeHTML(c.name)}</strong></td>
+                    <td><span class="badge" style="background:${phaseColor}">${escapeHTML(phaseInfo.phase)}</span></td>
                     <td><span class="badge pending">${PATHS[c.path].label}</span></td>
                     <td><span class="badge pending">${escapeHTML(stageLabel)}</span></td>
                     <td><div class="row-actions"><button class="btn ghost sm" onclick="navigator.clipboard.writeText('${escapeAttr(url)}');alert('Link copied!')">&#128279; Share</button><button class="btn ghost sm" data-action="delete-client" data-id="${c.id}" style="color:var(--danger)">&#128465; Delete</button></div></td>
@@ -3353,9 +3356,15 @@ function renderClient() {
         : '<div class="badge" style="background:#15803d">Live - synced</div>')
     : '<button class="btn ghost sm" data-action="preview-as-client">👁 Preview as client</button>';
 
+  const phaseInfo = computePipelinePhase(c);
+  const phaseColor = phaseInfo.phase === "Presales" ? "#64748b" : phaseInfo.phase === "Sales" ? "#b45309" : "#15803d";
+  const phaseBadgeHtml = isClientView ? "" :
+    '<span class="badge" style="background:' + phaseColor + ';margin-left:10px;font-size:11px" title="Computed from the stage tracker, proposal status, and account status - advances automatically as those move.">' +
+    escapeHTML(phaseInfo.phase) + ' · ' + escapeHTML(phaseInfo.stage) + '</span>';
+
   return `
     <div class="topbar">
-      <div class="brand"><div class="logo">GTM</div> <strong>${escapeHTML(c.name)}</strong></div>
+      <div class="brand"><div class="logo">GTM</div> <strong>${escapeHTML(c.name)}</strong>${phaseBadgeHtml}</div>
       <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
         <button class="btn ghost sm" data-action="open-docs">📖 Docs</button>
         ${badgeHtml}
@@ -5084,6 +5093,38 @@ function renderModal() {
   document.body.appendChild(div);
   const firstInput = div.querySelector("input");
   if (firstInput) firstInput.focus();
+}
+
+// Maps everything already being tracked (the stage tracker, proposal status, and post-signature
+// account status) into a single Presales -> Sales -> Post-sales CS framing. Deliberately has no
+// separate stored field: every input here is already something the team updates as part of normal
+// work (advancing a stage, approving a proposal, setting Account Status), so this can never drift out
+// of sync with reality the way a second, manually-maintained "phase" field could. "Auto-advancing"
+// falls out of that for free - move the underlying data forward and this recomputes correctly, with
+// no separate step to remember.
+function computePipelinePhase(c) {
+  var approved = c.proposal && c.proposal.stage === "approved";
+  if (!approved) {
+    var stages = c.stages || [];
+    var current = stages.find(function(s) { return s.status !== "Complete"; });
+    var name = current ? (current.stage || "").toLowerCase() : "";
+    if (name.indexOf("proposal") !== -1 || name.indexOf("commercial") !== -1) {
+      var stageLabel = { draft: "Proposal Draft", sent: "Scope Review", final: "Final Sent" }[c.proposal ? c.proposal.stage : "draft"] || "Proposal Sent";
+      return { phase: "Sales", stage: stageLabel };
+    }
+    return { phase: "Presales", stage: current ? current.stage : "Qualification" };
+  }
+  // Approved (signed) - post-sales CS. While the delivery stage tracker still has incomplete steps
+  // (Onboarding through First Review, whichever apply on this client's path), the engagement is still
+  // being stood up. Once that's all done, the ongoing relationship is represented by the existing,
+  // already-manually-managed Account Status field (Onboarding/Active/At Risk/Paused/Renewed/Churned) -
+  // reusing it here rather than inventing a second, parallel status that could say something different.
+  var delivStages = c.stages || [];
+  var delivCurrent = delivStages.find(function(s) { return s.status !== "Complete"; });
+  if (delivCurrent) {
+    return { phase: "Post-sales CS", stage: "Onboarding & Launch (" + delivCurrent.stage + ")" };
+  }
+  return { phase: "Post-sales CS", stage: c.accountStatus || "Active" };
 }
 
 // Picks which tab to land on when a team member opens a client from the Clients list, based on
