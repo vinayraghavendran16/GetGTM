@@ -25,17 +25,14 @@
       --info: #1d4ed8;
       --info-light: #dbeafe;
     }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --text-primary: #fafaf9;
-        --text-secondary: #a8a29e;
-        --text-muted: #78716c;
-        --border: #44423e;
-        --border-dark: #5a5551;
-        --surface-1: #1a1917;
-        --surface-2: #27251f;
-      }
-    }
+    /* Dark mode intentionally removed: the tool previously followed the visitor's OS/browser
+       color-scheme preference via prefers-color-scheme, which made it render dark for anyone with
+       system dark mode on - team, client, and (via the same shared CSS) the in-app Reporting tab
+       alike. Forced to light mode everywhere instead: the :root values above are already a complete
+       light palette (used consistently via var() throughout every card/table/button), and the
+       black-background presentation-deck elements (.ppt-dark, .ppt-fullscreen, .problem-table, the
+       topbar, etc.) were never tied to this toggle in the first place - they're an intentional fixed
+       dark "keynote" style for the Offers slides specifically, unaffected by this change. */
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--surface-1); color: var(--text-primary);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -183,7 +180,7 @@
     overflow: auto; }
   .ppt-dark { background: #111; color: #ccc; }
   .ppt-light { background: #fafaf9; color: #1c1917; }
-  @media (prefers-color-scheme: dark) { .ppt-light { background: #1e1e1c; color: #e5e5e3; } }
+  /* .ppt-light, .problem-right, .ppt-line-check dark-mode overrides removed - see note above. */
   @media (max-width: 768px) {
     .ppt-slide { grid-template-columns: 1fr; }
     .ppt-half { padding: 24px 20px; }
@@ -223,7 +220,7 @@
   @media (max-width: 900px) { .problem-center { max-width: 100%; border-left: none; border-right: none;
     border-top: 2px solid #b91c1c; border-bottom: 2px solid #b91c1c; } }
   .problem-right { background: #fafaf9; color: #1c1917; }
-  @media (prefers-color-scheme: dark) { .problem-right { background: #1e1e1c; color: #e5e5e3; } }
+
 
   .problem-col-stat { font-size: 15px; font-weight: 700; color: #ef4444; margin-top: 16px; }
   .problem-col-statsub { font-size: 12px; color: #777; margin-top: 4px; }
@@ -237,7 +234,7 @@
   .gap-desc { font-size: 11px; color: #888; line-height: 1.4; margin-top: 2px; }
 
   .ppt-line-check { color: #1c1917; }
-  @media (prefers-color-scheme: dark) { .ppt-line-check { color: #e5e5e3; } }
+
 
   .problem-table { padding: 0 48px 8px; background: #000; }
   .problem-table table { width: 100%; max-width: 640px; margin: 0 auto; border-collapse: collapse;
@@ -794,64 +791,15 @@ function seedCampaignsFromDrive() {
   return added;
 }
 
-function refreshResponsesFromDrive() {
-  if (!state.responses) state.responses = [];
-  var existingRefs = state.responses.map(function(r) { return r.screenshotRef; });
-
-  function addIfMissing(r) {
-    if (existingRefs.indexOf(r.screenshotRef) !== -1) return false;
-    state.responses.push(Object.assign({
-      id: "r_" + Math.random().toString(36).slice(2,10),
-      clientStatus: "", confirmed: false
-    }, r));
-    return true;
-  }
-
-  var added = 0;
-  var securotixReplies = [
-    { date: "2026-08-25", contact: "Yara Basager (Bupa Arabia)", screenshotRef: "Screenshot 2026-08-27 at 12.09.32 PM.png", screenshotUrl: "https://drive.google.com/file/d/1OC8gktwY3AkhYfZzfx2hkgdGE3utEXBB/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "1Kosmos campaign. Explained her GRC team owns governance/policy, actual IAM implementation sits with IAM/IT teams - useful redirect toward the right contact." },
-    { date: "2026-03-26", contact: "Yara A. Al Qahtani (alrajhi bank)", screenshotRef: "Screenshot 2026-08-27 at 12.09.21 PM.png", screenshotUrl: "https://drive.google.com/file/d/1tIvyq93iO4yBippPBKV2ts8mqqx2_9eK/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "1Kosmos campaign. Reply is minimal (\"Hi, Adhnaan\") - real engagement but thin content, worth a follow-up to develop." },
-    { date: "2026-08-25", contact: "Muhammad Yahya (Riyad Bank)", screenshotRef: "Screenshot 2026-08-27 at 12.09.10 PM.png", screenshotUrl: "https://drive.google.com/file/d/1swbnJTrlZd_e_AjysHMoSsR68K1vvFtE/view?usp=drivesdk", heddlStatus: "No Fit", notes: "1Kosmos campaign. \"We don't work on that\" then \"not sure if I'm the right person\" - declined, no referral given." },
-    { date: "2026-08-26", contact: "Raad Algaead (Al Rajhi Takaful)", screenshotRef: "Screenshot 2026-08-27 at 12.09.01 PM.png", screenshotUrl: "https://drive.google.com/file/d/14pcMd5wiOPb5leMAuX-YAva91U2X_tdR/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "1Kosmos campaign. Confirmed \"Yes, part of my work is to implement this controls\" - directly relevant owner." },
-    { date: "2026-08-21", contact: "Mohamed Abd El-Wahab (Cisco)", screenshotRef: "Screenshot 2026-08-27 at 12.08.52 PM.png", screenshotUrl: "https://drive.google.com/file/d/1AC0rdLN_fDdKGe2nCI9AstaGaOSBdZjo/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "Tufin campaign. Detailed answer on their hybrid automation approach to security policy changes - substantive engagement." },
-    { date: "2026-08-21", contact: "Chunyu Qu (ICBC)", screenshotRef: "Screenshot 2026-08-27 at 12.08.43 PM.png", screenshotUrl: "https://drive.google.com/file/d/1QFyoCkH5lf-DWHxy79uFRIyLEovRVvap/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "Tufin campaign. Multi-turn technical exchange, rep sent a meeting ask (\"brief knowledge-sharing session\") - awaiting confirmation, not yet booked." },
-    { date: "2026-08-18", contact: "Dr. Anil Tiwari (Ooredoo Qatar)", screenshotRef: "Screenshot 2026-08-27 at 12.08.31 PM.png", screenshotUrl: "https://drive.google.com/file/d/1TKrpxBMkKgkIHZ5OIYdqFgbnSthHuOfY/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "Tufin campaign. Long, detailed expert answer on firewall rule cleanup best practices - highly engaged." },
-    { date: "2026-08-15", contact: "Abdullah Alzahrani (Bupa Arabia)", screenshotRef: "Screenshot 2026-08-27 at 12.08.17 PM.png", screenshotUrl: "https://drive.google.com/file/d/1C-i8cfMU2FPBpd5ANKfdWdzQ8aMicnCc/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "Tufin campaign. Reciprocal engagement (\"Where are you from?\") - minimal but genuine back-and-forth." },
-    { date: "2026-08-12", contact: "Mohanned Mudathir (Huawei)", screenshotRef: "Screenshot 2026-08-27 at 12.08.06 PM.png", screenshotUrl: "https://drive.google.com/file/d/1uqfLVFIE_oIIt0MUYDXIZQoOOfWATlct/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "Tufin campaign. Asked rep to \"describe more details\" about the query - engaged, inviting more info." },
-    { date: "2026-08-11", contact: "Mahammad Imran Shiledar (DXC Technology)", screenshotRef: "Screenshot 2026-08-27 at 12.07.55 PM.png", screenshotUrl: "https://drive.google.com/file/d/1pMj2egSq4gMVDG4JzQRCxC2iLaAU_0t1/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "Tufin campaign. \"Fully automated, using several tools\" - substantive, relevant answer." },
-    { date: "2026-08-09", contact: "Abhinav Kumar Shrivastava (NMC Healthcare)", screenshotRef: "Screenshot 2026-08-27 at 12.07.46 PM.png", heddlStatus: "Positive Reply", notes: "Tufin senior profile campaign. \"With a different team, but may I ask the reason for this question?\" - not the owner but curious, engaged." },
-    { date: "2026-08-14", contact: "Surohith Surendran (First Abu Dhabi Bank)", screenshotRef: "Screenshot 2026-08-27 at 12.07.36 PM.png", heddlStatus: "No Fit", notes: "Tufin/AlgoSec campaign. \"Not working with the Firewall team anymore\" - no longer the right contact." },
-    { date: "2026-08-07", contact: "Shakeer Ahmed Mohammad (Saudi Investment Bank)", screenshotRef: "Screenshot 2026-08-27 at 12.07.23 PM.png", heddlStatus: "Positive Reply", notes: "Tufin/AlgoSec campaign. Detailed answer on firewall change pain points (NAT/routing complexity) - engaged, relevant." },
-    { date: "2026-08-18", contact: "Khalinder Attar (Emirates NBD)", screenshotRef: "Screenshot 2026-08-27 at 12.07.12 PM.png", heddlStatus: "Not Interested", notes: "AlgoSec Displacement (Tufin) campaign. Flat \"No\" to the outreach." },
-    { date: "2026-08-15", contact: "Maryam Alshehyari (First Abu Dhabi Bank)", screenshotRef: "Screenshot 2026-08-27 at 12.07.05 PM.png", heddlStatus: "Not Interested", notes: "AlgoSec Displacement (Tufin) campaign. \"Not currently looking for solutions\" - polite decline." },
-    { date: "2026-08-11", contact: "Fadel Salmi (Al Rajhi Bank)", screenshotRef: "Screenshot 2026-08-27 at 12.06.55 PM.png", heddlStatus: "Positive Reply", notes: "AlgoSec Displacement (Tufin) campaign. \"Not directly within my scope\" but asked for a referral to the right team - real redirect value." },
-    { date: "2026-08-10", contact: "Ganesha Sannap (Emirates)", screenshotRef: "Screenshot 2026-08-27 at 12.06.48 PM.png", heddlStatus: "Not Interested", notes: "AlgoSec Displacement (Tufin) campaign. \"No thanks, we have our own solution.\"" },
-    { date: "2026-07-15", contact: "Mohammed Abrar (Alpha Data)", screenshotRef: "Screenshot 2026-08-27 at 12.05.44 PM.png", screenshotUrl: "https://drive.google.com/file/d/1a1nLjvYFoAtkCWo5GBCw6LNUUJs_1shj/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "FireMon Expansion (Tufin) campaign. Asked clarifying questions - \"You do only security consulting\" / \"Or complete fit gap assessment\" - genuinely curious about scope." },
-    { date: "2026-08-28", contact: "Hassan Almohsen (Mirai, a Scopely company)", screenshotRef: "Screenshot 2026-08-29 at 5.28.42 PM.png", screenshotUrl: "https://drive.google.com/file/d/1l1UAgt_EOH2PCSRsiu-k5YN68S3g4xK2/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "1Kosmos-SAMA CSF campaign. Reply is minimal (\"I see\") in response to outreach about identity/authentication assurance - real acknowledgment but very thin, needs follow-up to develop." },
-    { date: "2026-08-05", contact: "Ramesh Vempali (Paramount Computer Systems)", screenshotRef: "Screenshot 2026-08-29 at 12.12.45 AM.png", screenshotUrl: "https://drive.google.com/file/d/1I8sZxeqoYsarBJ7fq0Dsw5O5JaBQD2Ym/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "AlgoSec Displacement (Tufin) campaign. \"Sure, thanks\" - agreed to receive the NCA ECC firewall audit checklist, real engagement." },
-    { date: "2026-07-26", contact: "Alaa Madani (Public Investment Fund)", screenshotRef: "Screenshot 2026-08-29 at 12.12.19 AM.png", screenshotUrl: "https://drive.google.com/file/d/1YcQ_A4XApEw2cr_whMjwbNFk0wsgpvOM/view?usp=drivesdk", heddlStatus: "Not Interested", notes: "FireMon Expansion (Tufin) campaign. \"Thanks for sharing but I am not interested\" - clear decline." },
-    { date: "2026-08-18", contact: "Essam Jabri (SDAIA)", screenshotRef: "Screenshot 2026-08-29 at 12.11.57 AM.png", screenshotUrl: "https://drive.google.com/file/d/1923zIICcFT-KIKujr_-0gXRVC3cKSq0q/view?usp=drivesdk", heddlStatus: "Not Interested", notes: "FireMon Expansion (Tufin) campaign. \"I'm not interested, and don't contact me again\" - emphatic decline, exclude from future outreach." },
-    { date: "2026-07-17", contact: "Prasanth Prasad (Spire Solutions)", screenshotRef: "Screenshot 2026-08-29 at 12.11.30 AM.png", screenshotUrl: "https://drive.google.com/file/d/1I_8YWOLr3Hr3BnmwLVu3ngJkVlrqmGye/view?usp=drivesdk", heddlStatus: "Positive Reply", notes: "AlgoSec Displacement (Tufin) campaign. \"I'd love a copy\" - directly requested the rulebase-reduction case study, strong engagement." },
-  ];
-  securotixReplies.forEach(function(r) {
-    if (addIfMissing(Object.assign({ client: "Securotix" }, r))) { added++; return; }
-    // Already exists (matched by screenshotRef) - backfill screenshotUrl if we now have one and it's missing.
-    if (r.screenshotUrl) {
-      var existing = state.responses.find(function(x) { return x.screenshotRef === r.screenshotRef; });
-      if (existing && !existing.screenshotUrl) { existing.screenshotUrl = r.screenshotUrl; added++; }
-    }
-  });
-
-  return added;
-}
-
 var isClientView = false;
 // The only ui.tab values valid while isClientView is true. Defined once here so the three places that
 // need to enforce it (URL-based routing, the manual "Preview as client" toggle, and the tab-click
 // handler itself) can never drift out of sync with each other.
 var CLIENT_TAB_IDS = ["client-outcomes", "client-campaigns", "client-responses", "calling"];
-function roAttr() { return isClientView ? " disabled" : ""; }
-function roStyle() { return isClientView ? " style=\"opacity:.7;pointer-events:none\"" : ""; }
+// Note: read-only enforcement for client view happens by hiding whole tabs (CLIENT_TAB_IDS) and by
+// early-returning inside action handlers when isClientView is true - not by disabling individual
+// fields. (roAttr/roStyle helpers that would have done the latter were defined here but never
+// actually used anywhere - removed.)
 var clientViewId = null;
 
 // ===== FIREBASE CONFIG =====
@@ -1453,7 +1401,7 @@ function renderHtmlToPdf(html, pdfOptions) {
   });
 }
 
-function generateCallingPDF(clientId) {
+function buildCallingReportHTML(clientId) {
   var leads = (state.callingLeads && state.callingLeads[clientId]) || [];
   var c = (state.clients || {})[clientId];
   var clientName = (c && c.name) || "Client";
@@ -1524,6 +1472,13 @@ function generateCallingPDF(clientId) {
         '</tr></thead><tbody>' + leadRows + '</tbody></table>') +
     '</div>';
 
+  return html;
+}
+
+function generateCallingPDF(clientId) {
+  var c = (state.clients || {})[clientId];
+  var clientName = (c && c.name) || "Client";
+  var html = buildCallingReportHTML(clientId);
   var opt = {
     margin: 10,
     filename: 'Calling_' + clientName.replace(/[^a-zA-Z0-9]+/g, '_') + '_' + new Date().toISOString().slice(0,10) + '.pdf',
@@ -1538,6 +1493,70 @@ function generateCallingPDF(clientId) {
 // ============================================================================
 // END CALLING FEATURE
 // ============================================================================
+
+// Client-facing "download everything in one file" button. Reuses the exact same HTML-building
+// functions the three individual PDF buttons use (buildCampaignsReportHTML, buildResponsesReportHTML,
+// buildCallingReportHTML) - same source of truth, so the combined report can never show different
+// numbers than downloading each one separately would. Rather than merging three already-rendered PDF
+// files with a separate library (new dependency, another thing that could reintroduce the exact
+// blank-page/mis-measurement bugs already fixed once), this concatenates the three sections into one
+// HTML document with page breaks between them and runs the whole thing through the SAME proven
+// same-document hide-and-capture pipeline as every other PDF here, in a single pass.
+function generateClientMasterReportPDF(clientId) {
+  var c = (state.clients || {})[clientId];
+  if (!c) return;
+  var clientName = c.name;
+
+  var prevCampaignFilter = ui.campaignFilters;
+  var prevResponseFilter = ui.responseFilters;
+  ui.campaignFilters = { client: clientName };
+  ui.responseFilters = { client: clientName, heddlStatus: "", clientStatus: "", confirmed: "" };
+
+  var campaignsHtml, responsesHtml, callingHtml;
+  try {
+    campaignsHtml = buildCampaignsReportHTML();
+    responsesHtml = buildResponsesReportHTML();
+    callingHtml = buildCallingReportHTML(clientId);
+  } finally {
+    // Restore regardless of whether the builds above throw, so a failed master report never leaves
+    // the team dashboard's own filters silently changed underneath the user.
+    ui.campaignFilters = prevCampaignFilter;
+    ui.responseFilters = prevResponseFilter;
+  }
+
+  var accentColor = "#7c3aed";
+  var generatedStamp = 'GetGTM Report generated on ' + new Date().toLocaleDateString("en-US", {year:"numeric",month:"long",day:"numeric"}) + ' at ' + new Date().toLocaleTimeString("en-US", {hour:"2-digit",minute:"2-digit"});
+  var logoHtml = CLIENT_LOGOS[clientName] ? '<img src="' + CLIENT_LOGOS[clientName] + '" style="height:48px;margin-bottom:14px">' : '';
+
+  var coverHtml = '<div style="font-family:Helvetica,Arial,sans-serif;padding:40px;color:#111">' +
+    logoHtml +
+    '<h1 style="font-size:26px;margin:0 0 8px;color:' + accentColor + '">Master Report</h1>' +
+    '<div style="font-size:15px;color:#334155;margin-bottom:4px">' + escapeHTML(clientName) + '</div>' +
+    '<div style="font-size:11px;color:#94a3b8;margin-bottom:28px">' + escapeHTML(generatedStamp) + '</div>' +
+    '<div style="font-size:12px;color:#475569;line-height:1.8">This report combines three sections, each identical to downloading it individually:' +
+    '<ol style="margin-top:8px"><li>Campaigns</li><li>Responses</li><li>Calling</li></ol></div>' +
+    '</div>';
+
+  // Wrap each section in its own page-break div rather than trying to pattern-match and modify each
+  // builder's own opening tag (they don't all use identical inline styles - e.g. the Responses builder
+  // omits the padding the other two include on their outer div). An extra wrapper div with no padding
+  // or margin of its own has no visual effect beyond the page break itself.
+  function onOwnPage(html) {
+    return '<div style="page-break-before:always">' + html + '</div>';
+  }
+
+  var combinedHtml = coverHtml + onOwnPage(campaignsHtml) + onOwnPage(responsesHtml) + onOwnPage(callingHtml);
+
+  var opt = {
+    margin: 10,
+    filename: 'Master_Report_' + clientName.replace(/[^a-zA-Z0-9]+/g, '_') + '_' + new Date().toISOString().slice(0,10) + '.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+    pagebreak: { mode: ['css', 'legacy'] }
+  };
+  renderHtmlToPdf(combinedHtml, opt);
+}
 
 function initFirebase() {
   try {
@@ -3427,6 +3446,7 @@ function renderClient() {
       <div class="brand"><div class="logo">GTM</div> <strong>${escapeHTML(c.name)}</strong>${phaseBadgeHtml}</div>
       <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
         <button class="btn ghost sm" data-action="open-docs">📖 Docs</button>
+        ${isClientView ? '<button class="btn ghost sm" data-action="client-export-master-report" style="color:var(--brand)">⬇ Download Master Report</button>' : ''}
         ${badgeHtml}
       </div>
     </div>
@@ -4415,7 +4435,10 @@ function buildProposalHTML(c, isForPDF) {
   return html;
 }
 
-function generateCampaignsPDF() {
+// Builds the Campaigns report HTML, filtered to whatever ui.campaignFilters currently says. Returns
+// the HTML string only - no PDF triggering here - so both the standalone Campaigns PDF button and the
+// combined client Master Report can share this one source of truth for that section's content.
+function buildCampaignsReportHTML() {
   var allCampaigns = (state.campaigns || []).slice().sort((a,b) => (b.createdDate||"").localeCompare(a.createdDate||""));
   var f = ui.campaignFilters || { client: "" };
   var campaigns = allCampaigns.filter(function(c) { return !f.client || c.client === f.client; });
@@ -4513,6 +4536,12 @@ function generateCampaignsPDF() {
     referencesPageHtml +
     '</div>';
 
+  return html;
+}
+
+function generateCampaignsPDF() {
+  var html = buildCampaignsReportHTML();
+  var f = ui.campaignFilters || { client: "" };
   var filenameSuffix = f.client ? f.client.replace(/[^a-zA-Z0-9]+/g, '_') : 'All';
   var opt = {
     margin: 10,
@@ -4525,7 +4554,7 @@ function generateCampaignsPDF() {
   renderHtmlToPdf(html, opt);
 }
 
-function generateResponsesPDF() {
+function buildResponsesReportHTML() {
   var allResponses = (state.responses || []).slice().sort((a,b) => (b.date||"").localeCompare(a.date||""));
   var f = ui.responseFilters || { client: "", heddlStatus: "", clientStatus: "", confirmed: "" };
   var responses = allResponses.filter(function(r) {
@@ -4700,6 +4729,12 @@ function generateResponsesPDF() {
     refListHtml +
     '</div>';
 
+  return html;
+}
+
+function generateResponsesPDF() {
+  var html = buildResponsesReportHTML();
+  var f = ui.responseFilters || { client: "", heddlStatus: "", clientStatus: "", confirmed: "" };
   var filenameSuffix = f.client ? f.client.replace(/[^a-zA-Z0-9]+/g, '_') : 'All';
   var opt = {
     margin: 10,
@@ -5367,6 +5402,9 @@ function attachHandlers() {
       }
       else if (action === "calling-import") {
         await importCallingLeadsFromSheet(el.dataset.callingClient);
+      }
+      else if (action === "client-export-master-report") {
+        generateClientMasterReportPDF(ui.clientId);
       }
       else if (action === "client-export-campaigns-pdf") {
         // Temporarily scope the shared campaigns-filter state to this client so the existing
