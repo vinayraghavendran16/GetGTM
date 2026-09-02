@@ -5086,8 +5086,39 @@ function renderModal() {
   if (firstInput) firstInput.focus();
 }
 
+// Picks which tab to land on when a team member opens a client from the Clients list, based on
+// where that engagement actually is right now - instead of always opening the full-screen Offers
+// presentation (which is a prospect-facing pitch deck, not useful once you already know the client
+// and just want to see their status). Maps the current (first non-complete) stage's name to the tab
+// that covers that phase of work. Stage names vary slightly across the three delivery paths (7-day
+// sprint / 14-day buildout / niche GTM - see PATHS), so this matches on keywords rather than exact
+// stage strings, which is robust across all three.
+function defaultTabForClient(c) {
+  var stages = c.stages || [];
+  var current = stages.find(function(s) { return s.status !== "Complete"; });
+  if (!current) return c.proposal && c.proposal.stage === "approved" ? "delivery" : "overview";
+  var name = (current.stage || "").toLowerCase();
+  if (name.indexOf("qualification") !== -1 || (name.indexOf("scoping") !== -1 && name.indexOf("proposal") === -1 && name.indexOf("commercial") === -1)) {
+    return "intake";
+  }
+  if (name.indexOf("proposal") !== -1 || name.indexOf("commercial") !== -1) {
+    return "proposal";
+  }
+  // Everything else (Onboarding, Infrastructure, Connecting Accounts, ICP Fitment, TAM & List,
+  // Target List Research, GTM Play Design, Deep Discovery, Messaging, Campaign Build, QA, Launch,
+  // First Review) is delivery-phase work.
+  if (c.proposal && c.proposal.stage === "approved") return "delivery";
+  return "overview";
+}
+
 function attachHandlers() {
-  window.openClient = (id) => { ui.view = "client"; ui.clientId = id; ui.tab = "offers"; ui.offerPage = 0; render(); };
+  window.openClient = (id) => {
+    ui.view = "client"; ui.clientId = id;
+    var c = state.clients[id];
+    ui.tab = c ? defaultTabForClient(c) : "overview";
+    ui.offerPage = 0;
+    render();
+  };
 
   const doLogin = () => {
     const el = document.getElementById("pw");
