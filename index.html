@@ -74,6 +74,14 @@
     .btn.ghost { background: transparent; color: var(--text-primary); }
     .btn.ghost:hover { background: var(--surface-1); }
     .btn.sm { padding: 5px 9px; font-size: 11px; }
+    /* The topbar is always black regardless of light/dark theme (see note above the removed
+       prefers-color-scheme block), but .btn.ghost/.btn.secondary color themselves via
+       var(--text-primary), which is theme-dependent. Before, that accidentally looked right only
+       because dark mode made --text-primary light; forcing light mode broke it, since --text-primary
+       is now dark text on the still-black topbar. Pin every button inside .topbar to white explicitly,
+       independent of the page theme, so this can't happen again if the palette changes later. */
+    .topbar .btn.ghost, .topbar .btn.secondary { color: #fff; }
+    .topbar .btn.ghost:hover, .topbar .btn.secondary:hover { background: rgba(255,255,255,0.12); }
 
     .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
       gap: 12px; margin-bottom: 20px; }
