@@ -599,6 +599,20 @@ function refreshProspectsFromGmail() {
     source: "Rajiv led, intro via Boardy.ai call the prior day",
     notes: "Tommaso (CEO/Co-founder of Shared Studios) and Rajiv had a call the day before (facilitated/logged via Boardy.ai). Tommaso followed up Sep 1 sharing Shared Studios' own sales overview deck and a short video, and said he'd shared getgtm with a colleague and would circle back. Rajiv acknowledged same day and is waiting to hear their thoughts."
   })) added++;
+  if (addIfMissing({
+    name: "Shiva", company: "Transact Bridge", email: "shiv@transactbridge.com",
+    dateContacted: "2026-08-25", status: "Follow-up Sent",
+    nextStep: "Awaiting Shiva's availability for a further scoping discussion, requested Aug 29",
+    source: "Vinay led",
+    notes: "Initial proposal sent Aug 25 after a call, outlining a signal-led pipeline engine focused on target companies. Vinay followed up Aug 29 asking to bring the team in for a further scoping discussion, offering to schedule the following week - still awaiting a reply."
+  })) added++;
+  if (addIfMissing({
+    name: "Vipin Johnson", company: "Vipin Johnson (company not yet identified)", email: "vipinjohnson685@gmail.com",
+    dateContacted: "2026-08-26", status: "Scheduling",
+    nextStep: "A call was being scheduled for webinar pre/post GTM motion services - confirm outcome and which company Vipin represents",
+    source: "Rajiv led (personal intro)",
+    notes: "Rajiv introduced Vipin Aug 26 for webinar pre/post GTM motion services and handed off to Vinay. Vipin used a personal Gmail address with no company mentioned in the thread - worth confirming who he represents. Some back-and-forth on scheduling (Vinay was at a hospital that day, pushed to evening) - unclear if the call actually happened."
+  })) added++;
 
   // Update existing prospects when their Gmail thread has moved since we last checked.
   // Only touches status/nextStep/notes - never overwrites name/company/email/dateContacted/source,
@@ -612,6 +626,21 @@ function refreshProspectsFromGmail() {
     return changed;
   }
 
+  if (updateIfExists("CLICK.BLUE", {
+    status: "Follow-up Sent",
+    nextStep: "Sent a fresh, more detailed outreach Sep 2 (direct to Alan, not just via Elizabeth) - awaiting reply",
+    notes: "Elizabeth introduced Alan Aug 25: trigger outreach from real-time buying signals, automate pipeline, build a steadier meeting calendar. Vinay replied same day asking about 2027 priorities with a calendar link - no response yet. Vinay sent a longer, more specific outreach Sep 2 referencing CLICK.BLUE's work helping UK founders and established businesses launch brands and digital products."
+  })) updated++;
+  if (updateIfExists("Shared Studios", {
+    status: "Warm - Call Requested",
+    nextStep: "Vinay replied warmly Sep 2 (loved the video) and asked to book a call - awaiting Tommaso's slot",
+    notes: "Tommaso (CEO/Co-founder) and Rajiv had a call Sep 1 (via Boardy.ai). Tommaso followed up sharing Shared Studios' own sales deck and a video, said he'd shared getgtm with a colleague. Rajiv acknowledged same day. Vinay then joined the thread Sep 2, said he loved the video, and asked to catch up soon with a calendar link - warmer signal than the prior 'awaiting internal discussion' state."
+  })) updated++;
+  if (updateIfExists("Rescribe (Scorg Technologies)", {
+    status: "Follow-up Sent",
+    nextStep: "Vinay introduced Swapnesh (CS Head) Aug 29 and proposed connecting next week - awaiting Sandeep's availability",
+    notes: "Call held Aug 21. Follow-up sent Aug 24 asking for current infra details and scheduling. Vinay followed up again Aug 29 introducing Swapnesh (Head of Customer Success) to lead the project, proposing to connect the following week."
+  })) updated++;
   if (updateIfExists("CognitivTrust", {
     status: "Converted",
     nextStep: "Kickoff completed Aug 25 - now tracked in the Delivery tab of the CognitivTrust engagement",
