@@ -601,10 +601,10 @@ function refreshProspectsFromGmail() {
   })) added++;
   if (addIfMissing({
     name: "Shiva", company: "Transact Bridge", email: "shiv@transactbridge.com",
-    dateContacted: "2026-08-25", lastActivity: "2026-08-29", status: "Follow-up Sent",
-    nextStep: "Awaiting Shiva's availability for a further scoping discussion, requested Aug 29",
+    dateContacted: "2026-08-25", lastActivity: "2026-09-07", status: "Follow-up Sent",
+    nextStep: "Vinay sent a second scoping-call follow-up Sep 7 (13:35) with a two-point agenda - realistically assess where GetGTM can help and scope ICP/Signal/tech-stack layers to decide next step (campaigns or audit). Full team CC'd (Rajiv, Nishanth, Arjun, Sean, Swapnesh). Awaiting Shiva's slot.",
     source: "Vinay led",
-    notes: "Initial proposal sent Aug 25 after a call, outlining a signal-led pipeline engine focused on target companies. Vinay followed up Aug 29 asking to bring the team in for a further scoping discussion, offering to schedule the following week - still awaiting a reply."
+    notes: "Initial proposal sent Aug 25 after a call. Vinay followed up Aug 29 asking to bring the team in for further scoping. Sep 7: sent a second, sharper follow-up with a concrete two-point agenda (assess fit, scope ICP/Signal/tech stack, decide campaigns vs audit) - team CC'd. Calendar link included."
   })) added++;
   if (addIfMissing({
     name: "Vipin Johnson", company: "Vipin Johnson (company not yet identified)", email: "vipinjohnson685@gmail.com",
@@ -676,6 +676,11 @@ function refreshProspectsFromGmail() {
     status: "Stalled", lastActivity: "2026-08-29",
     nextStep: "Two more follow-ups sent (Aug 24, Aug 29) with no response - Rajiv reached out Aug 29 to referral source Pinkesh (Delightloop) to check if Nirav is still interested",
     notes: "GTM plan shared May 26 targeting HR/People leaders in the Bay Area. Setup requirements and $600/mo + $100/meeting pricing discussed Jun 5. Full proposal doc sent Jul 21. Went quiet for a month. Vinay re-engaged Aug 24 asking to connect, then followed up again Aug 29 proposing a scoping discussion - still no response from Nirav. Rajiv forwarded the thread to Pinkesh (original referral source at Delightloop) same day to check whether Nirav is still interested."
+  })) updated++;
+  if (updateIfExists("Transact Bridge", {
+    status: "Follow-up Sent", lastActivity: "2026-09-07",
+    nextStep: "Vinay sent a second scoping-call follow-up Sep 7 (13:35) with a two-point agenda - realistically assess where GetGTM can help and scope ICP/Signal/tech-stack layers to decide next step (campaigns or audit). Full team CC'd (Rajiv, Nishanth, Arjun, Sean, Swapnesh). Awaiting Shiva's slot.",
+    notes: "Initial proposal sent Aug 25 after a call. Vinay followed up Aug 29 asking to bring the team in for further scoping. Sep 7: sent a second, sharper follow-up with a concrete two-point agenda (assess fit, scope ICP/Signal/tech stack, decide campaigns vs audit) - team CC'd. Calendar link included."
   })) updated++;
   if (updateIfExists("Inspiration Digital", {
     status: "Closed Lost", lastActivity: "2026-07-23",
