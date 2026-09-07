@@ -653,7 +653,7 @@ function refreshProspectsFromGmail() {
     notes: "Elizabeth introduced Alan Aug 25: trigger outreach from real-time buying signals, automate pipeline, build a steadier meeting calendar. Vinay replied same day asking about 2027 priorities with a calendar link - no response yet. Vinay sent a longer, more specific outreach Sep 2 referencing CLICK.BLUE's work helping UK founders and established businesses launch brands and digital products."
   })) updated++;
   if (updateIfExists("Shared Studios", {
-    status: "Deck Shared", lastActivity: "2026-09-07",
+    status: "Deck Shared", lastActivity: "2026-09-07", potentialValue: 2999,
     nextStep: "Vinay sent a positioning deck for Noro Sep 7 with an ask to review and connect - awaiting Tommaso's feedback",
     notes: "Tommaso (CEO/Co-founder) and Rajiv had a call Sep 1 (via Boardy.ai). Tommaso followed up sharing Shared Studios' own sales deck and video, said he'd shared getgtm with a colleague. Rajiv acknowledged Sep 2. Vinay joined the thread Sep 2 (loved the video, asked to catch up). Sep 7: Vinay sent a Noro-specific positioning deck (Swapnesh CC'd) with an ask to go over positioning together - active engaged state, not just warm."
   })) updated++;
@@ -663,9 +663,9 @@ function refreshProspectsFromGmail() {
     notes: "Call held Aug 21. Follow-up sent Aug 24 asking for current infra details and scheduling. Vinay followed up again Aug 29 introducing Swapnesh (Head of Customer Success) to lead the project, proposing to connect the following week."
   })) updated++;
   if (updateIfExists("CognitivTrust", {
-    status: "Converted", lastActivity: "2026-09-07",
-    nextStep: "DELIVERY FLAG (Sep 6): Yogesh flagged senior AI engineer leaving; Bangalore workshop next week is now priority. Swapnesh pulled in to lead delivery through the transition. SOW sent Sep 4 - awaiting countersign.",
-    notes: "Kickoff Aug 25. Onboarding call Sep 3 held. SOW sent Sep 4 for signing. Sep 6: Yogesh flagged a senior AI engineer departure and asked to prioritize the Bangalore workshop the following week by reallocating work - Vinay looped Swapnesh in Sep 7 to cover the workshop and lead delivery through the transition. Deal is signed but delivery timeline is compressed; watch closely."
+    status: "Proposal Sent", lastActivity: "2026-09-07",
+    nextStep: "SOW sent Sep 4 - awaiting countersign. DELIVERY FLAG (Sep 6): Yogesh flagged senior AI engineer leaving; Bangalore workshop next week is now priority. Swapnesh pulled in Sep 7 to lead delivery through the transition.",
+    notes: "Kickoff Aug 25 (pre-signing sync). Onboarding call Sep 3 held. SOW sent Sep 4 for signing - not yet countersigned. Sep 6: Yogesh flagged a senior AI engineer departure and asked to prioritize the Bangalore workshop the following week by reallocating work - Vinay looped Swapnesh in Sep 7 to cover the workshop and lead delivery through the transition. Delivery timeline is compressed; watch closely."
   })) updated++;
   if (updateIfExists("QNu Labs", {
     status: "Follow-up Sent", lastActivity: "2026-08-29",
@@ -2882,9 +2882,34 @@ function renderProspectsView() {
   const active = prospects.filter(p => !["Stalled","Closed Lost","Not a Fit","Converted"].includes(p.status)).length;
   const stalled = prospects.filter(p => p.status === "Stalled").length;
   const converted = prospects.filter(p => p.status === "Converted").length;
+  const signedMRR = prospects
+    .filter(p => p.status === "Converted")
+    .reduce((sum, p) => sum + (parseFloat(p.potentialValue) || 0), 0);
   const potentialMRR = prospects
     .filter(p => !["Stalled","Closed Lost","Not a Fit","Converted"].includes(p.status))
     .reduce((sum, p) => sum + (parseFloat(p.potentialValue) || 0), 0);
+
+  // Per-status breakdown: count + $/mo sum, in the same order as PROSPECT_STATUSES so
+  // the strip reads pipeline-left → closed-right rather than random. Only shows statuses
+  // that actually have prospects in them, so empty buckets don't clutter the strip.
+  const byStatus = {};
+  prospects.forEach(p => {
+    const s = p.status || "Unknown";
+    if (!byStatus[s]) byStatus[s] = { count: 0, mrr: 0 };
+    byStatus[s].count++;
+    byStatus[s].mrr += (parseFloat(p.potentialValue) || 0);
+  });
+  const statusOrder = PROSPECT_STATUSES.concat(Object.keys(byStatus).filter(s => PROSPECT_STATUSES.indexOf(s) === -1));
+  const statusChips = statusOrder
+    .filter(s => byStatus[s])
+    .map(s => {
+      const c = prospectStatusColor(s);
+      const b = byStatus[s];
+      return `<div style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;background:${c.bg};border:0.5px solid ${c.color}22">
+        <span style="font-size:11px;font-weight:600;color:${c.color}">${escapeHTML(s)}</span>
+        <span style="font-size:11px;color:${c.color};opacity:0.85">${b.count}${b.mrr ? ' · $' + b.mrr.toLocaleString() : ''}</span>
+      </div>`;
+    }).join("");
 
   return `
       <div class="kpis">
@@ -2892,8 +2917,16 @@ function renderProspectsView() {
         <div class="kpi"><div class="label">Active</div><div class="value">${active}</div></div>
         <div class="kpi"><div class="label">Stalled</div><div class="value" style="color:${stalled?'var(--danger)':'inherit'}">${stalled}</div></div>
         <div class="kpi"><div class="label">Converted</div><div class="value" style="color:var(--success)">${converted}</div></div>
-        <div class="kpi"><div class="label">Potential MRR if converted</div><div class="value" style="color:var(--brand)">$${potentialMRR.toLocaleString()}</div></div>
+        <div class="kpi"><div class="label">Signed MRR</div><div class="value" style="color:var(--success)">$${signedMRR.toLocaleString()}</div></div>
+        <div class="kpi"><div class="label">Potential MRR</div><div class="value" style="color:var(--brand)">$${potentialMRR.toLocaleString()}</div></div>
       </div>
+
+      ${statusChips ? `<div class="card" style="margin-top:12px">
+        <div style="padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <span class="small" style="color:var(--text-secondary);font-weight:600;margin-right:4px">By status:</span>
+          ${statusChips}
+        </div>
+      </div>` : ''}
 
       <div class="card">
         <div class="card-head">
@@ -5972,14 +6005,29 @@ function attachHandlers() {
   });
 
   document.querySelectorAll("[data-prospect]").forEach(el => {
-    var handler = function() {
+    var writeOnly = function() {
       var p = state.prospects.find(function(x) { return x.id === el.dataset.prospect; });
       if (!p) return;
       p[el.dataset.key] = el.value;
-      if (el.dataset.key === "status") { saveState(); render(); } else { save(); }
+      save();
     };
-    el.addEventListener("input", handler);
-    el.addEventListener("change", handler);
+    var writeAndRerender = function() {
+      var p = state.prospects.find(function(x) { return x.id === el.dataset.prospect; });
+      if (!p) return;
+      p[el.dataset.key] = el.value;
+      saveState(); render();
+    };
+    // Status is a badge now (no input event); potentialValue re-renders KPIs on blur/enter,
+    // not per keystroke, so focus isn't stolen while typing.
+    if (el.dataset.key === "potentialValue") {
+      el.addEventListener("input", writeOnly);
+      el.addEventListener("change", writeAndRerender);
+    } else if (el.dataset.key === "status") {
+      el.addEventListener("change", writeAndRerender);
+    } else {
+      el.addEventListener("input", writeOnly);
+      el.addEventListener("change", writeOnly);
+    }
   });
 
   // Auto-size any prospect textarea marked data-autosize: grow to fit content, no scrollbar.
