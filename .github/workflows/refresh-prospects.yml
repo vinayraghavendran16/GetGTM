@@ -1,0 +1,40 @@
+name: Refresh prospects from Gmail
+
+# Fired by the "Refresh from Gmail" button in the tracker via workflow_dispatch, and also runs
+# every 2 hours as a safety net so the pipeline view is never more than a couple hours stale.
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 */2 * * *"
+
+concurrency:
+  group: refresh-prospects
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install googleapis
+
+      - name: Run sweep
+        env:
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
+          FIREBASE_DATABASE_SECRET: ${{ secrets.FIREBASE_DATABASE_SECRET }}
+          SWEEP_DAYS: "14"
+        run: node scripts/refresh-prospects.mjs
