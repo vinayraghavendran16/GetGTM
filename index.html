@@ -2859,6 +2859,36 @@ var PROSPECT_STATUSES = ["New", "Contacted", "Follow-up Sent", "In Conversation"
   "Proposal Requested", "Proposal Sent", "Deck Shared", "Meeting Booked", "Scheduling",
   "Kickoff Scheduled", "Stalled", "Closed Lost", "Not a Fit", "Converted"];
 
+// Funnel-stage grouping used for sorting and section labels on the Prospects tab.
+// Lower rank = closer to signed = shown at the top. Dead statuses sink to the bottom.
+// Order within a bucket is by lastActivity desc so the most recently-touched deal in each
+// stage sits above the ones that haven't moved.
+var PROSPECT_FUNNEL_STAGE = {
+  "Converted":         { bucket: 0, label: "Signed",  color: "#15803d" },
+  "Kickoff Scheduled": { bucket: 1, label: "BOFU",    color: "#1d4ed8" },
+  "Meeting Booked":    { bucket: 1, label: "BOFU",    color: "#1d4ed8" },
+  "Proposal Sent":     { bucket: 1, label: "BOFU",    color: "#1d4ed8" },
+  "Proposal Requested":{ bucket: 1, label: "BOFU",    color: "#1d4ed8" },
+  "Deck Shared":       { bucket: 1, label: "BOFU",    color: "#1d4ed8" },
+  "In Conversation":   { bucket: 2, label: "MOFU",    color: "#b45309" },
+  "Objection Handling":{ bucket: 2, label: "MOFU",    color: "#b45309" },
+  "Scheduling":        { bucket: 2, label: "MOFU",    color: "#b45309" },
+  "Follow-up Sent":    { bucket: 2, label: "MOFU",    color: "#b45309" },
+  "Contacted":         { bucket: 3, label: "TOFU",    color: "#78716c" },
+  "New":               { bucket: 3, label: "TOFU",    color: "#78716c" },
+  "Stalled":           { bucket: 4, label: "Dead",    color: "#b91c1c" },
+  "Not a Fit":         { bucket: 4, label: "Dead",    color: "#b91c1c" },
+  "Closed Lost":       { bucket: 4, label: "Dead",    color: "#b91c1c" }
+};
+function prospectFunnelRank(status) {
+  var entry = PROSPECT_FUNNEL_STAGE[status];
+  return entry ? entry.bucket : 3; // unknown statuses treated as TOFU rather than Dead
+}
+function prospectFunnelLabel(status) {
+  var entry = PROSPECT_FUNNEL_STAGE[status];
+  return entry ? entry.label : "TOFU";
+}
+
 function prospectStatusColor(status) {
   if (status === "Converted") return { bg: "#dcfce7", color: "#15803d" };
   if (status === "Meeting Booked" || status === "Kickoff Scheduled") return { bg: "#dbeafe", color: "#1d4ed8" };
@@ -2883,7 +2913,11 @@ function fmtActivityDate(iso) {
 }
 
 function renderProspectsView() {
-  const prospects = (state.prospects || []).slice().sort((a,b) => (b.lastActivity||b.dateContacted||"").localeCompare(a.lastActivity||a.dateContacted||""));
+  const prospects = (state.prospects || []).slice().sort((a,b) => {
+    var rankA = prospectFunnelRank(a.status), rankB = prospectFunnelRank(b.status);
+    if (rankA !== rankB) return rankA - rankB;
+    return (b.lastActivity || b.dateContacted || "").localeCompare(a.lastActivity || a.dateContacted || "");
+  });
   const active = prospects.filter(p => !["Stalled","Closed Lost","Not a Fit","Converted"].includes(p.status)).length;
   const stalled = prospects.filter(p => p.status === "Stalled").length;
   const converted = prospects.filter(p => p.status === "Converted").length;
@@ -2937,6 +2971,7 @@ function renderProspectsView() {
         <div class="card-head">
           <h2>Prospects</h2>
           <div style="display:flex;gap:8px">
+            <button class="btn ghost sm" data-action="export-prospects-pdf">⬇ Export PDF</button>
             <button class="btn ghost sm" data-action="refresh-prospects">↻ Refresh from Gmail</button>
             <button class="btn" data-action="add-prospect">+ Add prospect</button>
           </div>
@@ -2954,31 +2989,49 @@ function renderProspectsView() {
                 <th>Name / Company</th><th>Contacted</th><th>Last activity</th><th>Status</th><th>Potential $/mo</th><th>Next step</th><th>Source</th><th></th>
               </tr></thead>
               <tbody>
-                ${prospects.map(p => {
-                  const matchedClient = Object.values(state.clients).find(c => c.name.trim().toLowerCase() === (p.company || "").trim().toLowerCase());
-                  const convertCell = p.status === "Converted"
-                    ? (matchedClient
-                        ? `<button class="btn ghost sm" onclick="window.openClient('${matchedClient.id}')">Open</button>`
-                        : `<span class="small" style="color:var(--text-muted)">Converted</span>`)
-                    : matchedClient
-                      ? `<button class="btn ghost sm" onclick="window.openClient('${matchedClient.id}')">Open</button>`
-                      : `<button class="btn sm" data-action="convert-prospect" data-id="${p.id}">Convert →</button>`;
-                  const sc = prospectStatusColor(p.status);
-                  return `
-                  <tr>
-                    <td style="vertical-align:top"><strong>${escapeHTML(p.name)}</strong><div class="small" style="word-wrap:break-word;overflow-wrap:break-word">${escapeHTML(p.company)}</div></td>
-                    <td style="vertical-align:top"><input type="date" data-prospect="${p.id}" data-key="dateContacted" value="${escapeAttr(p.dateContacted)}" style="border:none;background:transparent;padding:0;width:100%;font-size:11px"></td>
-                    <td style="vertical-align:top">${fmtActivityDate(p.lastActivity)}</td>
-                    <td style="vertical-align:top">
-                      <span class="status-badge" title="Auto-set by Gmail refresh" style="display:inline-block;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:600;background:${sc.bg};color:${sc.color};white-space:nowrap">${escapeHTML(p.status || "")}</span>
-                    </td>
-                    <td style="vertical-align:top"><input type="number" placeholder="-" data-prospect="${p.id}" data-key="potentialValue" value="${escapeAttr(p.potentialValue || "")}" style="width:100%;border:0.5px solid var(--border);border-radius:4px;padding:4px 6px;background:var(--surface-1);font-size:12px"></td>
-                    <td style="vertical-align:top"><textarea data-prospect="${p.id}" data-key="nextStep" data-autosize="1" rows="1" style="width:100%;border:0.5px solid var(--border);border-radius:4px;padding:6px 8px;background:var(--surface-1);font:inherit;font-size:12px;resize:none;overflow:hidden;white-space:pre-wrap;word-wrap:break-word;line-height:1.4;display:block">${escapeHTML(p.nextStep || "")}</textarea></td>
-                    <td style="vertical-align:top"><div class="small" style="word-wrap:break-word;overflow-wrap:break-word">${escapeHTML(p.source)}</div></td>
-                    <td style="vertical-align:top"><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">${convertCell}<button class="btn ghost sm" data-action="delete-prospect" data-id="${p.id}" style="padding:2px 6px">&#128465;</button></div></td>
-                  </tr>
-                  ${p.notes ? `<tr><td colspan="8" style="padding-top:0"><div class="small" style="color:var(--text-muted);padding:0 0 8px;white-space:normal;word-wrap:break-word">${escapeHTML(p.notes)}</div></td></tr>` : ""}
-                `;}).join("")}
+                ${(() => {
+                  var rows = "";
+                  var lastLabel = null;
+                  prospects.forEach(function(p) {
+                    var label = prospectFunnelLabel(p.status);
+                    if (label !== lastLabel) {
+                      var color = (PROSPECT_FUNNEL_STAGE[p.status] || {}).color || "#78716c";
+                      var subtitle = label === "Signed"  ? "Closed-won, in delivery"
+                                   : label === "BOFU"    ? "Late stage - proposal, deck, meeting"
+                                   : label === "MOFU"    ? "Mid stage - in conversation, handling objections"
+                                   : label === "TOFU"    ? "Early stage - new outreach, awaiting first reply"
+                                   :                       "Stalled or closed";
+                      rows += '<tr class="funnel-header"><td colspan="8" style="background:var(--surface-1);padding:10px 12px;border-top:0.5px solid var(--border);border-bottom:0.5px solid var(--border)">'
+                            + '<span style="display:inline-block;padding:2px 8px;border-radius:4px;background:' + color + '22;color:' + color + ';font-size:11px;font-weight:700;letter-spacing:0.5px">' + label + '</span>'
+                            + '<span class="small" style="margin-left:10px;color:var(--text-secondary)">' + subtitle + '</span>'
+                            + '</td></tr>';
+                      lastLabel = label;
+                    }
+                    var matchedClient = Object.values(state.clients).find(function(c) { return c.name.trim().toLowerCase() === (p.company || "").trim().toLowerCase(); });
+                    var convertCell = p.status === "Converted"
+                      ? (matchedClient
+                          ? '<button class="btn ghost sm" onclick="window.openClient(\'' + matchedClient.id + '\')">Open</button>'
+                          : '<span class="small" style="color:var(--text-muted)">Converted</span>')
+                      : matchedClient
+                        ? '<button class="btn ghost sm" onclick="window.openClient(\'' + matchedClient.id + '\')">Open</button>'
+                        : '<button class="btn sm" data-action="convert-prospect" data-id="' + p.id + '">Convert →</button>';
+                    var sc = prospectStatusColor(p.status);
+                    rows += '<tr>'
+                          + '<td style="vertical-align:top"><strong>' + escapeHTML(p.name) + '</strong><div class="small" style="word-wrap:break-word;overflow-wrap:break-word">' + escapeHTML(p.company) + '</div></td>'
+                          + '<td style="vertical-align:top"><input type="date" data-prospect="' + p.id + '" data-key="dateContacted" value="' + escapeAttr(p.dateContacted) + '" style="border:none;background:transparent;padding:0;width:100%;font-size:11px"></td>'
+                          + '<td style="vertical-align:top">' + fmtActivityDate(p.lastActivity) + '</td>'
+                          + '<td style="vertical-align:top"><span class="status-badge" title="Auto-set by Gmail refresh" style="display:inline-block;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:600;background:' + sc.bg + ';color:' + sc.color + ';white-space:nowrap">' + escapeHTML(p.status || "") + '</span></td>'
+                          + '<td style="vertical-align:top"><input type="number" placeholder="-" data-prospect="' + p.id + '" data-key="potentialValue" value="' + escapeAttr(p.potentialValue || "") + '" style="width:100%;border:0.5px solid var(--border);border-radius:4px;padding:4px 6px;background:var(--surface-1);font-size:12px"></td>'
+                          + '<td style="vertical-align:top"><textarea data-prospect="' + p.id + '" data-key="nextStep" data-autosize="1" rows="1" style="width:100%;border:0.5px solid var(--border);border-radius:4px;padding:6px 8px;background:var(--surface-1);font:inherit;font-size:12px;resize:none;overflow:hidden;white-space:pre-wrap;word-wrap:break-word;line-height:1.4;display:block">' + escapeHTML(p.nextStep || "") + '</textarea></td>'
+                          + '<td style="vertical-align:top"><div class="small" style="word-wrap:break-word;overflow-wrap:break-word">' + escapeHTML(p.source) + '</div></td>'
+                          + '<td style="vertical-align:top"><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">' + convertCell + '<button class="btn ghost sm" data-action="delete-prospect" data-id="' + p.id + '" style="padding:2px 6px">&#128465;</button></div></td>'
+                          + '</tr>';
+                    if (p.notes) {
+                      rows += '<tr><td colspan="8" style="padding-top:0"><div class="small" style="color:var(--text-muted);padding:0 0 8px;white-space:normal;word-wrap:break-word">' + escapeHTML(p.notes) + '</div></td></tr>';
+                    }
+                  });
+                  return rows;
+                })()}
               </tbody>
             </table>
           `}
@@ -4880,6 +4933,141 @@ function generateResponsesPDF() {
   renderHtmlToPdf(html, opt);
 }
 
+// Prospects PDF: grouped by funnel stage (BOFU top, TOFU bottom, Dead at end), with a metrics
+// block on page 1 (totals, active/stalled/converted, signed MRR, potential MRR, per-status
+// breakdown) and the full table starting on page 2. Mirrors the Response Tracker report style
+// so all exports feel consistent.
+function buildProspectsReportHTML() {
+  var accentColor = "#7c3aed";
+  var prospects = (state.prospects || []).slice().sort(function(a, b) {
+    var rankA = prospectFunnelRank(a.status), rankB = prospectFunnelRank(b.status);
+    if (rankA !== rankB) return rankA - rankB;
+    return (b.lastActivity || b.dateContacted || "").localeCompare(a.lastActivity || a.dateContacted || "");
+  });
+
+  var active = prospects.filter(function(p) { return ["Stalled","Closed Lost","Not a Fit","Converted"].indexOf(p.status) === -1; }).length;
+  var stalled = prospects.filter(function(p) { return p.status === "Stalled"; }).length;
+  var converted = prospects.filter(function(p) { return p.status === "Converted"; }).length;
+  var signedMRR = prospects.filter(function(p) { return p.status === "Converted"; })
+    .reduce(function(s, p) { return s + (parseFloat(p.potentialValue) || 0); }, 0);
+  var potentialMRR = prospects.filter(function(p) { return ["Stalled","Closed Lost","Not a Fit","Converted"].indexOf(p.status) === -1; })
+    .reduce(function(s, p) { return s + (parseFloat(p.potentialValue) || 0); }, 0);
+
+  var byStatus = {};
+  prospects.forEach(function(p) {
+    var s = p.status || "Unknown";
+    if (!byStatus[s]) byStatus[s] = { count: 0, mrr: 0 };
+    byStatus[s].count++;
+    byStatus[s].mrr += (parseFloat(p.potentialValue) || 0);
+  });
+
+  function metricCard(label, value, color) {
+    return '<div style="flex:1;border:0.5px solid #e5e7eb;border-radius:6px;padding:12px 14px">' +
+      '<div style="font-size:9px;color:#94a3b8;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:4px">' + escapeHTML(label) + '</div>' +
+      '<div style="font-size:20px;font-weight:700;color:' + (color || "#111") + '">' + value + '</div>' +
+      '</div>';
+  }
+
+  var metricsHtml = '<div style="display:flex;gap:10px;margin-bottom:14px">' +
+    metricCard("Total", String(prospects.length), "#111") +
+    metricCard("Active", String(active), "#111") +
+    metricCard("Stalled", String(stalled), stalled ? "#b91c1c" : "#111") +
+    metricCard("Converted", String(converted), "#15803d") +
+    metricCard("Signed MRR", "$" + signedMRR.toLocaleString(), "#15803d") +
+    metricCard("Potential MRR", "$" + potentialMRR.toLocaleString(), accentColor) +
+    '</div>';
+
+  var breakdownRows = PROSPECT_STATUSES.concat(Object.keys(byStatus).filter(function(s) { return PROSPECT_STATUSES.indexOf(s) === -1; }))
+    .filter(function(s) { return byStatus[s]; })
+    .map(function(s) {
+      var c = prospectStatusColor(s);
+      var b = byStatus[s];
+      return '<tr>' +
+        '<td style="padding:5px 8px;border-bottom:0.5px solid #eee;font-size:10px"><span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:9px;font-weight:600;background:' + c.bg + ';color:' + c.color + '">' + escapeHTML(s) + '</span></td>' +
+        '<td style="padding:5px 8px;border-bottom:0.5px solid #eee;font-size:10px;text-align:right">' + b.count + '</td>' +
+        '<td style="padding:5px 8px;border-bottom:0.5px solid #eee;font-size:10px;text-align:right">' + (b.mrr ? "$" + b.mrr.toLocaleString() : "-") + '</td>' +
+        '<td style="padding:5px 8px;border-bottom:0.5px solid #eee;font-size:10px">' + escapeHTML(prospectFunnelLabel(s)) + '</td>' +
+        '</tr>';
+    }).join("");
+
+  var breakdownHtml = '<div style="margin-bottom:16px">' +
+    '<div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:6px">Pipeline by status</div>' +
+    '<table style="width:100%;border-collapse:collapse">' +
+    '<thead><tr>' +
+    '<th style="text-align:left;padding:5px 8px;font-size:9px;color:#64748b;border-bottom:1px solid #e5e7eb">STATUS</th>' +
+    '<th style="text-align:right;padding:5px 8px;font-size:9px;color:#64748b;border-bottom:1px solid #e5e7eb">COUNT</th>' +
+    '<th style="text-align:right;padding:5px 8px;font-size:9px;color:#64748b;border-bottom:1px solid #e5e7eb">POTENTIAL $/MO</th>' +
+    '<th style="text-align:left;padding:5px 8px;font-size:9px;color:#64748b;border-bottom:1px solid #e5e7eb">STAGE</th>' +
+    '</tr></thead><tbody>' + breakdownRows + '</tbody></table></div>';
+
+  // Table body: group headers between funnel-stage buckets, one row per prospect.
+  var tableRows = "";
+  var lastLabel = null;
+  prospects.forEach(function(p) {
+    var label = prospectFunnelLabel(p.status);
+    if (label !== lastLabel) {
+      var color = (PROSPECT_FUNNEL_STAGE[p.status] || {}).color || "#78716c";
+      tableRows += '<tr><td colspan="6" style="padding:10px 8px 4px;background:#f8f7f5;border-top:1px solid #e5e7eb">' +
+        '<span style="display:inline-block;padding:2px 8px;border-radius:4px;background:' + color + '22;color:' + color + ';font-size:10px;font-weight:700;letter-spacing:0.5px">' + label + '</span>' +
+        '</td></tr>';
+      lastLabel = label;
+    }
+    var sc = prospectStatusColor(p.status);
+    tableRows += '<tr>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #eee;font-size:10px;vertical-align:top"><strong>' + escapeHTML(p.name) + '</strong><div style="color:#64748b;font-size:9px">' + escapeHTML(p.company) + '</div></td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #eee;font-size:9px;vertical-align:top;color:#64748b">' + escapeHTML(p.lastActivity || p.dateContacted || "-") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #eee;vertical-align:top"><span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:9px;font-weight:600;background:' + sc.bg + ';color:' + sc.color + '">' + escapeHTML(p.status || "") + '</span></td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #eee;font-size:10px;vertical-align:top;text-align:right">' + (p.potentialValue ? "$" + parseFloat(p.potentialValue).toLocaleString() : "-") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #eee;font-size:9px;vertical-align:top;line-height:1.4">' + escapeHTML(p.nextStep || "") + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:0.5px solid #eee;font-size:9px;vertical-align:top;color:#64748b">' + escapeHTML(p.source || "") + '</td>' +
+      '</tr>';
+    if (p.notes) {
+      tableRows += '<tr><td colspan="6" style="padding:0 8px 8px;border-bottom:0.5px solid #eee;font-size:9px;color:#94a3b8;line-height:1.4">' + escapeHTML(p.notes) + '</td></tr>';
+    }
+  });
+
+  var generatedStamp = 'GetGTM Report generated on ' + new Date().toLocaleDateString("en-US", {year:"numeric",month:"long",day:"numeric"}) + ' at ' + new Date().toLocaleTimeString("en-US", {hour:"2-digit",minute:"2-digit"});
+
+  return '<div style="font-family:Helvetica,Arial,sans-serif;color:#111">' +
+    // Page 1: summary + per-status breakdown
+    '<div style="padding:28px 28px 0">' +
+    '<h1 style="font-size:19px;margin:0 0 4px;color:' + accentColor + '">Prospects</h1>' +
+    '<div style="font-size:10px;color:#94a3b8;margin-bottom:20px">' + escapeHTML(generatedStamp) + ' - ' + prospects.length + ' prospect' + (prospects.length !== 1 ? 's' : '') + ', sorted BOFU → TOFU</div>' +
+    metricsHtml +
+    breakdownHtml +
+    '</div>' +
+    // Page 2+: full detail table grouped by funnel stage
+    '<div style="page-break-before:always;padding:28px">' +
+    '<h2 style="font-size:14px;margin:0 0 12px;color:' + accentColor + '">All prospects (by funnel stage)</h2>' +
+    '<table style="width:100%;border-collapse:collapse;table-layout:fixed">' +
+    '<colgroup>' +
+    '<col style="width:15%"><col style="width:9%"><col style="width:11%"><col style="width:9%"><col style="width:34%"><col style="width:22%">' +
+    '</colgroup>' +
+    '<thead><tr>' +
+    '<th style="text-align:left;padding:8px;font-size:9px;color:#64748b;border-bottom:1px solid #e5e7eb;background:#f8f7f5">NAME / COMPANY</th>' +
+    '<th style="text-align:left;padding:8px;font-size:9px;color:#64748b;border-bottom:1px solid #e5e7eb;background:#f8f7f5">LAST ACTIVITY</th>' +
+    '<th style="text-align:left;padding:8px;font-size:9px;color:#64748b;border-bottom:1px solid #e5e7eb;background:#f8f7f5">STATUS</th>' +
+    '<th style="text-align:right;padding:8px;font-size:9px;color:#64748b;border-bottom:1px solid #e5e7eb;background:#f8f7f5">$/MO</th>' +
+    '<th style="text-align:left;padding:8px;font-size:9px;color:#64748b;border-bottom:1px solid #e5e7eb;background:#f8f7f5">NEXT STEP</th>' +
+    '<th style="text-align:left;padding:8px;font-size:9px;color:#64748b;border-bottom:1px solid #e5e7eb;background:#f8f7f5">SOURCE</th>' +
+    '</tr></thead>' +
+    '<tbody>' + tableRows + '</tbody></table>' +
+    '</div></div>';
+}
+
+function generateProspectsPDF() {
+  var html = buildProspectsReportHTML();
+  var opt = {
+    margin: 10,
+    filename: 'Prospects_' + new Date().toISOString().slice(0,10) + '.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+    pagebreak: { mode: ['css', 'legacy'] }
+  };
+  renderHtmlToPdf(html, opt);
+}
+
 function generateProposalPDF(c) {
   var html = buildProposalHTML(c, true);
   var filename = c.name.replace(/[^a-zA-Z0-9]+/g, '_') + '_x_GetGTM_Initial_Proposal.pdf';
@@ -5464,6 +5652,7 @@ function attachHandlers() {
       }
       else if (action === "docs-tab") { ui.docsTab = el.dataset.docsTab; render(); }
       else if (action === "docs-export-pdf") { generateDocsPDF(); }
+      else if (action === "export-prospects-pdf") { generateProspectsPDF(); }
       else if (action === "new-client") { ui.modal = { type: "new-client" }; render(); }
       else if (action === "delete-client") {
         var cl = state.clients[el.dataset.id];
@@ -5758,18 +5947,105 @@ function attachHandlers() {
         }
       }
       else if (action === "refresh-prospects") {
-        var result = refreshProspectsFromGmail();
-        state.lastGmailRefresh = new Date().toLocaleDateString("en-US", {year:"numeric",month:"short",day:"numeric"});
-        await saveState("prospects");
-        render();
-        if (result.added > 0 || result.updated > 0) {
-          var parts = [];
-          if (result.added > 0) parts.push(result.added + " new prospect" + (result.added > 1 ? "s" : ""));
-          if (result.updated > 0) parts.push(result.updated + " updated with newer activity");
-          alert(parts.join(", ") + ".");
-        } else {
-          alert("No changes found. This checks against threads I already know about - ask Claude in chat to search Gmail fresh, and I'll add or update anything new the same way.");
-        }
+        // Live Gmail refresh via GitHub Actions - mirrors the Drive refresh flow.
+        //
+        // (1) Fully wired: if the team has stored a prospects-refresh config in Firebase, POST to
+        //     the workflow_dispatch API. The backend runs Node script scripts/refresh-prospects.mjs,
+        //     which sweeps Gmail via the Gmail API, extracts prospect updates via the Anthropic API,
+        //     writes them to Firebase, and the tracker picks up new rows live via the existing
+        //     Firebase subscription - no reload needed. 30-60 seconds end-to-end.
+        //
+        // (2) Not yet wired: opens the Actions page in a new tab so the user can hit "Run workflow"
+        //     manually. Same end result, one extra click.
+        //
+        // (3) Fallback: if the user has not set up the backend at all, offer to run the static
+        //     addIfMissing/updateIfExists sweep from this HTML file - what "refresh" used to do
+        //     before the backend existed. Honest label, no misleading UI.
+        //
+        // Config path is separate from Drive so the two backends can point at different repos or
+        // workflows if needed.
+        (async function() {
+          var configRef = (typeof db !== "undefined" && db && db.ref) ? db.ref("getgtm_tracker/config/githubDispatchProspects") : null;
+          var cfg = null;
+          if (configRef) {
+            try {
+              var snap = await configRef.once("value");
+              cfg = snap.val();
+            } catch (e) { /* fall through to prompt path */ }
+          }
+
+          if (!cfg || !cfg.repo || !cfg.token || !cfg.workflow) {
+            // First-time setup - offer either backend config or the static-only fallback.
+            var choice = prompt(
+              "Refresh from Gmail - first time setup.\n\n" +
+              "The backend Gmail sweep runs as a GitHub Actions workflow that reads your Gmail via the Gmail API, " +
+              "extracts prospect updates using Claude, and writes them to Firebase.\n\n" +
+              "Enter the backend repo path in owner/name format (e.g. vinayraghavendran16/getgtm-backend) to wire it now, " +
+              "or type 'stub' to just re-run the last static sweep Claude prepared in this HTML file.",
+              "vinayraghavendran16/getgtm-backend"
+            );
+            if (!choice) return;
+            if (choice.trim().toLowerCase() === "stub") {
+              var result = refreshProspectsFromGmail();
+              state.lastGmailRefresh = new Date().toLocaleDateString("en-US", {year:"numeric",month:"short",day:"numeric"}) + " (static)";
+              await saveState("prospects");
+              render();
+              var parts = [];
+              if (result.added > 0) parts.push(result.added + " added");
+              if (result.updated > 0) parts.push(result.updated + " updated");
+              alert(parts.length ? parts.join(", ") + " from the static sweep." : "No changes - this only replays what Claude prepared in this HTML file. Ask in chat to do a fresh Gmail search, or wire the backend to make this button live.");
+              return;
+            }
+            var repo = choice.trim();
+            var workflow = prompt("Workflow filename to trigger:", "refresh-prospects.yml");
+            if (!workflow) return;
+            var token = prompt(
+              "GitHub Personal Access Token with actions:write scope for that repo.\n\n" +
+              "Create one at https://github.com/settings/tokens?type=beta - restrict to the single backend repo, " +
+              "permission: Actions = Read and write. Stored in Firebase for the whole team."
+            );
+            if (!token) return;
+            var branch = prompt("Branch to run the workflow on:", "main") || "main";
+            cfg = { repo: repo, workflow: workflow.trim(), token: token.trim(), branch: branch.trim() };
+            if (configRef) {
+              try { await configRef.set(cfg); } catch (e) { console.warn("Could not persist dispatch config:", e.message); }
+            }
+          }
+
+          // Fire the workflow. GitHub returns 204 No Content on success, 401/403/404 on auth/path errors.
+          var url = "https://api.github.com/repos/" + cfg.repo + "/actions/workflows/" + cfg.workflow + "/dispatches";
+          try {
+            var res = await fetch(url, {
+              method: "POST",
+              headers: {
+                "Accept": "application/vnd.github+json",
+                "Authorization": "Bearer " + cfg.token,
+                "X-GitHub-Api-Version": "2022-11-28",
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({ ref: cfg.branch || "main" })
+            });
+            if (res.status === 204) {
+              alert("Triggered ✓ The backend is scanning Gmail now. New rows and updated statuses will appear here in 30-60 seconds - no reload needed.");
+            } else if (res.status === 401 || res.status === 403) {
+              if (confirm("GitHub rejected the token (" + res.status + "). Reset the setup and try again?")) {
+                if (configRef) await configRef.remove();
+              }
+            } else if (res.status === 404) {
+              if (confirm("Not found (404) - the repo path or workflow filename is wrong. Reset the setup and try again?")) {
+                if (configRef) await configRef.remove();
+              }
+            } else {
+              var body = "";
+              try { body = await res.text(); } catch (e) {}
+              alert("GitHub returned " + res.status + ". Response: " + body.slice(0, 200));
+            }
+          } catch (err) {
+            if (confirm("Could not reach the GitHub API from the browser (" + err.message + "). Open the Actions page in a new tab instead so you can Run workflow manually?")) {
+              window.open("https://github.com/" + cfg.repo + "/actions/workflows/" + cfg.workflow, "_blank");
+            }
+          }
+        })();
       }
       else if (action === "modal-close") { ui.modal = null; render(); }
       else if (action === "modal-create") {
