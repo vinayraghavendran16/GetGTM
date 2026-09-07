@@ -613,6 +613,27 @@ function refreshProspectsFromGmail() {
     source: "Rajiv led (personal intro)",
     notes: "Rajiv introduced Vipin Aug 26 for webinar pre/post GTM motion services and handed off to Vinay. Vipin used a personal Gmail address with no company mentioned in the thread - worth confirming who he represents. Some back-and-forth on scheduling (Vinay was at a hospital that day, pushed to evening) - unclear if the call actually happened."
   })) added++;
+  if (addIfMissing({
+    name: "Gaurav", company: "The Elevate", email: "gaurav@theelevate.co.in",
+    dateContacted: "2026-09-01", status: "In Conversation",
+    nextStep: "Gaurav clarified Sep 1 that he wants an agency (not consulting) to help enter new markets/segments on a success-based engagement - respond with GetGTM's new-market entry motion, not the Heddl self-serve pitch",
+    source: "Heddl x The Elevate thread (Sean led, Vinay CC'd)",
+    notes: "Prospect wants a success-based partnership with an agency to help The Elevate enter new markets/segments - explicitly not another consulting engagement. Positioned via Heddl thread initially; response needs to reframe from Heddl self-serve to the GetGTM managed-service outbound motion for market/segment expansion."
+  })) added++;
+  if (addIfMissing({
+    name: "Vipin Johnson", company: "LatentForce.ai", email: "vipin.johnson@latentforce.ai",
+    dateContacted: "2026-09-02", status: "Proposal Sent",
+    nextStep: "Sean sent Heddl first-month discounted trial proposal Sep 2 - awaiting Vipin's decision on onboarding",
+    source: "Sean led (Heddl motion)",
+    notes: "Heddl platform pitch with Vipin Johnson (LatentForce.ai) and Shruti K on the thread. Sean sent the first-month discounted trial proposal Sep 2 with an ask to onboard. Note: might be the same Vipin as the earlier 'company not yet identified' entry from Aug 26 - worth reconciling once he engages."
+  })) added++;
+  if (addIfMissing({
+    name: "Shota Atago", company: "Ant Capital Partners (Takumi)", email: "shota.atago@takumi.best",
+    dateContacted: "2026-09-03", status: "Meeting Booked",
+    nextStep: "Meeting confirmed for Sep 15, 1:10 PM IST (4:40 PM JST) - Shota asked for agenda pre-brief, needs a short 'what we'll discuss' note",
+    source: "Inbound (Shota booked directly via Vinay's calendar link)",
+    notes: "Shota Atago booked a 25-min slot Sep 3 via Vinay's calendar - agenda listed as 'Ant Capital Partners x GetGTM'. Shota shared his LinkedIn and asked Sep 3 what Vinay would want to talk about before the meeting - needs a short reply outlining scope."
+  })) added++;
 
   // Update existing prospects when their Gmail thread has moved since we last checked.
   // Only touches status/nextStep/notes - never overwrites name/company/email/dateContacted/source,
@@ -632,9 +653,9 @@ function refreshProspectsFromGmail() {
     notes: "Elizabeth introduced Alan Aug 25: trigger outreach from real-time buying signals, automate pipeline, build a steadier meeting calendar. Vinay replied same day asking about 2027 priorities with a calendar link - no response yet. Vinay sent a longer, more specific outreach Sep 2 referencing CLICK.BLUE's work helping UK founders and established businesses launch brands and digital products."
   })) updated++;
   if (updateIfExists("Shared Studios", {
-    status: "Warm - Call Requested",
-    nextStep: "Vinay replied warmly Sep 2 (loved the video) and asked to book a call - awaiting Tommaso's slot",
-    notes: "Tommaso (CEO/Co-founder) and Rajiv had a call Sep 1 (via Boardy.ai). Tommaso followed up sharing Shared Studios' own sales deck and a video, said he'd shared getgtm with a colleague. Rajiv acknowledged same day. Vinay then joined the thread Sep 2, said he loved the video, and asked to catch up soon with a calendar link - warmer signal than the prior 'awaiting internal discussion' state."
+    status: "Deck Shared",
+    nextStep: "Vinay sent a positioning deck for Noro Sep 7 with an ask to review and connect - awaiting Tommaso's feedback",
+    notes: "Tommaso (CEO/Co-founder) and Rajiv had a call Sep 1 (via Boardy.ai). Tommaso followed up sharing Shared Studios' own sales deck and video, said he'd shared getgtm with a colleague. Rajiv acknowledged Sep 2. Vinay joined the thread Sep 2 (loved the video, asked to catch up). Sep 7: Vinay sent a Noro-specific positioning deck (Swapnesh CC'd) with an ask to go over positioning together - active engaged state, not just warm."
   })) updated++;
   if (updateIfExists("Rescribe (Scorg Technologies)", {
     status: "Follow-up Sent",
@@ -643,8 +664,8 @@ function refreshProspectsFromGmail() {
   })) updated++;
   if (updateIfExists("CognitivTrust", {
     status: "Converted",
-    nextStep: "Kickoff completed Aug 25 - now tracked in the Delivery tab of the CognitivTrust engagement",
-    notes: "Kickoff call held Aug 25 (rescheduled once same-morning after brief timing confusion - Yogesh proposed 12:30pm after an initial 10:30am slot mix-up). Fireflies meeting recap generated. Now converted and being tracked as a signed client."
+    nextStep: "DELIVERY FLAG (Sep 6): Yogesh flagged senior AI engineer leaving; Bangalore workshop next week is now priority. Swapnesh pulled in to lead delivery through the transition. SOW sent Sep 4 - awaiting countersign.",
+    notes: "Kickoff Aug 25. Onboarding call Sep 3 held. SOW sent Sep 4 for signing. Sep 6: Yogesh flagged a senior AI engineer departure and asked to prioritize the Bangalore workshop the following week by reallocating work - Vinay looped Swapnesh in Sep 7 to cover the workshop and lead delivery through the transition. Deal is signed but delivery timeline is compressed; watch closely."
   })) updated++;
   if (updateIfExists("QNu Labs", {
     status: "Follow-up Sent",
@@ -2554,6 +2575,11 @@ function renderReleaseNotes() {
     <div class="rel-entry">
       <h3>Fix: client Campaigns/Responses tabs were empty for real clients</h3>
       <p>The new client-facing Campaigns and Responses tabs relied on data (<code>responses</code>, <code>campaigns</code>) that was only ever synced to the browser after signing in as team - an anonymous client's browser never even asked for it, regardless of what the Firebase rules allowed. Both now sync for everyone, the same way client records and calling leads already did. Firebase rules for <code>responses</code> and <code>campaigns</code> also opened up to match (read/write for anyone with the link, same trust model as the rest of the client-facing data).</p>
+    </div>
+
+    <div class="rel-entry">
+      <h3>Prospects: Sep 7 Gmail refresh</h3>
+      <p>Added three new prospects surfaced from a fresh Gmail sweep of vinay@ and rajiv@: <strong>The Elevate</strong> (Gaurav - success-based agency engagement for new-market entry), <strong>LatentForce.ai</strong> (Vipin Johnson - Sean sent Heddl first-month trial proposal Sep 2), and <strong>Ant Capital Partners / Takumi</strong> (Shota Atago - meeting booked Sep 15 IST). Updated <strong>CognitivTrust</strong> with a delivery-risk flag (Sep 6: Yogesh flagged a senior AI eng departure and re-prioritized the Bangalore workshop; Swapnesh pulled in Sep 7; SOW sent Sep 4 awaiting countersign) and <strong>Shared Studios</strong> from "Call Requested" to "Deck Shared" (Sep 7 Noro positioning deck sent). Pintel was intentionally excluded from this sweep.</p>
     </div>
 
     <div class="rel-entry">
